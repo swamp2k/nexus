@@ -11,17 +11,17 @@
     "check": "tsc -b --pretty false"
   },
   "dependencies": {
-    "@vitejs/plugin-react": "latest",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "^1.54.1",
-    "@cloudflare/workers-types": "latest",
-    "@types/react": "latest",
-    "@types/react-dom": "latest",
-    "typescript": "latest",
+    "@cloudflare/workers-types": "^5.20260827.1",
+    "@types/react": "^19.2.18",
+    "@types/react-dom": "^19.2.5",
+    "@vitejs/plugin-react": "^6.1.0",
+    "typescript": "^7.0.2",
     "vite": "^8.2.2",
-    "wrangler": "latest"
+    "wrangler": "^4.126.0"
   }
 }
