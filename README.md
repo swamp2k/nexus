@@ -13,17 +13,20 @@ The goal is not to replace those systems. Nexus is the presentation, integration
 - **KISS over architecture theatre.** Prefer a modular monolith and boring infrastructure over unnecessary microservices.
 - **Data stays useful outside the source system.** Imported data should be normalized where practical so Nexus can analyse and combine it across modules.
 
-## Initial platform direction
+## Platform
 
-Target stack:
+Phase 0 stack is intentionally conservative:
 
-- Cloudflare-hosted web/PWA frontend
+- React + TypeScript
+- Vite
+- Cloudflare Vite plugin
 - Cloudflare Worker API
-- D1 for structured application and normalized module data
+- Cloudflare static assets / SPA routing
+- D1 for structured application and normalized module data when storage is introduced
 - R2 for large/raw imports such as Garmin exports, FIT, TCX, GPX, JSON, and other blobs
 - Cron / Queues only where they solve a concrete requirement
 
-The exact frontend framework and authentication implementation are intentionally not locked yet.
+Authentication is deliberately not selected yet. It will be chosen as its own decision because the login flow must be both secure and simple enough for non-technical family members.
 
 ## MVP
 
@@ -62,6 +65,8 @@ Initial data domains may include:
 
 Raw Garmin exports should be retained separately from normalized data so imports can be reprocessed later without requiring another export.
 
-## Repository status
+## Current status
 
-Architecture and data modelling come before feature implementation. See `docs/ARCHITECTURE.md` and `docs/MVP.md`.
+Phase 0 bootstrap is in progress. The repository contains the React/TypeScript shell, Cloudflare Worker entry point, SPA routing configuration, initial PWA metadata, and a minimal `/api/health` endpoint.
+
+See `docs/ARCHITECTURE.md` and `docs/MVP.md` for the wider plan.
