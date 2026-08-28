@@ -52,6 +52,10 @@ function cleanRecord(record: unknown): EnergyPricePoint | null {
   };
 }
 
+function normalizePriceArea(value: string | undefined): "DK1" | "DK2" {
+  return String(value ?? "DK1").toUpperCase() === "DK2" ? "DK2" : "DK1";
+}
+
 async function fetchEnergyPrices(area: string): Promise<EnergyPriceData> {
   const start = new Date();
   start.setUTCDate(start.getUTCDate() - 1);
@@ -98,7 +102,7 @@ export async function getEnergyPrices(env: Env & { ENERGY_PRICE_AREA?: string })
   const cached = await readSourceCache<EnergyPriceData>(env.DB, CACHE_KEY);
   if (cached && !cached.stale) return cached;
 
-  const area = env.ENERGY_PRICE_AREA === "DK2" ? "DK2" : "DK1";
+  const area = normalizePriceArea(env.ENERGY_PRICE_AREA);
 
   try {
     const data = await fetchEnergyPrices(area);
