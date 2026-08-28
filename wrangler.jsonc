@@ -6,5 +6,13 @@
   "assets": {
     "not_found_handling": "single-page-application",
     "run_worker_first": ["/api/*"]
-  }
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "nexus",
+      "database_id": "e2d4b9fe-1d9b-4e24-9f48-6cf54fa758df",
+      "migrations_dir": "migrations"
+    }
+  ]
 }
