@@ -206,8 +206,14 @@ async function completeUpload(request: Request, env: Env): Promise<Response> {
       id: importId,
       filename,
       sizeBytes: object.size,
+      contentType,
       status: "uploaded",
+      fileCount: null,
+      detectedFrom: null,
+      detectedTo: null,
+      errorMessage: null,
       createdAt: now,
+      updatedAt: now,
     },
   }, { status: 201 });
 }
@@ -238,8 +244,17 @@ async function listImports(request: Request, env: Env): Promise<Response> {
   if (!user) return json({ error: "unauthorized" }, { status: 401 });
 
   const result = await env.DB.prepare(
-    `SELECT id, source_filename, source_size_bytes, source_content_type, status,
-            file_count, detected_from, detected_to, error_message, created_at, updated_at
+    `SELECT id,
+            source_filename AS filename,
+            source_size_bytes AS sizeBytes,
+            source_content_type AS contentType,
+            status,
+            file_count AS fileCount,
+            detected_from AS detectedFrom,
+            detected_to AS detectedTo,
+            error_message AS errorMessage,
+            created_at AS createdAt,
+            updated_at AS updatedAt
      FROM garmin_imports
      WHERE user_id = ?
      ORDER BY created_at DESC
