@@ -4,7 +4,8 @@
   "compatibility_date": "2026-08-27",
   "main": "./worker/index.ts",
   "vars": {
-    "MAIL_FROM": "login@nexus.starrewards.app"
+    "MAIL_FROM": "login@nexus.starrewards.app",
+    "ENERGY_PRICE_AREA": "DK1"
   },
   "assets": {
     "not_found_handling": "single-page-application",
