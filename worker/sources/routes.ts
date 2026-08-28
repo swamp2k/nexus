@@ -15,6 +15,10 @@ function json(body: unknown, init: ResponseInit = {}): Response {
   return Response.json(body, { ...init, headers });
 }
 
+function normalizePriceArea(value: string | undefined): "DK1" | "DK2" {
+  return String(value ?? "DK1").toUpperCase() === "DK2" ? "DK2" : "DK1";
+}
+
 async function requireUser(request: Request, env: SourceEnv) {
   return getAuthenticatedUser(request, env.DB);
 }
@@ -35,7 +39,7 @@ export async function handleSourceRoute(request: Request, env: SourceEnv): Promi
       sources: {
         energyPrices: {
           configured: true,
-          area: env.ENERGY_PRICE_AREA === "DK2" ? "DK2" : "DK1",
+          area: normalizePriceArea(env.ENERGY_PRICE_AREA),
         },
         electricityUsage: {
           configured: Boolean(env.ELOVERBLIK_REFRESH_TOKEN && env.ELOVERBLIK_METERING_POINT),
