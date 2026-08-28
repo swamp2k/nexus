@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
+import GarminPage from "./GarminPage";
 
 type User = {
   id: string;
@@ -73,55 +74,6 @@ function Dashboard({ onOpen }: { onOpen: (page: Page) => void }) {
         </div>
       </section>
     </>
-  );
-}
-
-function GarminPage() {
-  return (
-    <section className="garmin-page" aria-labelledby="garmin-heading">
-      <div className="module-page-hero">
-        <div className="module-page-icon tone-blue">⌖</div>
-        <div>
-          <p className="section-label">Første datamodul</p>
-          <h2 id="garmin-heading">Garmin</h2>
-          <p>Få dine Garmin-data ud af silo'en, behold rådata og gør historikken søgbar, sammenlignelig og klar til analyse.</p>
-        </div>
-      </div>
-
-      <div className="garmin-summary-grid">
-        <article className="summary-card">
-          <span className="summary-kicker">Status</span>
-          <strong>Klar til første import</strong>
-          <p>Bruger og datamodel er klar. Næste trin er at gemme den originale Garmin-export.</p>
-        </article>
-        <article className="summary-card">
-          <span className="summary-kicker">Rådata</span>
-          <strong>Bevares uændret</strong>
-          <p>Originale ZIP, FIT, TCX, GPX og JSON-filer beholdes, så vi altid kan genbehandle dem senere.</p>
-        </article>
-        <article className="summary-card">
-          <span className="summary-kicker">Analyse</span>
-          <strong>Normaliseres til D1</strong>
-          <p>Skridt, puls, søvn, aktiviteter og øvrige målinger bliver først modelleret efter en rigtig export.</p>
-        </article>
-      </div>
-
-      <article className="import-card">
-        <div>
-          <p className="section-label">Import</p>
-          <h3>Start med din Garmin-export</h3>
-          <p>Vi bruger den komplette export som sandhedsgrundlag. Det undgår at bygge schema og parser efter antagelser om, hvad Garmin leverer.</p>
-        </div>
-        <div className="import-steps">
-          <div><span>1</span><p>Hent en komplet Garmin-dataexport.</p></div>
-          <div><span>2</span><p>Upload arkivet til Nexus.</p></div>
-          <div><span>3</span><p>Nexus inventerer filerne og viser præcis hvilke datatyper der blev fundet.</p></div>
-          <div><span>4</span><p>Derefter bygger vi den første parser og historikvisning.</p></div>
-        </div>
-        <button className="primary-action" type="button" disabled>Importér Garmin-export</button>
-        <small className="import-note">Upload aktiveres, så snart rådata-lageret er bundet til Nexus.</small>
-      </article>
-    </section>
   );
 }
 
