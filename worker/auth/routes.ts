@@ -9,7 +9,7 @@ import {
 } from "./session";
 
 type AuthEnv = Env & {
-  FORWARD_EMAIL_API_TOKEN?: string;
+  FORWARD_EMAIL_API_KEY?: string;
   MAIL_FROM?: string;
 };
 
@@ -110,7 +110,7 @@ async function requestLogin(request: Request, env: AuthEnv): Promise<Response> {
   ]);
 
   try {
-    if (!env.FORWARD_EMAIL_API_TOKEN || !env.MAIL_FROM) {
+    if (!env.FORWARD_EMAIL_API_KEY || !env.MAIL_FROM) {
       throw new Error("mail_provider_not_configured");
     }
 
@@ -118,7 +118,7 @@ async function requestLogin(request: Request, env: AuthEnv): Promise<Response> {
     loginUrl.searchParams.set("token", token);
 
     const mail = createForwardEmailProvider({
-      apiToken: env.FORWARD_EMAIL_API_TOKEN,
+      apiToken: env.FORWARD_EMAIL_API_KEY,
       from: env.MAIL_FROM,
     });
 
