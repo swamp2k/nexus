@@ -1,9 +1,10 @@
-import { FormEvent, useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import type { FormEvent } from "react";
 
 type User = {
   id: string;
   email: string;
-  display_name: string | null;
+  displayName: string | null;
   role: "admin" | "member" | "viewer";
 };
 
@@ -34,7 +35,7 @@ const secondaryNav = ["Overblik", "Notifikationer", "Indstillinger"];
 
 function initials(user: User | null): string {
   if (!user) return "N";
-  const source = user.display_name?.trim() || user.email;
+  const source = user.displayName?.trim() || user.email;
   return source.slice(0, 1).toUpperCase();
 }
 
@@ -63,7 +64,7 @@ function App() {
   const displayName = useMemo(() => {
     const user = session?.user;
     if (!user) return "Nexus";
-    return user.display_name?.trim() || user.email.split("@")[0];
+    return user.displayName?.trim() || user.email.split("@")[0];
   }, [session]);
 
   async function requestLogin(event: FormEvent<HTMLFormElement>) {
