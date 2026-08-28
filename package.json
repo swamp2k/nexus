@@ -9,7 +9,9 @@
     "build": "npm run types && tsc -b && vite build",
     "preview": "npm run build && vite preview",
     "deploy": "npm run build && wrangler deploy",
-    "check": "npm run types && tsc -b --pretty false"
+    "check": "npm run types && tsc -b --pretty false",
+    "db:migrations:list": "wrangler d1 migrations list nexus --remote",
+    "db:migrate": "wrangler d1 migrations apply nexus --remote"
   },
   "dependencies": {
     "react": "^19.2.8",
