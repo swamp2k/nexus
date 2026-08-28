@@ -17,5 +17,11 @@
       "database_id": "e2d4b9fe-1d9b-4e24-9f48-6cf54fa758df",
       "migrations_dir": "migrations"
     }
+  ],
+  "r2_buckets": [
+    {
+      "binding": "DATA",
+      "bucket_name": "nexus-data"
+    }
   ]
 }
