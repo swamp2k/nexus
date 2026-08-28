@@ -1,0 +1,191 @@
+.module-card {
+  width: 100%;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.garmin-page {
+  display: grid;
+  gap: 22px;
+}
+
+.module-page-hero {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 30px 32px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  background: var(--surface);
+  box-shadow: var(--shadow-soft);
+}
+
+.module-page-icon {
+  display: grid;
+  width: 62px;
+  height: 62px;
+  flex: 0 0 auto;
+  place-items: center;
+  border-radius: 18px;
+  font-size: 1.8rem;
+  font-weight: 900;
+}
+
+.module-page-hero h2,
+.import-card h3,
+.placeholder-card h2 {
+  margin-top: 0;
+}
+
+.module-page-hero h2 {
+  margin-bottom: 8px;
+  font-size: clamp(2rem, 4vw, 3rem);
+  letter-spacing: -0.045em;
+}
+
+.module-page-hero p:last-child {
+  max-width: 760px;
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.65;
+}
+
+.garmin-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.summary-card,
+.import-card,
+.placeholder-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-soft);
+}
+
+.summary-card {
+  min-height: 168px;
+  padding: 22px;
+}
+
+.summary-kicker {
+  display: block;
+  margin-bottom: 12px;
+  color: var(--accent);
+  font-size: 0.74rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.summary-card strong {
+  display: block;
+  margin-bottom: 10px;
+  font-size: 1.08rem;
+}
+
+.summary-card p,
+.import-card > div > p:last-child,
+.placeholder-card p {
+  margin-bottom: 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.import-card {
+  padding: 30px 32px;
+}
+
+.import-card h3 {
+  margin-bottom: 10px;
+  font-size: 1.55rem;
+  letter-spacing: -0.03em;
+}
+
+.import-steps {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin: 26px 0 22px;
+}
+
+.import-steps > div {
+  display: grid;
+  grid-template-columns: 34px 1fr;
+  gap: 11px;
+  align-items: start;
+  padding: 15px;
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  background: var(--surface-soft);
+}
+
+.import-steps span {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+.import-steps p {
+  margin: 5px 0 0;
+  color: var(--muted-strong);
+  line-height: 1.45;
+}
+
+.primary-action {
+  padding: 12px 16px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--accent);
+  color: white;
+  font-weight: 800;
+}
+
+.primary-action:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.import-note {
+  display: block;
+  margin-top: 10px;
+  color: var(--muted);
+}
+
+.placeholder-card {
+  padding: 32px;
+}
+
+.placeholder-card h2 {
+  margin-bottom: 8px;
+}
+
+@media (max-width: 900px) {
+  .garmin-summary-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 680px) {
+  .module-page-hero {
+    align-items: flex-start;
+    padding: 24px;
+  }
+
+  .import-card {
+    padding: 24px;
+  }
+
+  .import-steps {
+    grid-template-columns: 1fr;
+  }
+}
