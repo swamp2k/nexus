@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import GarminPage from "./GarminPage";
+import KitchenDisplay from "./KitchenDisplay";
 
 type User = {
   id: string;
@@ -88,6 +89,8 @@ function App() {
     return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
   });
 
+  const isKitchenDisplay = window.location.pathname === "/display/kitchen";
+
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
     localStorage.setItem("nexus-theme", theme);
@@ -148,6 +151,10 @@ function App() {
         </section>
       </div>
     );
+  }
+
+  if (isKitchenDisplay) {
+    return <KitchenDisplay />;
   }
 
   const isHome = page === "Hjem";
