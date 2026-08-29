@@ -1,10 +1,13 @@
 import { getAuthenticatedUser } from "../auth/session";
+import { GRID_PROVIDERS, normalizeGridProvider, type GridProviderKey } from "../sources/energy-tariffs";
 
 type SettingsRow = {
   weatherLabel: string | null;
   weatherLat: number | null;
   weatherLon: number | null;
   energyPriceArea: "DK1" | "DK2" | null;
+  energyGridProvider: GridProviderKey | null;
+  energySupplierMarkupOere: number | null;
   updatedAt: string | null;
 };
 
@@ -13,6 +16,8 @@ type SettingsBody = {
   weatherLat?: unknown;
   weatherLon?: unknown;
   energyPriceArea?: unknown;
+  energyGridProvider?: unknown;
+  energySupplierMarkupOere?: unknown;
 };
 
 type SettingsEnv = Env & {
@@ -20,6 +25,8 @@ type SettingsEnv = Env & {
   WEATHER_LAT?: string;
   WEATHER_LON?: string;
   ENERGY_PRICE_AREA?: string;
+  ENERGY_GRID_PROVIDER?: string;
+  ENERGY_SUPPLIER_MARKUP_OERE?: string;
 };
 
 function json(body: unknown, init: ResponseInit = {}): Response {
@@ -47,12 +54,20 @@ function cleanPriceArea(value: unknown): "DK1" | "DK2" {
   return String(value ?? "DK1").toUpperCase() === "DK2" ? "DK2" : "DK1";
 }
 
+function cleanMarkup(value: unknown): number {
+  const parsed = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0 || parsed > 500) return 0;
+  return Math.round(parsed * 1000) / 1000;
+}
+
 function fallbackSettings(env: SettingsEnv): SettingsRow {
   return {
     weatherLabel: String(env.WEATHER_LABEL ?? "Hjem").trim() || "Hjem",
     weatherLat: cleanCoordinate(env.WEATHER_LAT, -90, 90),
     weatherLon: cleanCoordinate(env.WEATHER_LON, -180, 180),
     energyPriceArea: cleanPriceArea(env.ENERGY_PRICE_AREA),
+    energyGridProvider: normalizeGridProvider(env.ENERGY_GRID_PROVIDER),
+    energySupplierMarkupOere: cleanMarkup(env.ENERGY_SUPPLIER_MARKUP_OERE),
     updatedAt: null,
   };
 }
@@ -64,6 +79,8 @@ async function readSettings(env: SettingsEnv, userId: string): Promise<SettingsR
               weather_lat AS weatherLat,
               weather_lon AS weatherLon,
               energy_price_area AS energyPriceArea,
+              energy_grid_provider AS energyGridProvider,
+              energy_supplier_markup_oere AS energySupplierMarkupOere,
               updated_at AS updatedAt
        FROM user_settings
        WHERE user_id = ?`,
@@ -73,6 +90,8 @@ async function readSettings(env: SettingsEnv, userId: string): Promise<SettingsR
     return {
       ...row,
       energyPriceArea: cleanPriceArea(row.energyPriceArea ?? env.ENERGY_PRICE_AREA),
+      energyGridProvider: normalizeGridProvider(row.energyGridProvider ?? env.ENERGY_GRID_PROVIDER),
+      energySupplierMarkupOere: cleanMarkup(row.energySupplierMarkupOere ?? env.ENERGY_SUPPLIER_MARKUP_OERE),
     };
   } catch {
     return fallbackSettings(env);
@@ -87,7 +106,12 @@ export async function handleSettingsRoute(request: Request, env: SettingsEnv): P
   if (!user) return json({ error: "unauthorized" }, { status: 401 });
 
   if (request.method === "GET") {
-    return json({ settings: await readSettings(env, user.id) });
+    return json({
+      settings: await readSettings(env, user.id),
+      options: {
+        gridProviders: Object.entries(GRID_PROVIDERS).map(([key, provider]) => ({ key, label: provider.label })),
+      },
+    });
   }
 
   if (request.method !== "PUT") {
@@ -105,22 +129,40 @@ export async function handleSettingsRoute(request: Request, env: SettingsEnv): P
   const weatherLat = cleanCoordinate(body.weatherLat, -90, 90);
   const weatherLon = cleanCoordinate(body.weatherLon, -180, 180);
   const energyPriceArea = cleanPriceArea(body.energyPriceArea);
+  const energyGridProvider = normalizeGridProvider(typeof body.energyGridProvider === "string" ? body.energyGridProvider : null);
+  const energySupplierMarkupOere = cleanMarkup(body.energySupplierMarkupOere);
 
   if (weatherLat === null || weatherLon === null) {
     return json({ error: "invalid_weather_location" }, { status: 400 });
   }
+  if (!energyGridProvider) {
+    return json({ error: "invalid_energy_grid_provider" }, { status: 400 });
+  }
 
   const updatedAt = new Date().toISOString();
   await env.DB.prepare(
-    `INSERT INTO user_settings (user_id, weather_label, weather_lat, weather_lon, energy_price_area, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?)
+    `INSERT INTO user_settings (
+       user_id, weather_label, weather_lat, weather_lon,
+       energy_price_area, energy_grid_provider, energy_supplier_markup_oere, updated_at
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(user_id) DO UPDATE SET
        weather_label = excluded.weather_label,
        weather_lat = excluded.weather_lat,
        weather_lon = excluded.weather_lon,
        energy_price_area = excluded.energy_price_area,
+       energy_grid_provider = excluded.energy_grid_provider,
+       energy_supplier_markup_oere = excluded.energy_supplier_markup_oere,
        updated_at = excluded.updated_at`,
-  ).bind(user.id, weatherLabel ?? "Hjem", weatherLat, weatherLon, energyPriceArea, updatedAt).run();
+  ).bind(
+    user.id,
+    weatherLabel ?? "Hjem",
+    weatherLat,
+    weatherLon,
+    energyPriceArea,
+    energyGridProvider,
+    energySupplierMarkupOere,
+    updatedAt,
+  ).run();
 
   return json({
     settings: {
@@ -128,6 +170,8 @@ export async function handleSettingsRoute(request: Request, env: SettingsEnv): P
       weatherLat,
       weatherLon,
       energyPriceArea,
+      energyGridProvider,
+      energySupplierMarkupOere,
       updatedAt,
     },
   });
