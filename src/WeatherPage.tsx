@@ -74,15 +74,15 @@ function describe(symbol: string | null): string {
   return "Vejrudsigt";
 }
 
-function compassDirection(degrees: number | null): string {
-  if (degrees === null || !Number.isFinite(degrees)) return "";
+function compassDirection(degrees: number | null | undefined): string {
+  if (typeof degrees !== "number" || !Number.isFinite(degrees)) return "";
   const directions = ["N", "NNØ", "NØ", "ØNØ", "Ø", "ØSØ", "SØ", "SSØ", "S", "SSV", "SV", "VSV", "V", "VNV", "NV", "NNV"];
   const normalized = ((degrees % 360) + 360) % 360;
   return directions[Math.round(normalized / 22.5) % 16];
 }
 
-function windLabel(speed: number | null, direction: number | null): string {
-  if (speed === null) return "—";
+function windLabel(speed: number | null | undefined, direction: number | null | undefined): string {
+  if (typeof speed !== "number" || !Number.isFinite(speed)) return "—";
   const compass = compassDirection(direction);
   return `${speed.toFixed(1)} m/s${compass ? ` ${compass}` : ""}`;
 }
