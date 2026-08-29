@@ -30,6 +30,7 @@ type EnergyResponse = {
 
 type HourWindow = { start: string; average: number };
 const TIME_ZONE = "Europe/Copenhagen";
+const CHART_MAX_DKK = 6;
 
 function price(point: PricePoint): number {
   return point.totalDkkPerKwh ?? point.approxDkkPerKwh;
@@ -37,6 +38,15 @@ function price(point: PricePoint): number {
 
 function formatTime(value: string): string {
   return new Intl.DateTimeFormat("da-DK", { hour: "2-digit", minute: "2-digit", timeZone: TIME_ZONE }).format(new Date(value));
+}
+
+function formatHour(value: string): string {
+  return new Intl.DateTimeFormat("da-DK", { hour: "2-digit", timeZone: TIME_ZONE }).format(new Date(value));
+}
+
+function localMinute(value: string): number {
+  const parts = new Intl.DateTimeFormat("en-GB", { minute: "2-digit", timeZone: TIME_ZONE }).formatToParts(new Date(value));
+  return Number(parts.find((part) => part.type === "minute")?.value ?? 0);
 }
 
 function formatDate(value: string): string {
@@ -67,28 +77,60 @@ function rollingHours(points: PricePoint[]): HourWindow[] {
 
 function PriceChart({ points }: { points: PricePoint[] }) {
   if (points.length === 0) return <div className="electricity-empty">Ingen priser til grafen.</div>;
-  const width = 1000;
-  const height = 260;
-  const padX = 24;
-  const padY = 28;
-  const values = points.map(price);
-  const min = Math.min(...values);
-  const max = Math.max(...values);
-  const span = Math.max(0.01, max - min);
+
+  const width = 1200;
+  const height = 330;
+  const padLeft = 52;
+  const padRight = 18;
+  const padTop = 18;
+  const padBottom = 46;
+  const plotWidth = width - padLeft - padRight;
+  const plotHeight = height - padTop - padBottom;
+  const firstTime = Date.parse(points[0].timeUtc);
+  const lastTime = Date.parse(points[points.length - 1].timeUtc);
+  const timeSpan = Math.max(1, lastTime - firstTime);
+
+  const xForTime = (timeUtc: string) => padLeft + ((Date.parse(timeUtc) - firstTime) / timeSpan) * plotWidth;
+  const yForPrice = (value: number) => padTop + (1 - Math.max(0, Math.min(CHART_MAX_DKK, value)) / CHART_MAX_DKK) * plotHeight;
+
   const path = points.map((point, index) => {
-    const x = padX + (index / Math.max(1, points.length - 1)) * (width - padX * 2);
-    const y = height - padY - ((price(point) - min) / span) * (height - padY * 2);
+    const x = xForTime(point.timeUtc);
+    const y = yForPrice(price(point));
     return `${index === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
   }).join(" ");
 
+  const hourTicks = points.filter((point) => localMinute(point.timeUtc) === 0);
+  const yTicks = Array.from({ length: CHART_MAX_DKK + 1 }, (_, index) => index);
+  const hasClippedValues = points.some((point) => price(point) > CHART_MAX_DKK);
+
   return (
     <div className="electricity-chart-wrap">
-      <svg className="electricity-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Samlet variabel elpris de næste 24 timer">
-        <line x1={padX} y1={height - padY} x2={width - padX} y2={height - padY} className="electricity-gridline" />
-        <line x1={padX} y1={height / 2} x2={width - padX} y2={height / 2} className="electricity-gridline" />
-        <path d={path} className="electricity-line" />
-      </svg>
-      <div className="electricity-axis"><span>{formatTime(points[0].timeUtc)}</span><span>{formatTime(points[Math.floor(points.length / 2)].timeUtc)}</span><span>{formatTime(points[points.length - 1].timeUtc)}</span></div>
+      <div className="electricity-chart-scroll">
+        <svg className="electricity-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Samlet variabel elpris de næste 24 timer, med fast skala fra 0 til 6 kroner pr. kWh">
+          {yTicks.map((tick) => {
+            const y = yForPrice(tick);
+            return (
+              <g key={`y-${tick}`}>
+                <line x1={padLeft} y1={y} x2={width - padRight} y2={y} className="electricity-gridline" />
+                <text x={padLeft - 10} y={y + 4} textAnchor="end" className="electricity-axis-label">{tick} kr</text>
+              </g>
+            );
+          })}
+
+          {hourTicks.map((point) => {
+            const x = xForTime(point.timeUtc);
+            return (
+              <g key={`x-${point.timeUtc}`}>
+                <line x1={x} y1={padTop} x2={x} y2={height - padBottom} className="electricity-gridline electricity-gridline--hour" />
+                <text x={x} y={height - 18} textAnchor="middle" className="electricity-axis-label electricity-axis-label--hour">{formatHour(point.timeUtc)}</text>
+              </g>
+            );
+          })}
+
+          <path d={path} className="electricity-line" />
+        </svg>
+      </div>
+      {hasClippedValues && <p className="electricity-chart-cap-note">Priser over {CHART_MAX_DKK} kr/kWh vises ved toppen af grafen.</p>}
     </div>
   );
 }
