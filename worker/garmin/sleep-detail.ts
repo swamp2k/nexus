@@ -50,11 +50,22 @@ function normalizeStage(value: unknown): "deep" | "light" | "rem" | "awake" | nu
   return null;
 }
 
-function normalizeSeries(value: unknown, valueKey: string, timeKey = "startGMT") {
-  return pointList(value).map((item) => ({
-    time: timestamp(item[timeKey]),
-    value: num(item[valueKey]),
-  })).filter((item): item is { time: number; value: number } => item.time !== null && item.value !== null);
+function normalizeSeries(value: unknown, valueKey: string, offsetMs: number, timeKey = "startGMT") {
+  return pointList(value).map((item) => {
+    const time = timestamp(item[timeKey]);
+    return {
+      time: time === null ? null : time + offsetMs,
+      value: num(item[valueKey]),
+    };
+  }).filter((item): item is { time: number; value: number } => item.time !== null && item.value !== null);
+}
+
+function shiftRow(row: SleepRow, offsetMs: number): SleepRow {
+  return {
+    ...row,
+    sleep_start_ms: row.sleep_start_ms === null ? null : row.sleep_start_ms + offsetMs,
+    sleep_end_ms: row.sleep_end_ms === null ? null : row.sleep_end_ms + offsetMs,
+  };
 }
 
 export async function getSleepDetail(env: Env, userId: string, requestedDate: string | null, days = 30) {
@@ -69,9 +80,9 @@ export async function getSleepDetail(env: Env, userId: string, requestedDate: st
      LIMIT ?`,
   ).bind(userId, safeDays).all<SleepRow>();
 
-  const history = historyResult.results;
-  if (history.length === 0) return { selected: null, history: [] };
-  const selected = (requestedDate ? history.find((row) => row.date === requestedDate) : null)
+  const rawHistory = historyResult.results;
+  if (rawHistory.length === 0) return { selected: null, history: [] };
+  const rawSelected = (requestedDate ? rawHistory.find((row) => row.date === requestedDate) : null)
     ?? (requestedDate
       ? await env.DB.prepare(
         `SELECT date, import_id, sleep_start_ms, sleep_end_ms, sleep_seconds, nap_seconds,
@@ -79,22 +90,23 @@ export async function getSleepDetail(env: Env, userId: string, requestedDate: st
                 avg_respiration, low_respiration, high_respiration
          FROM garmin_sleep WHERE user_id = ? AND date = ?`,
       ).bind(userId, requestedDate).first<SleepRow>()
-      : history[0]);
+      : rawHistory[0]);
 
-  if (!selected) return { selected: null, history };
+  if (!rawSelected) return { selected: null, history: [...rawHistory].reverse() };
 
   let detail: Record<string, unknown> | null = null;
-  if (selected.import_id) {
+  let localOffsetMs = 0;
+  if (rawSelected.import_id) {
     const [importRow, fileRow] = await Promise.all([
       env.DB.prepare(
         `SELECT storage_key AS storageKey FROM garmin_imports WHERE id = ? AND user_id = ?`,
-      ).bind(selected.import_id, userId).first<ImportRow>(),
+      ).bind(rawSelected.import_id, userId).first<ImportRow>(),
       env.DB.prepare(
         `SELECT path FROM garmin_import_files
          WHERE import_id = ? AND path LIKE ?
          ORDER BY CASE WHEN path = ? THEN 0 ELSE 1 END, path
          LIMIT 1`,
-      ).bind(selected.import_id, `%Sleep/sleep_${selected.date}.json`, `Sleep/sleep_${selected.date}.json`).first<FileRow>(),
+      ).bind(rawSelected.import_id, `%Sleep/sleep_${rawSelected.date}.json`, `Sleep/sleep_${rawSelected.date}.json`).first<FileRow>(),
     ]);
 
     if (importRow?.storageKey && fileRow?.path) {
@@ -103,28 +115,42 @@ export async function getSleepDetail(env: Env, userId: string, requestedDate: st
       if (text) {
         const raw = object(JSON.parse(text));
         const dto = object(raw?.dailySleepDTO);
-        const stages = pointList(raw?.sleepLevels).map((item) => ({
-          start: timestamp(item.startGMT),
-          end: timestamp(item.endGMT),
-          stage: normalizeStage(item.activityLevel),
-        })).filter((item): item is { start: number; end: number; stage: "deep" | "light" | "rem" | "awake" } => (
+        const gmtStart = num(dto?.sleepStartTimestampGMT) ?? rawSelected.sleep_start_ms;
+        const localStart = num(dto?.sleepStartTimestampLocal);
+        const gmtEnd = num(dto?.sleepEndTimestampGMT) ?? rawSelected.sleep_end_ms;
+        const localEnd = num(dto?.sleepEndTimestampLocal);
+        if (gmtStart !== null && localStart !== null) localOffsetMs = localStart - gmtStart;
+
+        const stages = pointList(raw?.sleepLevels).map((item) => {
+          const start = timestamp(item.startGMT);
+          const end = timestamp(item.endGMT);
+          return {
+            start: start === null ? null : start + localOffsetMs,
+            end: end === null ? null : end + localOffsetMs,
+            stage: normalizeStage(item.activityLevel),
+          };
+        }).filter((item): item is { start: number; end: number; stage: "deep" | "light" | "rem" | "awake" } => (
           item.start !== null && item.end !== null && item.end > item.start && item.stage !== null
         ));
 
         detail = {
-          sleepStartMs: num(dto?.sleepStartTimestampGMT) ?? selected.sleep_start_ms,
-          sleepEndMs: num(dto?.sleepEndTimestampGMT) ?? selected.sleep_end_ms,
+          sleepStartMs: localStart ?? (gmtStart === null ? null : gmtStart + localOffsetMs),
+          sleepEndMs: localEnd ?? (gmtEnd === null ? null : gmtEnd + localOffsetMs),
+          localOffsetMs,
           bodyBatteryChange: num(raw?.bodyBatteryChange),
           restingHeartRate: num(raw?.restingHeartRate),
           stages,
-          heartRate: normalizeSeries(raw?.sleepHeartRate, "value"),
-          stress: normalizeSeries(raw?.sleepStress, "value"),
-          bodyBattery: normalizeSeries(raw?.sleepBodyBattery, "value"),
-          respiration: normalizeSeries(raw?.wellnessEpochRespirationDataDTOList, "respirationValue", "startTimeGMT"),
+          heartRate: normalizeSeries(raw?.sleepHeartRate, "value", localOffsetMs),
+          stress: normalizeSeries(raw?.sleepStress, "value", localOffsetMs),
+          bodyBattery: normalizeSeries(raw?.sleepBodyBattery, "value", localOffsetMs),
+          respiration: normalizeSeries(raw?.wellnessEpochRespirationDataDTOList, "respirationValue", localOffsetMs, "startTimeGMT"),
         };
       }
     }
   }
+
+  const history = rawHistory.map((row) => shiftRow(row, localOffsetMs));
+  const selected = shiftRow(rawSelected, localOffsetMs);
 
   return {
     selected: { ...selected, detail },
