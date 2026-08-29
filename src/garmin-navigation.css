@@ -1,0 +1,85 @@
+.sleep-date-nav {
+  display: grid;
+  grid-template-columns: 52px minmax(0, 1fr) 52px;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  min-width: 0;
+}
+
+.sleep-date-nav .sleep-range-label {
+  min-width: 0;
+}
+
+.sleep-date-arrow {
+  display: grid;
+  width: 46px;
+  height: 46px;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--surface-soft);
+  color: var(--text);
+  font: inherit;
+  font-size: 1.45rem;
+  font-weight: 800;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.sleep-date-arrow:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.sleep-date-arrow:disabled {
+  opacity: 0.28;
+  cursor: default;
+}
+
+.garmin-health-overview.garmin-health-collapsed {
+  grid-template-columns: 1fr;
+  gap: 8px;
+  padding-block: 16px;
+}
+
+.garmin-health-collapsed .garmin-health-heading {
+  align-items: center;
+}
+
+.garmin-health-collapsed .section-label {
+  margin-bottom: 3px;
+}
+
+.garmin-health-collapsed h3 {
+  font-size: 1rem;
+}
+
+.garmin-health-collapsed > p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+@media (max-width: 600px) {
+  .sleep-date-nav {
+    grid-template-columns: 46px minmax(0, 1fr) 46px;
+    gap: 6px;
+  }
+
+  .sleep-date-arrow {
+    width: 42px;
+    height: 42px;
+  }
+
+  .garmin-health-collapsed .garmin-health-heading {
+    display: flex;
+    align-items: center;
+  }
+
+  .garmin-health-collapsed .secondary-action {
+    margin-top: 0;
+    white-space: nowrap;
+  }
+}
