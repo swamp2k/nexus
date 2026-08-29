@@ -13,6 +13,7 @@ type WeatherResponse = {
       temperature: number;
       humidity: number | null;
       windSpeed: number | null;
+      windDirection: number | null;
       pressure: number | null;
       symbol: string | null;
       precipitationMm: number | null;
@@ -22,6 +23,7 @@ type WeatherResponse = {
       temperature: number;
       humidity: number | null;
       windSpeed: number | null;
+      windDirection: number | null;
       symbol: string | null;
       precipitationMm: number | null;
       precipitationProbability: number | null;
@@ -32,6 +34,8 @@ type WeatherResponse = {
       maxTemperature: number;
       symbol: string | null;
       maxPrecipitationProbability: number | null;
+      windSpeed: number | null;
+      windDirection: number | null;
     }>;
   };
   fetchedAt: string;
@@ -68,6 +72,19 @@ function describe(symbol: string | null): string {
   if (value.includes("fair")) return "Let skyet";
   if (value.includes("clearsky")) return "Klart";
   return "Vejrudsigt";
+}
+
+function compassDirection(degrees: number | null): string {
+  if (degrees === null || !Number.isFinite(degrees)) return "";
+  const directions = ["N", "NNØ", "NØ", "ØNØ", "Ø", "ØSØ", "SØ", "SSØ", "S", "SSV", "SV", "VSV", "V", "VNV", "NV", "NNV"];
+  const normalized = ((degrees % 360) + 360) % 360;
+  return directions[Math.round(normalized / 22.5) % 16];
+}
+
+function windLabel(speed: number | null, direction: number | null): string {
+  if (speed === null) return "—";
+  const compass = compassDirection(direction);
+  return `${speed.toFixed(1)} m/s${compass ? ` ${compass}` : ""}`;
 }
 
 function formatHour(value: string): string {
@@ -151,7 +168,7 @@ export default function WeatherPage() {
 
         <div className="weather-now-metrics">
           <div><span>Fugtighed</span><strong>{current.humidity === null ? "—" : `${Math.round(current.humidity)}%`}</strong></div>
-          <div><span>Vind</span><strong>{current.windSpeed === null ? "—" : `${current.windSpeed.toFixed(1)} m/s`}</strong></div>
+          <div><span>Vind</span><strong>{windLabel(current.windSpeed, current.windDirection)}</strong></div>
           <div><span>Nedbør næste time</span><strong>{current.precipitationMm === null ? "—" : `${current.precipitationMm.toFixed(1)} mm`}</strong></div>
           <div><span>Lufttryk</span><strong>{current.pressure === null ? "—" : `${Math.round(current.pressure)} hPa`}</strong></div>
         </div>
@@ -168,6 +185,7 @@ export default function WeatherPage() {
               <span>{formatHour(hour.time)}</span>
               <b aria-hidden="true">{icon(hour.symbol)}</b>
               <strong>{Math.round(hour.temperature)}°</strong>
+              <small className="weather-wind">{windLabel(hour.windSpeed, hour.windDirection)}</small>
               <small>{hour.precipitationMm !== null && hour.precipitationMm > 0 ? `${hour.precipitationMm.toFixed(1)} mm` : ""}</small>
             </div>
           ))}
@@ -182,6 +200,7 @@ export default function WeatherPage() {
               <span className="weather-day-date">{formatDay(day.date)}</span>
               <span className="weather-day-icon" aria-hidden="true">{icon(day.symbol)}</span>
               <span className="weather-day-description">{describe(day.symbol)}</span>
+              <span className="weather-day-wind">{windLabel(day.windSpeed, day.windDirection)}</span>
               <span className="weather-day-rain">
                 {day.maxPrecipitationProbability === null ? "" : `☂ ${Math.round(day.maxPrecipitationProbability)}%`}
               </span>
