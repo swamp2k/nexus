@@ -1,0 +1,134 @@
+.garmin-health-overview {
+  display: grid;
+  gap: 18px;
+  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-soft);
+}
+
+.garmin-health-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.garmin-health-heading h3 {
+  margin: 0;
+  font-size: 1.35rem;
+}
+
+.garmin-health-heading > span {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.garmin-metric-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.garmin-metric-grid article {
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-soft);
+}
+
+.garmin-metric-grid span,
+.garmin-metric-grid strong,
+.garmin-metric-grid small {
+  display: block;
+}
+
+.garmin-metric-grid span {
+  margin-bottom: 7px;
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.garmin-metric-grid strong {
+  margin-bottom: 5px;
+  font-size: 1.35rem;
+  letter-spacing: -0.03em;
+}
+
+.garmin-metric-grid small {
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.garmin-recent-activities {
+  display: grid;
+  gap: 6px;
+}
+
+.garmin-recent-activities > div:not(:first-child) {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 16px;
+  padding: 10px 4px;
+  border-bottom: 1px solid var(--border);
+}
+
+.garmin-recent-activities > div:last-child {
+  border-bottom: 0;
+}
+
+.garmin-recent-activities strong,
+.garmin-recent-activities span {
+  display: block;
+}
+
+.garmin-recent-activities div > div > span,
+.garmin-recent-activities > div > span {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.inventory-file-row {
+  grid-template-columns: 54px minmax(0, 1fr) auto auto;
+}
+
+.status-processing {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+@media (max-width: 850px) {
+  .garmin-metric-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 600px) {
+  .garmin-health-heading {
+    display: block;
+  }
+
+  .garmin-health-heading > span {
+    display: block;
+    margin-top: 6px;
+  }
+
+  .garmin-metric-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .garmin-recent-activities > div:not(:first-child) {
+    grid-template-columns: 1fr auto;
+  }
+
+  .garmin-recent-activities > div > span:last-child {
+    grid-column: 2;
+  }
+
+  .inventory-file-row {
+    grid-template-columns: 44px minmax(0, 1fr);
+  }
+}
