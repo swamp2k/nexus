@@ -205,12 +205,12 @@ export async function processGarminDbBatch(env: Env, userId: string, importId: s
       const text = texts.get(file.path);
       if (text === undefined) throw new Error("zip_entry_missing");
       await parseOne(env.DB, userId, importId, file.path, text);
-      await env.DB.prepare(`UPDATE garmin_import_files SET status = 'parsed' WHERE id = ?`).bind(file.id).run();
+      await env.DB.prepare(`UPDATE garmin_import_files SET status = 'processed' WHERE id = ?`).bind(file.id).run();
       processed += 1;
     } catch (error) {
       failed += 1;
       const message = error instanceof Error ? error.message : "garmin_file_parse_failed";
-      await env.DB.prepare(`UPDATE garmin_import_files SET status = 'error' WHERE id = ?`).bind(file.id).run();
+      await env.DB.prepare(`UPDATE garmin_import_files SET status = 'failed' WHERE id = ?`).bind(file.id).run();
       console.error(JSON.stringify({ event: "garmin_file_parse_failed", userId, importId, path: file.path, error: message }));
     }
   }
