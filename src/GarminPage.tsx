@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 type GarminImport = {
   id: string;
@@ -12,6 +12,13 @@ type GarminImport = {
   errorMessage: string | null;
   createdAt: string;
   updatedAt: string;
+};
+
+type GarminImportFile = {
+  path: string;
+  sizeBytes: number | null;
+  fileType: string | null;
+  status: string;
 };
 
 type StartUploadResponse = {
@@ -41,6 +48,7 @@ type InventoryResponse = {
 };
 
 type UploadState = "idle" | "uploading" | "complete" | "error";
+type FilesState = "idle" | "loading" | "ready" | "error";
 
 function formatBytes(bytes: number | null): string {
   if (bytes === null) return "—";
@@ -83,6 +91,21 @@ export default function GarminPage() {
   const [uploadFilename, setUploadFilename] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [inventoryingId, setInventoryingId] = useState<string | null>(null);
+  const [selectedImportId, setSelectedImportId] = useState<string | null>(null);
+  const [inventoryFiles, setInventoryFiles] = useState<GarminImportFile[]>([]);
+  const [filesState, setFilesState] = useState<FilesState>("idle");
+  const [filesError, setFilesError] = useState<string | null>(null);
+
+  const selectedImport = imports.find((item) => item.id === selectedImportId) ?? null;
+
+  const fileTypeCounts = useMemo(() => {
+    const counts = new Map<string, number>();
+    for (const file of inventoryFiles) {
+      const type = file.fileType?.toLowerCase() || "uden filtype";
+      counts.set(type, (counts.get(type) ?? 0) + 1);
+    }
+    return [...counts.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
+  }, [inventoryFiles]);
 
   async function refreshImports() {
     try {
@@ -99,6 +122,34 @@ export default function GarminPage() {
   useEffect(() => {
     void refreshImports();
   }, []);
+
+  async function loadInventoryFiles(importId: string) {
+    if (selectedImportId === importId && filesState !== "error") {
+      setSelectedImportId(null);
+      setInventoryFiles([]);
+      setFilesState("idle");
+      return;
+    }
+
+    setSelectedImportId(importId);
+    setInventoryFiles([]);
+    setFilesError(null);
+    setFilesState("loading");
+
+    try {
+      const query = new URLSearchParams({ importId });
+      const response = await fetch(`/api/garmin/imports/files?${query}`, {
+        credentials: "same-origin",
+      });
+      if (!response.ok) throw new Error(await responseError(response));
+      const body = await response.json() as { files: GarminImportFile[] };
+      setInventoryFiles(body.files);
+      setFilesState("ready");
+    } catch (error) {
+      setFilesError(error instanceof Error ? error.message : "inventory_files_failed");
+      setFilesState("error");
+    }
+  }
 
   async function inventoryImport(importId: string) {
     setInventoryingId(importId);
@@ -328,11 +379,57 @@ export default function GarminPage() {
                       {inventoryingId === item.id ? "Analyserer…" : "Analysér"}
                     </button>
                   )}
+                  {item.status === "ready" && (
+                    <button
+                      className="secondary-action"
+                      type="button"
+                      onClick={() => void loadInventoryFiles(item.id)}
+                    >
+                      {selectedImportId === item.id ? "Skjul filer" : "Se filer"}
+                    </button>
+                  )}
                   <span className={`import-status status-${item.status}`}>{item.status}</span>
                 </div>
               </article>
             ))}
           </div>
+        )}
+
+        {selectedImport && (
+          <section className="inventory-panel" aria-labelledby="inventory-heading">
+            <div className="inventory-heading">
+              <div>
+                <span className="summary-kicker">Inventory</span>
+                <h4 id="inventory-heading">{selectedImport.filename}</h4>
+              </div>
+              <span className="inventory-total">{inventoryFiles.length || selectedImport.fileCount || 0} filer</span>
+            </div>
+
+            {filesState === "loading" && <p className="empty-state">Henter filoversigt…</p>}
+            {filesState === "error" && <p className="import-feedback error">Filoversigten kunne ikke hentes: {filesError}</p>}
+            {filesState === "ready" && (
+              <>
+                <div className="inventory-type-grid">
+                  {fileTypeCounts.map(([type, count]) => (
+                    <div className="inventory-type-card" key={type}>
+                      <strong>{count}</strong>
+                      <span>.{type === "uden filtype" ? "—" : type}</span>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="inventory-file-list">
+                  {inventoryFiles.map((file) => (
+                    <div className="inventory-file-row" key={file.path}>
+                      <span className="inventory-file-type">{file.fileType?.toUpperCase() || "FILE"}</span>
+                      <code title={file.path}>{file.path}</code>
+                      <span>{formatBytes(file.sizeBytes)}</span>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </section>
         )}
       </section>
     </section>
