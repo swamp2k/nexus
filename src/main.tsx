@@ -4,6 +4,7 @@ import App from "./App";
 import "./styles.css";
 import "./garmin.css";
 import "./weather.css";
+import "./electricity.css";
 import "./settings.css";
 import "./kitchen-display.css";
 
