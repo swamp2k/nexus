@@ -32,7 +32,11 @@ type SleepRow = {
   } | null;
 };
 
-type SleepResponse = { selected: SleepRow | null; history: SleepRow[] };
+type SleepResponse = {
+  selected: SleepRow | null;
+  history: SleepRow[];
+  navigation: { previousDate: string | null; nextDate: string | null };
+};
 
 const RANGE_DAYS: Record<RangeKey, number> = { "1d": 1, "7d": 7, "4w": 28, "1y": 365 };
 const STAGES: Stage[] = ["deep", "light", "rem", "awake"];
@@ -158,12 +162,45 @@ export default function GarminSleepDetail({ initialDate, onClose }: { initialDat
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [selectedDate, setSelectedDate] = useState(initialDate);
   const [range, setRange] = useState<RangeKey>("1d");
-  async function load(date: string, nextRange = range) { setState("loading"); try { const query = new URLSearchParams({ date, days: String(RANGE_DAYS[nextRange]) }); const response = await fetch(`/api/garmin/sleep?${query}`, { credentials: "same-origin", cache: "no-store" }); if (!response.ok) throw new Error(`HTTP ${response.status}`); setData(await response.json() as SleepResponse); setSelectedDate(date); setState("ready"); } catch { setState("error"); } }
+
+  async function load(date: string, nextRange = range) {
+    setState("loading");
+    try {
+      const query = new URLSearchParams({ date, days: String(RANGE_DAYS[nextRange]) });
+      const response = await fetch(`/api/garmin/sleep?${query}`, { credentials: "same-origin", cache: "no-store" });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      setData(await response.json() as SleepResponse);
+      setSelectedDate(date);
+      setState("ready");
+    } catch { setState("error"); }
+  }
+
   useEffect(() => { void load(initialDate, "1d"); }, [initialDate]);
   function changeRange(next: RangeKey) { setRange(next); void load(selectedDate, next); }
   function selectNight(date: string) { setRange("1d"); void load(date, "1d"); }
+
   const selected = data?.selected ?? null;
   const history = data?.history ?? [];
-  const rangeLabel = useMemo(() => { if (!history.length) return ""; if (range === "1d") return longDate(selectedDate); return `${shortDate(history[0].date)} – ${shortDate(history.at(-1)!.date)}`; }, [history, range, selectedDate]);
-  return <section className="garmin-deep-dive garmin-sleep-screen" aria-labelledby="sleep-detail-heading"><div className="garmin-deep-heading"><div><p className="section-label">Dig deeper</p><h3 id="sleep-detail-heading">Søvn</h3></div><button className="secondary-action" type="button" onClick={onClose}>Luk</button></div><div className="sleep-range-tabs" role="tablist">{(["1d", "7d", "4w", "1y"] as RangeKey[]).map((key) => <button key={key} type="button" role="tab" aria-selected={range === key} className={range === key ? "active" : ""} onClick={() => changeRange(key)}>{key}</button>)}</div><div className="sleep-range-label">{rangeLabel}</div>{state === "loading" && <p className="empty-state">Henter søvndata…</p>}{state === "error" && <p className="empty-state">Søvndata kunne ikke hentes.</p>}{state === "ready" && selected && (range === "1d" ? <DailyView row={selected} /> : <RangeView history={history} onSelect={selectNight} />)}</section>;
+  const rangeLabel = useMemo(() => {
+    if (!history.length) return "";
+    if (range === "1d") return longDate(selectedDate);
+    return `${shortDate(history[0].date)} – ${shortDate(history.at(-1)!.date)}`;
+  }, [history, range, selectedDate]);
+
+  const previousDate = data?.navigation?.previousDate ?? null;
+  const nextDate = data?.navigation?.nextDate ?? null;
+
+  return <section className="garmin-deep-dive garmin-sleep-screen" aria-labelledby="sleep-detail-heading">
+    <div className="garmin-deep-heading"><div><p className="section-label">Dig deeper</p><h3 id="sleep-detail-heading">Søvn</h3></div><button className="secondary-action" type="button" onClick={onClose}>Luk</button></div>
+    <div className="sleep-range-tabs" role="tablist">{(["1d", "7d", "4w", "1y"] as RangeKey[]).map((key) => <button key={key} type="button" role="tab" aria-selected={range === key} className={range === key ? "active" : ""} onClick={() => changeRange(key)}>{key}</button>)}</div>
+    {range === "1d" ? <div className="sleep-date-nav">
+      <button type="button" className="sleep-date-arrow" aria-label="Forrige nat" title="Forrige nat" disabled={!previousDate || state === "loading"} onClick={() => previousDate && selectNight(previousDate)}>←</button>
+      <div className="sleep-range-label">{rangeLabel}</div>
+      <button type="button" className="sleep-date-arrow" aria-label="Næste nat" title="Næste nat" disabled={!nextDate || state === "loading"} onClick={() => nextDate && selectNight(nextDate)}>→</button>
+    </div> : <div className="sleep-range-label">{rangeLabel}</div>}
+
+    {state === "loading" && <p className="empty-state">Henter søvndata…</p>}
+    {state === "error" && <p className="empty-state">Søvndata kunne ikke hentes.</p>}
+    {state === "ready" && selected && (range === "1d" ? <DailyView row={selected} /> : <RangeView history={history} onSelect={selectNight} />)}
+  </section>;
 }
