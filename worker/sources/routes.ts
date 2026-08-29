@@ -1,10 +1,12 @@
 import { getAuthenticatedUser } from "../auth/session";
 import { getElectricityUsage } from "./eloverblik";
-import { getEnergyPrices, resolvePriceArea } from "./energy-prices";
+import { getEnergyPrices, resolveEnergySettings } from "./energy-prices";
 import { getWeatherForecast, resolveWeatherLocation } from "./weather";
 
 type SourceEnv = Env & {
   ENERGY_PRICE_AREA?: string;
+  ENERGY_GRID_PROVIDER?: string;
+  ENERGY_SUPPLIER_MARKUP_OERE?: string;
   ELOVERBLIK_REFRESH_TOKEN?: string;
   ELOVERBLIK_METERING_POINT?: string;
   WASTE_CALENDAR_ICS_URL?: string;
@@ -27,17 +29,15 @@ export async function handleSourceRoute(request: Request, env: SourceEnv): Promi
   const pathname = new URL(request.url).pathname;
   if (!pathname.startsWith("/api/sources/")) return null;
 
-  if (request.method !== "GET") {
-    return json({ error: "method_not_allowed" }, { status: 405 });
-  }
+  if (request.method !== "GET") return json({ error: "method_not_allowed" }, { status: 405 });
 
   const user = await requireUser(request, env);
   if (!user) return json({ error: "unauthorized" }, { status: 401 });
 
   if (pathname === "/api/sources/status") {
-    const [weatherLocation, energyArea] = await Promise.all([
+    const [weatherLocation, energySettings] = await Promise.all([
       resolveWeatherLocation(env, user.id),
-      resolvePriceArea(env, user.id),
+      resolveEnergySettings(env, user.id),
     ]);
     return json({
       sources: {
@@ -47,8 +47,10 @@ export async function handleSourceRoute(request: Request, env: SourceEnv): Promi
           label: weatherLocation?.label ?? "Hjem",
         },
         energyPrices: {
-          configured: true,
-          area: energyArea,
+          configured: Boolean(energySettings.gridProvider),
+          area: energySettings.area,
+          gridProvider: energySettings.gridProvider,
+          supplierMarkupOere: energySettings.supplierMarkupOere,
         },
         electricityUsage: {
           configured: Boolean(env.ELOVERBLIK_REFRESH_TOKEN && env.ELOVERBLIK_METERING_POINT),
@@ -73,17 +75,13 @@ export async function handleSourceRoute(request: Request, env: SourceEnv): Promi
 
   if (pathname === "/api/sources/energy/usage") {
     const result = await getElectricityUsage(env);
-    if (!result) {
-      return json({ error: "source_not_configured" }, { status: 503 });
-    }
+    if (!result) return json({ error: "source_not_configured" }, { status: 503 });
     return json(result);
   }
 
   if (pathname === "/api/sources/waste") {
     return json(
-      {
-        error: env.WASTE_CALENDAR_ICS_URL ? "calendar_adapter_pending" : "source_not_configured",
-      },
+      { error: env.WASTE_CALENDAR_ICS_URL ? "calendar_adapter_pending" : "source_not_configured" },
       { status: env.WASTE_CALENDAR_ICS_URL ? 501 : 503 },
     );
   }
