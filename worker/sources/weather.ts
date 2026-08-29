@@ -9,6 +9,7 @@ type MetInstant = {
     air_temperature?: unknown;
     relative_humidity?: unknown;
     wind_speed?: unknown;
+    wind_from_direction?: unknown;
     air_pressure_at_sea_level?: unknown;
   };
 };
@@ -44,24 +45,28 @@ type ParsedPoint = {
   temperature: number;
   humidity: number | null;
   windSpeed: number | null;
+  windDirection: number | null;
   pressure: number | null;
   symbol: string | null;
   precipitationMm: number | null;
   precipitationProbability: number | null;
 };
 
+type WeatherLocation = {
+  label: string;
+  latitude: number;
+  longitude: number;
+};
+
 export type WeatherForecast = {
   source: typeof SOURCE;
-  location: {
-    label: string;
-    latitude: number;
-    longitude: number;
-  };
+  location: WeatherLocation;
   current: {
     time: string;
     temperature: number;
     humidity: number | null;
     windSpeed: number | null;
+    windDirection: number | null;
     pressure: number | null;
     symbol: string | null;
     precipitationMm: number | null;
@@ -71,6 +76,7 @@ export type WeatherForecast = {
     temperature: number;
     humidity: number | null;
     windSpeed: number | null;
+    windDirection: number | null;
     symbol: string | null;
     precipitationMm: number | null;
     precipitationProbability: number | null;
@@ -81,6 +87,8 @@ export type WeatherForecast = {
     maxTemperature: number;
     symbol: string | null;
     maxPrecipitationProbability: number | null;
+    windSpeed: number | null;
+    windDirection: number | null;
   }>;
 };
 
@@ -88,6 +96,12 @@ type WeatherEnv = Env & {
   WEATHER_LAT?: string;
   WEATHER_LON?: string;
   WEATHER_LABEL?: string;
+};
+
+type SettingsWeatherRow = {
+  weatherLabel: string | null;
+  weatherLat: number | null;
+  weatherLon: number | null;
 };
 
 function number(value: unknown): number | null {
@@ -132,6 +146,7 @@ function parsePoint(value: unknown): ParsedPoint | null {
     temperature,
     humidity: number(item.data.instant.details.relative_humidity),
     windSpeed: number(item.data.instant.details.wind_speed),
+    windDirection: number(item.data.instant.details.wind_from_direction),
     pressure: number(item.data.instant.details.air_pressure_at_sea_level),
     symbol: typeof preferredPeriod?.summary?.symbol_code === "string" ? preferredPeriod.summary.symbol_code : null,
     precipitationMm: number(item.data.next_1_hours?.details?.precipitation_amount),
@@ -156,6 +171,10 @@ function buildDaily(points: ParsedPoint[]): WeatherForecast["daily"] {
     const probabilities = dayPoints
       .map((point) => point.precipitationProbability)
       .filter((value): value is number => value !== null);
+    const daytimePoint = dayPoints.reduce((best, point) => {
+      if (!best) return point;
+      return Math.abs(point.localHour - 12) < Math.abs(best.localHour - 12) ? point : best;
+    }, null as ParsedPoint | null);
     const symbolPoint = dayPoints.reduce((best, point) => {
       if (!point.symbol) return best;
       if (!best) return point;
@@ -168,6 +187,8 @@ function buildDaily(points: ParsedPoint[]): WeatherForecast["daily"] {
       maxTemperature: Math.max(...temperatures),
       symbol: symbolPoint?.symbol ?? null,
       maxPrecipitationProbability: probabilities.length > 0 ? Math.max(...probabilities) : null,
+      windSpeed: daytimePoint?.windSpeed ?? null,
+      windDirection: daytimePoint?.windDirection ?? null,
     };
   });
 }
@@ -176,7 +197,7 @@ function cacheKey(latitude: number, longitude: number): string {
   return `weather:met:${latitude.toFixed(4)}:${longitude.toFixed(4)}`;
 }
 
-function config(env: WeatherEnv) {
+function fallbackConfig(env: WeatherEnv): WeatherLocation | null {
   const latitude = number(env.WEATHER_LAT);
   const longitude = number(env.WEATHER_LON);
   if (latitude === null || longitude === null || latitude < -90 || latitude > 90 || longitude < -180 || longitude > 180) {
@@ -187,6 +208,35 @@ function config(env: WeatherEnv) {
     longitude,
     label: String(env.WEATHER_LABEL ?? "Hjem").trim() || "Hjem",
   };
+}
+
+export async function resolveWeatherLocation(env: WeatherEnv, userId: string): Promise<WeatherLocation | null> {
+  try {
+    const row = await env.DB.prepare(
+      `SELECT weather_label AS weatherLabel,
+              weather_lat AS weatherLat,
+              weather_lon AS weatherLon
+       FROM user_settings
+       WHERE user_id = ?`,
+    ).bind(userId).first<SettingsWeatherRow>();
+
+    if (
+      row?.weatherLat !== null && row?.weatherLat !== undefined
+      && row?.weatherLon !== null && row?.weatherLon !== undefined
+      && row.weatherLat >= -90 && row.weatherLat <= 90
+      && row.weatherLon >= -180 && row.weatherLon <= 180
+    ) {
+      return {
+        label: row.weatherLabel?.trim() || "Hjem",
+        latitude: row.weatherLat,
+        longitude: row.weatherLon,
+      };
+    }
+  } catch {
+    // During first deploy before migration 0004 is applied, keep the configured fallback working.
+  }
+
+  return fallbackConfig(env);
 }
 
 async function fetchForecast(latitude: number, longitude: number, label: string): Promise<WeatherForecast> {
@@ -220,6 +270,7 @@ async function fetchForecast(latitude: number, longitude: number, label: string)
       temperature: point.temperature,
       humidity: point.humidity,
       windSpeed: point.windSpeed,
+      windDirection: point.windDirection,
       symbol: point.symbol,
       precipitationMm: point.precipitationMm,
       precipitationProbability: point.precipitationProbability,
@@ -233,6 +284,7 @@ async function fetchForecast(latitude: number, longitude: number, label: string)
       temperature: current.temperature,
       humidity: current.humidity,
       windSpeed: current.windSpeed,
+      windDirection: current.windDirection,
       pressure: current.pressure,
       symbol: current.symbol,
       precipitationMm: current.precipitationMm,
@@ -242,13 +294,23 @@ async function fetchForecast(latitude: number, longitude: number, label: string)
   };
 }
 
-export async function getWeatherForecast(env: WeatherEnv) {
-  const weatherConfig = config(env);
+function withLocationLabel<T extends { data: WeatherForecast }>(cached: T, location: WeatherLocation): T {
+  return {
+    ...cached,
+    data: {
+      ...cached.data,
+      location,
+    },
+  };
+}
+
+export async function getWeatherForecast(env: WeatherEnv, userId: string) {
+  const weatherConfig = await resolveWeatherLocation(env, userId);
   if (!weatherConfig) return null;
 
   const key = cacheKey(weatherConfig.latitude, weatherConfig.longitude);
   const cached = await readSourceCache<WeatherForecast>(env.DB, key);
-  if (cached && !cached.stale) return cached;
+  if (cached && !cached.stale) return withLocationLabel(cached, weatherConfig);
 
   try {
     const data = await fetchForecast(weatherConfig.latitude, weatherConfig.longitude, weatherConfig.label);
@@ -257,12 +319,12 @@ export async function getWeatherForecast(env: WeatherEnv) {
     const message = error instanceof Error ? error.message : "weather_fetch_failed";
     await recordSourceError(env.DB, key, message);
     if (cached) {
-      return {
+      return withLocationLabel({
         ...cached,
         stale: true,
         lastErrorAt: new Date().toISOString(),
         lastErrorMessage: message,
-      };
+      }, weatherConfig);
     }
     throw error;
   }
