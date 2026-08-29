@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import GarminSleepDetail from "./GarminSleepDetail";
 
 type GarminOverview = {
   daily: Record<string, unknown> | null;
@@ -25,6 +26,7 @@ function numberValue(row: Record<string, unknown> | null, key: string): number |
 export default function GarminPage() {
   const [overview, setOverview] = useState<GarminOverview | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
+  const [deepDive, setDeepDive] = useState<"sleep" | null>(null);
 
   useEffect(() => {
     void fetch("/api/garmin/overview", { credentials: "same-origin", cache: "no-store" })
@@ -60,7 +62,9 @@ export default function GarminPage() {
             <article><span>Hvilepuls</span><strong>{latestRhr === null ? "—" : `${Math.round(latestRhr)} bpm`}</strong><small>{numberValue(daily, "min_hr") ?? "—"}–{numberValue(daily, "max_hr") ?? "—"} bpm</small></article>
             <article><span>Body Battery</span><strong>{numberValue(daily, "body_battery_latest") ?? "—"}</strong><small>{numberValue(daily, "body_battery_low") ?? "—"} → {numberValue(daily, "body_battery_high") ?? "—"}</small></article>
             <article><span>Stress</span><strong>{numberValue(daily, "avg_stress") ?? "—"}</strong><small>Maks {numberValue(daily, "max_stress") ?? "—"}</small></article>
-            <article><span>Søvn</span><strong>{hours(sleep?.sleep_seconds)}</strong><small>Dyb {hours(sleep?.deep_seconds)} · REM {hours(sleep?.rem_seconds)}</small></article>
+            <button className="garmin-metric-card garmin-metric-action" type="button" onClick={() => setDeepDive(deepDive === "sleep" ? null : "sleep")}>
+              <span>Søvn</span><strong>{hours(sleep?.sleep_seconds)}</strong><small>Dyb {hours(sleep?.deep_seconds)} · REM {hours(sleep?.rem_seconds)}</small><em>{deepDive === "sleep" ? "Skjul detaljer ↑" : "Se detaljer ↓"}</em>
+            </button>
             <article><span>Aktive kalorier</span><strong>{numberValue(daily, "active_calories") === null ? "—" : `${Math.round(numberValue(daily, "active_calories")!)} kcal`}</strong><small>Total {Math.round(numberValue(daily, "total_calories") ?? 0)} kcal</small></article>
           </div>
 
@@ -69,9 +73,11 @@ export default function GarminPage() {
           ))}</div>}
         </section>
 
+        {deepDive === "sleep" && sleep?.date && <GarminSleepDetail initialDate={String(sleep.date)} onClose={() => setDeepDive(null)} />}
+
         <div className="garmin-summary-grid">
           <article className="summary-card"><span className="summary-kicker">Historik</span><strong>{overview?.counts?.dailyCount ?? 0} dage</strong><p>Daglige sundhedsdata klar til trends og sammenligning.</p></article>
-          <article className="summary-card"><span className="summary-kicker">Søvn</span><strong>{overview?.counts?.sleepCount ?? 0} nætter</strong><p>Sleep summaries er normaliseret og klar til trendvisning.</p></article>
+          <button className="summary-card garmin-summary-action" type="button" onClick={() => setDeepDive("sleep")}><span className="summary-kicker">Søvn</span><strong>{overview?.counts?.sleepCount ?? 0} nætter</strong><p>Åbn søvnfordeling, natlige signaler og 30-dages historik.</p></button>
           <article className="summary-card"><span className="summary-kicker">Aktiviteter</span><strong>{overview?.counts?.activityCount ?? 0} aktiviteter</strong><p>Aktiviteter med distance, varighed, puls og øvrige Garmin-metadata.</p></article>
         </div>
       </>}
