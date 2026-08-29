@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import GarminPage from "./GarminPage";
 import WeatherPage from "./WeatherPage";
+import SettingsPage from "./SettingsPage";
 import KitchenDisplay from "./KitchenDisplay";
 
 type User = {
@@ -24,7 +25,8 @@ type Module = {
   icon: string;
 };
 
-type Page = "Hjem" | "Garmin" | "Vejr" | "Strøm" | "DBA" | "Unraid" | "PC Watch";
+type Page = "Hjem" | "Garmin" | "Vejr" | "Strøm" | "DBA" | "Unraid" | "PC Watch" | "Indstillinger";
+type PrimaryPage = Exclude<Page, "Indstillinger">;
 
 const modules: Module[] = [
   { name: "Garmin", status: "First data module", detail: "Import, historik og analyse", tone: "blue", icon: "⌖" },
@@ -35,8 +37,8 @@ const modules: Module[] = [
   { name: "PC Watch", status: "Later integration", detail: "Maskinstatus samlet ét sted", tone: "teal", icon: "▣" },
 ];
 
-const primaryNav: Page[] = ["Hjem", "Garmin", "Vejr", "Strøm", "DBA", "Unraid", "PC Watch"];
-const secondaryNav = ["Overblik", "Notifikationer", "Indstillinger"];
+const primaryNav: PrimaryPage[] = ["Hjem", "Garmin", "Vejr", "Strøm", "DBA", "Unraid", "PC Watch"];
+const secondaryNav = ["Overblik", "Notifikationer", "Indstillinger"] as const;
 const navIcons = ["⌂", "⌖", "☁", "ϟ", "◇", "▤", "▣"];
 
 function initials(user: User | null): string {
@@ -164,9 +166,11 @@ function App() {
     ? "Én rolig indgang til data, overvågning og de små værktøjer familien faktisk bruger."
     : page === "Garmin"
       ? "Din sundheds- og aktivitetshistorik samlet, importeret og klar til analyse."
-      : page === "Vejr"
-        ? "Prognosen fra MET Norway, pakket roligt ind til Nexus og køkkendisplayet."
-        : "Modulet er planlagt, men endnu ikke bygget.";
+      : page === "Indstillinger"
+        ? "Dine personlige Nexus-indstillinger."
+        : page === "Vejr"
+          ? ""
+          : "Modulet er planlagt, men endnu ikke bygget.";
 
   return (
     <div className="app-frame">
@@ -181,14 +185,29 @@ function App() {
         </nav>
         <div className="sidebar-divider" />
         <nav className="sidebar-nav sidebar-nav--secondary" aria-label="Sekundær navigation">
-          {secondaryNav.map((item, index) => <button className="nav-item" key={item} type="button"><span className="nav-icon">{["▦", "♧", "⚙"][index]}</span><span>{item}</span></button>)}
+          {secondaryNav.map((item, index) => {
+            const active = item === "Indstillinger" && page === "Indstillinger";
+            return (
+              <button
+                className={`nav-item ${active ? "active" : ""}`}
+                key={item}
+                type="button"
+                onClick={() => {
+                  if (item === "Overblik") setPage("Hjem");
+                  if (item === "Indstillinger") setPage("Indstillinger");
+                }}
+              >
+                <span className="nav-icon">{["▦", "♧", "⚙"][index]}</span><span>{item}</span>
+              </button>
+            );
+          })}
         </nav>
         <div className="system-status"><span className="status-dot" /><div><small>Systemstatus</small><strong>Alt kører</strong></div><span className="status-arrow">›</span></div>
       </aside>
 
       <div className="content-shell">
         <header className="app-header">
-          <div><h1>{heading}</h1><p>{subheading}</p></div>
+          <div><h1>{heading}</h1>{subheading && <p>{subheading}</p>}</div>
           <div className="header-actions">
             <button className="theme-toggle" onClick={() => setTheme(theme === "light" ? "dark" : "light")} aria-label="Skift tema">{theme === "light" ? "☾" : "☀"}</button>
             <div className="user-menu"><span className="avatar">{initials(session.user)}</span><span className="user-name">{displayName}</span><button className="logout-button" type="button" onClick={logout}>Log ud</button></div>
@@ -199,7 +218,8 @@ function App() {
           {page === "Hjem" && <Dashboard onOpen={setPage} />}
           {page === "Garmin" && <GarminPage />}
           {page === "Vejr" && <WeatherPage />}
-          {!isHome && page !== "Garmin" && page !== "Vejr" && <section className="placeholder-card"><p className="section-label">Planlagt</p><h2>{page}</h2><p>Modulet er på vej ind i Nexus.</p></section>}
+          {page === "Indstillinger" && <SettingsPage />}
+          {!isHome && page !== "Garmin" && page !== "Vejr" && page !== "Indstillinger" && <section className="placeholder-card"><p className="section-label">Planlagt</p><h2>{page}</h2><p>Modulet er på vej ind i Nexus.</p></section>}
         </main>
 
         <footer><span>Nexus v0.1</span><span>Simple by design.</span></footer>
