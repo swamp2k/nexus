@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import GarminPage from "./GarminPage";
 import WeatherPage from "./WeatherPage";
+import ElectricityPage from "./ElectricityPage";
 import SettingsPage from "./SettingsPage";
 import KitchenDisplay from "./KitchenDisplay";
 
@@ -31,7 +32,7 @@ type PrimaryPage = Exclude<Page, "Indstillinger">;
 const modules: Module[] = [
   { name: "Garmin", status: "First data module", detail: "Import, historik og analyse", tone: "blue", icon: "⌖" },
   { name: "Vejr", status: "Active", detail: "MET Norway prognose", tone: "sky", icon: "☁" },
-  { name: "Strøm", status: "In progress", detail: "Priser og bedste tidspunkter", tone: "amber", icon: "ϟ" },
+  { name: "Strøm", status: "Active", detail: "Spotpriser og bedste tidspunkter", tone: "amber", icon: "ϟ" },
   { name: "DBA", status: "Later integration", detail: "Fund og monitorering", tone: "green", icon: "◇" },
   { name: "Unraid", status: "Later integration", detail: "Serverstatus og advarsler", tone: "violet", icon: "▤" },
   { name: "PC Watch", status: "Later integration", detail: "Maskinstatus samlet ét sted", tone: "teal", icon: "▣" },
@@ -156,9 +157,7 @@ function App() {
     );
   }
 
-  if (isKitchenDisplay) {
-    return <KitchenDisplay />;
-  }
+  if (isKitchenDisplay) return <KitchenDisplay />;
 
   const isHome = page === "Hjem";
   const heading = isHome ? "Overblik uden bøvl." : page;
@@ -168,9 +167,9 @@ function App() {
       ? "Din sundheds- og aktivitetshistorik samlet, importeret og klar til analyse."
       : page === "Indstillinger"
         ? "Dine personlige Nexus-indstillinger."
-        : page === "Vejr"
-          ? ""
-          : "Modulet er planlagt, men endnu ikke bygget.";
+        : page === "Strøm"
+          ? "Spotpriser og de bedste tidspunkter at bruge strøm på."
+          : "";
 
   return (
     <div className="app-frame">
@@ -188,15 +187,10 @@ function App() {
           {secondaryNav.map((item, index) => {
             const active = item === "Indstillinger" && page === "Indstillinger";
             return (
-              <button
-                className={`nav-item ${active ? "active" : ""}`}
-                key={item}
-                type="button"
-                onClick={() => {
-                  if (item === "Overblik") setPage("Hjem");
-                  if (item === "Indstillinger") setPage("Indstillinger");
-                }}
-              >
+              <button className={`nav-item ${active ? "active" : ""}`} key={item} type="button" onClick={() => {
+                if (item === "Overblik") setPage("Hjem");
+                if (item === "Indstillinger") setPage("Indstillinger");
+              }}>
                 <span className="nav-icon">{["▦", "♧", "⚙"][index]}</span><span>{item}</span>
               </button>
             );
@@ -218,8 +212,9 @@ function App() {
           {page === "Hjem" && <Dashboard onOpen={setPage} />}
           {page === "Garmin" && <GarminPage />}
           {page === "Vejr" && <WeatherPage />}
+          {page === "Strøm" && <ElectricityPage />}
           {page === "Indstillinger" && <SettingsPage />}
-          {!isHome && page !== "Garmin" && page !== "Vejr" && page !== "Indstillinger" && <section className="placeholder-card"><p className="section-label">Planlagt</p><h2>{page}</h2><p>Modulet er på vej ind i Nexus.</p></section>}
+          {!isHome && page !== "Garmin" && page !== "Vejr" && page !== "Strøm" && page !== "Indstillinger" && <section className="placeholder-card"><p className="section-label">Planlagt</p><h2>{page}</h2><p>Modulet er på vej ind i Nexus.</p></section>}
         </main>
 
         <footer><span>Nexus v0.1</span><span>Simple by design.</span></footer>
