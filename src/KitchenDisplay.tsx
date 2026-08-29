@@ -129,9 +129,7 @@ function PriceChart({ envelope }: { envelope: CachedEnvelope<EnergyPriceData> | 
     });
   }, [envelope]);
 
-  if (!envelope || points.length === 0) {
-    return <div className="display-empty">Ingen strømpriser endnu</div>;
-  }
+  if (!envelope || points.length === 0) return <div className="display-empty">Ingen strømpriser endnu</div>;
 
   const values = points.map((point) => point.approxDkkPerKwh);
   const min = Math.min(...values);
@@ -159,7 +157,7 @@ function PriceChart({ envelope }: { envelope: CachedEnvelope<EnergyPriceData> | 
         <div><span className="display-metric-label">Lige nu</span><strong>{current.approxDkkPerKwh.toFixed(2)} kr/kWh</strong></div>
         <div><span className="display-metric-label">Billigst næste 24 t</span><strong>{min.toFixed(2)} kr/kWh</strong></div>
       </div>
-      <svg className="display-line-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Strømpris næste 24 timer">
+      <svg className="display-line-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Samlet elpris næste 24 timer">
         <line x1="16" y1="198" x2="744" y2="198" className="display-gridline" />
         <line x1="16" y1="110" x2="744" y2="110" className="display-gridline" />
         <path d={path} className="display-line" />
@@ -243,7 +241,7 @@ function KitchenDisplay() {
 
       <main className="display-grid">
         <section className="display-card display-card--wide">
-          <div className="display-card-header"><div><span className="display-kicker">Strøm</span><h2>Pris næste 24 timer</h2></div><span className={`freshness ${data.prices?.stale ? "stale" : ""}`}>{data.prices?.stale ? "Forsinket" : `Opdateret ${ageLabel(data.prices?.fetchedAt)}`}</span></div>
+          <div className="display-card-header"><div><span className="display-kicker">Strøm</span><h2>Samlet pris næste 24 timer</h2></div><span className={`freshness ${data.prices?.stale ? "stale" : ""}`}>{data.prices?.stale ? "Forsinket" : `Opdateret ${ageLabel(data.prices?.fetchedAt)}`}</span></div>
           {loading ? <div className="display-empty">Henter priser…</div> : <PriceChart envelope={data.prices} />}
         </section>
 
@@ -255,7 +253,7 @@ function KitchenDisplay() {
         <section className="display-card display-card--compact">
           <span className="display-kicker">Lige nu</span>
           <div className="display-big-number">{currentPrice ? `${currentPrice.approxDkkPerKwh.toFixed(2)} kr` : "—"}</div>
-          <p>pr. kWh før tariffer og moms</p>
+          <p>pr. kWh inkl. moms, net og afgifter</p>
         </section>
 
         <section className="display-card display-card--compact">
@@ -266,9 +264,7 @@ function KitchenDisplay() {
 
         <section className="display-card display-card--compact">
           <span className="display-kicker">Vejr · {data.weather?.data.location.label ?? "Hjem"}</span>
-          <div className="display-big-number display-big-number--text">
-            {currentWeather ? `${weatherIcon(currentWeather.symbol)} ${Math.round(currentWeather.temperature)}°C` : "Ikke klar"}
-          </div>
+          <div className="display-big-number display-big-number--text">{currentWeather ? `${weatherIcon(currentWeather.symbol)} ${Math.round(currentWeather.temperature)}°C` : "Ikke klar"}</div>
           <p>{currentWeather ? `${weatherDescription(currentWeather.symbol)} · opdateret ${ageLabel(data.weather?.fetchedAt)}` : "Venter på MET Norway."}</p>
         </section>
 
