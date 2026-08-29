@@ -5,6 +5,8 @@ type SleepRow = {
   import_id: string | null;
   sleep_start_ms: number | null;
   sleep_end_ms: number | null;
+  sleep_start_display_ms: number | null;
+  sleep_end_display_ms: number | null;
   sleep_seconds: number | null;
   nap_seconds: number | null;
   deep_seconds: number | null;
@@ -19,6 +21,7 @@ type SleepRow = {
 type ImportRow = { storageKey: string | null };
 type FileRow = { path: string };
 type RawPoint = Record<string, unknown>;
+type DateRow = { date: string };
 
 function object(value: unknown): Record<string, unknown> | null {
   return typeof value === "object" && value !== null && !Array.isArray(value) ? value as Record<string, unknown> : null;
@@ -71,20 +74,23 @@ function normalizeSeries(value: unknown, valueKey: string, offsetMs: number, tim
   }).filter((item): item is { time: number; value: number } => item.time !== null && item.value !== null);
 }
 
-function shiftRow(row: SleepRow, offsetMs: number): SleepRow {
+function displayRow(row: SleepRow, fallbackOffsetMs: number): SleepRow {
   return {
     ...row,
-    sleep_start_ms: row.sleep_start_ms === null ? null : row.sleep_start_ms + offsetMs,
-    sleep_end_ms: row.sleep_end_ms === null ? null : row.sleep_end_ms + offsetMs,
+    sleep_start_ms: row.sleep_start_display_ms ?? (row.sleep_start_ms === null ? null : row.sleep_start_ms + fallbackOffsetMs),
+    sleep_end_ms: row.sleep_end_display_ms ?? (row.sleep_end_ms === null ? null : row.sleep_end_ms + fallbackOffsetMs),
   };
 }
+
+const SELECT_SLEEP = `date, import_id, sleep_start_ms, sleep_end_ms,
+  sleep_start_display_ms, sleep_end_display_ms, sleep_seconds, nap_seconds,
+  deep_seconds, light_seconds, rem_seconds, awake_seconds,
+  avg_respiration, low_respiration, high_respiration`;
 
 export async function getSleepDetail(env: Env, userId: string, requestedDate: string | null, days = 30) {
   const safeDays = Math.max(1, Math.min(365, Math.trunc(days) || 30));
   const historyResult = await env.DB.prepare(
-    `SELECT date, import_id, sleep_start_ms, sleep_end_ms, sleep_seconds, nap_seconds,
-            deep_seconds, light_seconds, rem_seconds, awake_seconds,
-            avg_respiration, low_respiration, high_respiration
+    `SELECT ${SELECT_SLEEP}
      FROM garmin_sleep
      WHERE user_id = ?
      ORDER BY date DESC
@@ -92,26 +98,32 @@ export async function getSleepDetail(env: Env, userId: string, requestedDate: st
   ).bind(userId, safeDays).all<SleepRow>();
 
   const rawHistory = historyResult.results;
-  if (rawHistory.length === 0) return { selected: null, history: [] };
+  if (rawHistory.length === 0) return { selected: null, history: [], navigation: { previousDate: null, nextDate: null } };
   const rawSelected = (requestedDate ? rawHistory.find((row) => row.date === requestedDate) : null)
     ?? (requestedDate
-      ? await env.DB.prepare(
-        `SELECT date, import_id, sleep_start_ms, sleep_end_ms, sleep_seconds, nap_seconds,
-                deep_seconds, light_seconds, rem_seconds, awake_seconds,
-                avg_respiration, low_respiration, high_respiration
-         FROM garmin_sleep WHERE user_id = ? AND date = ?`,
-      ).bind(userId, requestedDate).first<SleepRow>()
+      ? await env.DB.prepare(`SELECT ${SELECT_SLEEP} FROM garmin_sleep WHERE user_id = ? AND date = ?`)
+        .bind(userId, requestedDate).first<SleepRow>()
       : rawHistory[0]);
 
-  if (!rawSelected) return { selected: null, history: [...rawHistory].reverse() };
+  if (!rawSelected) return { selected: null, history: [...rawHistory].reverse(), navigation: { previousDate: null, nextDate: null } };
+
+  const [previousRow, nextRow] = await Promise.all([
+    env.DB.prepare(`SELECT date FROM garmin_sleep WHERE user_id = ? AND date < ? AND sleep_seconds > 0 ORDER BY date DESC LIMIT 1`)
+      .bind(userId, rawSelected.date).first<DateRow>(),
+    env.DB.prepare(`SELECT date FROM garmin_sleep WHERE user_id = ? AND date > ? AND sleep_seconds > 0 ORDER BY date ASC LIMIT 1`)
+      .bind(userId, rawSelected.date).first<DateRow>(),
+  ]);
 
   let detail: Record<string, unknown> | null = null;
   let displayOffsetMs = 0;
+  if (rawSelected.sleep_start_display_ms !== null && rawSelected.sleep_start_ms !== null) {
+    displayOffsetMs = rawSelected.sleep_start_display_ms - rawSelected.sleep_start_ms;
+  }
+
   if (rawSelected.import_id) {
     const [importRow, fileRow] = await Promise.all([
-      env.DB.prepare(
-        `SELECT storage_key AS storageKey FROM garmin_imports WHERE id = ? AND user_id = ?`,
-      ).bind(rawSelected.import_id, userId).first<ImportRow>(),
+      env.DB.prepare(`SELECT storage_key AS storageKey FROM garmin_imports WHERE id = ? AND user_id = ?`)
+        .bind(rawSelected.import_id, userId).first<ImportRow>(),
       env.DB.prepare(
         `SELECT path FROM garmin_import_files
          WHERE import_id = ? AND path LIKE ?
@@ -129,11 +141,21 @@ export async function getSleepDetail(env: Env, userId: string, requestedDate: st
         const gmtStart = num(dto?.sleepStartTimestampGMT) ?? rawSelected.sleep_start_ms;
         const localStart = num(dto?.sleepStartTimestampLocal);
         const gmtEnd = num(dto?.sleepEndTimestampGMT) ?? rawSelected.sleep_end_ms;
+        const localEnd = num(dto?.sleepEndTimestampLocal);
         if (gmtStart !== null && localStart !== null) {
-          // Garmin's Local timestamps encode wall-clock time as if it were UTC.
-          // Shift the actual GMT series just enough that normal Copenhagen rendering
-          // lands on the same wall-clock values Garmin Connect displays.
+          // Garmin Local values encode wall-clock time as if it were UTC.
           displayOffsetMs = localStart - gmtStart - timezoneOffsetMs(gmtStart);
+        }
+
+        const displayStart = gmtStart === null ? null : gmtStart + displayOffsetMs;
+        const displayEnd = gmtEnd === null ? null : gmtEnd + displayOffsetMs;
+        if ((rawSelected.sleep_start_display_ms === null || rawSelected.sleep_end_display_ms === null) && displayStart !== null && displayEnd !== null) {
+          await env.DB.prepare(
+            `UPDATE garmin_sleep SET sleep_start_display_ms = ?, sleep_end_display_ms = ?, updated_at = ?
+             WHERE user_id = ? AND date = ?`,
+          ).bind(displayStart, displayEnd, new Date().toISOString(), userId, rawSelected.date).run();
+          rawSelected.sleep_start_display_ms = displayStart;
+          rawSelected.sleep_end_display_ms = displayEnd;
         }
 
         const stages = pointList(raw?.sleepLevels).map((item) => {
@@ -149,8 +171,10 @@ export async function getSleepDetail(env: Env, userId: string, requestedDate: st
         ));
 
         detail = {
-          sleepStartMs: gmtStart === null ? null : gmtStart + displayOffsetMs,
-          sleepEndMs: gmtEnd === null ? null : gmtEnd + displayOffsetMs,
+          sleepStartMs: displayStart,
+          sleepEndMs: displayEnd,
+          localStartRawMs: localStart,
+          localEndRawMs: localEnd,
           displayOffsetMs,
           bodyBatteryChange: num(raw?.bodyBatteryChange),
           restingHeartRate: num(raw?.restingHeartRate),
@@ -164,11 +188,15 @@ export async function getSleepDetail(env: Env, userId: string, requestedDate: st
     }
   }
 
-  const history = rawHistory.map((row) => shiftRow(row, displayOffsetMs));
-  const selected = shiftRow(rawSelected, displayOffsetMs);
+  const history = rawHistory.map((row) => displayRow(row, displayOffsetMs));
+  const selected = displayRow(rawSelected, displayOffsetMs);
 
   return {
     selected: { ...selected, detail },
     history: [...history].reverse(),
+    navigation: {
+      previousDate: previousRow?.date ?? null,
+      nextDate: nextRow?.date ?? null,
+    },
   };
 }
