@@ -3,6 +3,7 @@ import { createRoot } from "react-dom/client";
 import App from "./App";
 import "./styles.css";
 import "./garmin.css";
+import "./garmin-health.css";
 import "./weather.css";
 import "./electricity.css";
 import "./settings.css";
