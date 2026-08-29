@@ -96,15 +96,26 @@
   min-width: 0;
 }
 
+.electricity-chart-scroll {
+  overflow-x: auto;
+  padding-bottom: 4px;
+  scrollbar-width: thin;
+}
+
 .electricity-chart {
   display: block;
   width: 100%;
-  min-height: 220px;
+  min-width: 1120px;
+  min-height: 260px;
 }
 
 .electricity-gridline {
   stroke: var(--border);
   stroke-width: 1;
+}
+
+.electricity-gridline--hour {
+  opacity: 0.55;
 }
 
 .electricity-line {
@@ -115,9 +126,18 @@
   stroke-linejoin: round;
 }
 
-.electricity-axis {
-  display: flex;
-  justify-content: space-between;
+.electricity-axis-label {
+  fill: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.electricity-axis-label--hour {
+  font-size: 11px;
+}
+
+.electricity-chart-cap-note {
+  margin: 8px 0 0;
   color: var(--muted);
   font-size: 0.75rem;
 }
