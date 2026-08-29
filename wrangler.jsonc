@@ -6,6 +6,8 @@
   "vars": {
     "MAIL_FROM": "login@nexus.starrewards.app",
     "ENERGY_PRICE_AREA": "DK1",
+    "ENERGY_GRID_PROVIDER": "Konstant",
+    "ENERGY_SUPPLIER_MARKUP_OERE": "0",
     "WEATHER_LAT": "56.1944",
     "WEATHER_LON": "10.6821",
     "WEATHER_LABEL": "Ebeltoft"
