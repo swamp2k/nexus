@@ -129,7 +129,6 @@ export async function getSleepDetail(env: Env, userId: string, requestedDate: st
         const gmtStart = num(dto?.sleepStartTimestampGMT) ?? rawSelected.sleep_start_ms;
         const localStart = num(dto?.sleepStartTimestampLocal);
         const gmtEnd = num(dto?.sleepEndTimestampGMT) ?? rawSelected.sleep_end_ms;
-        const localEnd = num(dto?.sleepEndTimestampLocal);
         if (gmtStart !== null && localStart !== null) {
           // Garmin's Local timestamps encode wall-clock time as if it were UTC.
           // Shift the actual GMT series just enough that normal Copenhagen rendering
@@ -150,8 +149,8 @@ export async function getSleepDetail(env: Env, userId: string, requestedDate: st
         ));
 
         detail = {
-          sleepStartMs: localStart ?? (gmtStart === null ? null : gmtStart + displayOffsetMs),
-          sleepEndMs: localEnd ?? (gmtEnd === null ? null : gmtEnd + displayOffsetMs),
+          sleepStartMs: gmtStart === null ? null : gmtStart + displayOffsetMs,
+          sleepEndMs: gmtEnd === null ? null : gmtEnd + displayOffsetMs,
           displayOffsetMs,
           bodyBatteryChange: num(raw?.bodyBatteryChange),
           restingHeartRate: num(raw?.restingHeartRate),
