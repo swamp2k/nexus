@@ -33,8 +33,23 @@ type UsageData = {
   days: UsageDay[];
 };
 
+type WeatherData = {
+  source: "MET Norway";
+  location: { label: string; latitude: number; longitude: number };
+  current: {
+    time: string;
+    temperature: number;
+    humidity: number | null;
+    windSpeed: number | null;
+    pressure: number | null;
+    symbol: string | null;
+    precipitationMm: number | null;
+  };
+};
+
 type SourceStatus = {
   sources: {
+    weather: { configured: boolean; provider: string; label: string };
     energyPrices: { configured: boolean; area: string };
     electricityUsage: { configured: boolean };
     wasteCalendar: { configured: boolean; implementation: string };
@@ -44,6 +59,7 @@ type SourceStatus = {
 type KitchenData = {
   prices: CachedEnvelope<EnergyPriceData> | null;
   usage: CachedEnvelope<UsageData> | null;
+  weather: CachedEnvelope<WeatherData> | null;
   status: SourceStatus | null;
 };
 
@@ -65,6 +81,35 @@ function ageLabel(iso?: string | null): string {
   if (minutes < 60) return `${minutes} min siden`;
   const hours = Math.round(minutes / 60);
   return `${hours} t siden`;
+}
+
+function weatherIcon(symbol: string | null): string {
+  const value = symbol ?? "";
+  if (value.includes("thunder")) return "⛈️";
+  if (value.includes("sleet")) return "🌨️";
+  if (value.includes("snow")) return "❄️";
+  if (value.includes("rain")) return "🌧️";
+  if (value.includes("fog")) return "🌫️";
+  if (value.includes("cloudy")) return "☁️";
+  if (value.includes("partlycloudy")) return "⛅";
+  if (value.includes("fair")) return "🌤️";
+  if (value.includes("clearsky")) return "☀️";
+  return "🌡️";
+}
+
+function weatherDescription(symbol: string | null): string {
+  const value = symbol ?? "";
+  if (value.includes("thunder")) return "Torden";
+  if (value.includes("sleet")) return "Slud";
+  if (value.includes("snow")) return "Sne";
+  if (value.includes("heavyrain")) return "Kraftig regn";
+  if (value.includes("rain")) return "Regn";
+  if (value.includes("fog")) return "Tåge";
+  if (value.includes("cloudy")) return "Overskyet";
+  if (value.includes("partlycloudy")) return "Delvist skyet";
+  if (value.includes("fair")) return "Let skyet";
+  if (value.includes("clearsky")) return "Klart";
+  return "Vejr";
 }
 
 async function fetchJson<T>(url: string): Promise<T | null> {
@@ -143,7 +188,7 @@ function UsageChart({ envelope }: { envelope: CachedEnvelope<UsageData> | null }
 }
 
 function KitchenDisplay() {
-  const [data, setData] = useState<KitchenData>({ prices: null, usage: null, status: null });
+  const [data, setData] = useState<KitchenData>({ prices: null, usage: null, weather: null, status: null });
   const [loading, setLoading] = useState(true);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const [error, setError] = useState(false);
@@ -153,13 +198,14 @@ function KitchenDisplay() {
 
     async function refresh() {
       try {
-        const [prices, usage, status] = await Promise.all([
+        const [prices, usage, weather, status] = await Promise.all([
           fetchJson<CachedEnvelope<EnergyPriceData>>("/api/sources/energy/prices"),
           fetchJson<CachedEnvelope<UsageData>>("/api/sources/energy/usage"),
+          fetchJson<CachedEnvelope<WeatherData>>("/api/sources/weather"),
           fetchJson<SourceStatus>("/api/sources/status"),
         ]);
         if (!cancelled) {
-          setData({ prices, usage, status });
+          setData({ prices, usage, weather, status });
           setLastRefresh(new Date());
           setError(false);
         }
@@ -183,6 +229,8 @@ function KitchenDisplay() {
     const next = all[index + 1] ? new Date(all[index + 1].timeUtc).getTime() : t + 15 * 60 * 1000;
     return Date.now() >= t && Date.now() < next;
   });
+
+  const currentWeather = data.weather?.data.current;
 
   return (
     <div className="kitchen-display">
@@ -217,9 +265,11 @@ function KitchenDisplay() {
         </section>
 
         <section className="display-card display-card--compact">
-          <span className="display-kicker">Vejr</span>
-          <div className="display-big-number display-big-number--text">Kommer næste</div>
-          <p>Vejr bliver næste direkte source efter de tre første integrationer.</p>
+          <span className="display-kicker">Vejr · {data.weather?.data.location.label ?? "Hjem"}</span>
+          <div className="display-big-number display-big-number--text">
+            {currentWeather ? `${weatherIcon(currentWeather.symbol)} ${Math.round(currentWeather.temperature)}°C` : "Ikke klar"}
+          </div>
+          <p>{currentWeather ? `${weatherDescription(currentWeather.symbol)} · opdateret ${ageLabel(data.weather?.fetchedAt)}` : "Venter på MET Norway."}</p>
         </section>
 
         <section className="display-card display-card--compact">
