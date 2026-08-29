@@ -1,4 +1,5 @@
 import { handleAuthRoute } from "./auth/routes";
+import { handleGarminProcessRoute } from "./garmin/process-routes";
 import { handleGarminRoute } from "./garmin/routes";
 import { handleSettingsRoute } from "./settings/routes";
 import { handleSourceRoute } from "./sources/routes";
@@ -34,6 +35,8 @@ export default {
       }
 
       if (url.pathname.startsWith("/api/garmin/")) {
+        const processResponse = await handleGarminProcessRoute(request, env);
+        if (processResponse) return processResponse;
         const garminResponse = await handleGarminRoute(request, env);
         if (garminResponse) return garminResponse;
       }
@@ -49,30 +52,20 @@ export default {
       }
 
       if (url.pathname.startsWith("/api/")) {
-        return Response.json(
-          {
-            error: "not_found",
-          },
-          { status: 404 },
-        );
+        return Response.json({ error: "not_found" }, { status: 404 });
       }
 
       return new Response(null, { status: 404 });
     } catch (error) {
-      console.error(
-        JSON.stringify({
-          event: "request_failed",
-          path: url.pathname,
-          error: error instanceof Error ? error.message : "unknown_error",
-        }),
-      );
+      console.error(JSON.stringify({
+        event: "request_failed",
+        path: url.pathname,
+        error: error instanceof Error ? error.message : "unknown_error",
+      }));
 
       return Response.json(
         { error: "internal_error" },
-        {
-          status: 500,
-          headers: { "Cache-Control": "no-store" },
-        },
+        { status: 500, headers: { "Cache-Control": "no-store" } },
       );
     }
   },
