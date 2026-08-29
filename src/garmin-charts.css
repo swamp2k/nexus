@@ -1,5 +1,6 @@
 .sleep-axis-chart,
-.sleep-bars-chart {
+.sleep-bars-chart,
+.sleep-consistency-axis-chart {
   position: relative;
   width: 100%;
   min-width: 0;
@@ -46,9 +47,10 @@
 }
 
 .sleep-chart-tooltip,
-.sleep-bar-tooltip {
+.sleep-bar-tooltip,
+.sleep-consistency-tooltip {
   position: absolute;
-  z-index: 5;
+  z-index: 8;
   top: 8px;
   left: 50%;
   transform: translateX(-50%);
@@ -56,7 +58,7 @@
   padding: 8px 10px;
   border: 1px solid var(--border-strong);
   border-radius: 9px;
-  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  background: color-mix(in srgb, var(--surface) 94%, transparent);
   box-shadow: var(--shadow-soft);
   pointer-events: none;
   text-align: center;
@@ -65,12 +67,15 @@
 .sleep-chart-tooltip strong,
 .sleep-chart-tooltip span,
 .sleep-bar-tooltip strong,
-.sleep-bar-tooltip span {
+.sleep-bar-tooltip span,
+.sleep-consistency-tooltip strong,
+.sleep-consistency-tooltip span {
   display: block;
 }
 
 .sleep-chart-tooltip span,
-.sleep-bar-tooltip span {
+.sleep-bar-tooltip span,
+.sleep-consistency-tooltip span {
   margin-top: 2px;
   color: var(--muted);
   font-size: 0.7rem;
@@ -112,12 +117,141 @@
   touch-action: pan-x;
 }
 
-.sleep-duration-bars.interactive button.active > span {
+.sleep-duration-bars.interactive button.active > span,
+.sleep-duration-bars.interactive button:hover > span {
   background: var(--accent);
 }
 
 .sleep-duration-bars.interactive button {
   touch-action: none;
+}
+
+.sleep-consistency-axis-chart {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr);
+  gap: 8px;
+}
+
+.sleep-consistency-y,
+.sleep-consistency-plot {
+  position: relative;
+  height: 250px;
+}
+
+.sleep-consistency-y span {
+  position: absolute;
+  right: 0;
+  transform: translateY(-50%);
+  color: var(--muted);
+  font-size: 0.65rem;
+}
+
+.sleep-consistency-grid,
+.sleep-average-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  pointer-events: none;
+}
+
+.sleep-consistency-grid {
+  border-top: 1px solid var(--border);
+}
+
+.sleep-average-line.bedtime {
+  z-index: 3;
+  border-top: 2px solid var(--muted-strong);
+}
+
+.sleep-average-line.wake {
+  z-index: 3;
+  border-top: 2px dashed var(--muted-strong);
+}
+
+.sleep-consistency-columns {
+  position: absolute;
+  inset: 0;
+  z-index: 2;
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(24px, 1fr);
+  gap: 6px;
+  min-width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.sleep-consistency-columns button {
+  position: relative;
+  min-width: 24px;
+  height: 250px;
+  padding: 0 0 22px;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+  touch-action: none;
+}
+
+.sleep-consistency-columns button > span {
+  position: absolute;
+  left: 22%;
+  right: 22%;
+  border-radius: 2px;
+  background: var(--sleep-light);
+  opacity: 0.88;
+}
+
+.sleep-consistency-columns button.active > span,
+.sleep-consistency-columns button:hover > span {
+  background: var(--accent);
+  opacity: 1;
+}
+
+.sleep-consistency-columns button small {
+  position: absolute;
+  left: 50%;
+  bottom: 1px;
+  transform: translateX(-50%);
+  color: var(--muted);
+  font-size: 0.62rem;
+  white-space: nowrap;
+}
+
+.sleep-consistency-tooltip {
+  top: 10px;
+}
+
+.sleep-consistency-legend {
+  grid-column: 2;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+
+.sleep-consistency-legend span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sleep-consistency-legend i {
+  display: inline-block;
+  width: 16px;
+  height: 0;
+  border-top: 2px solid var(--sleep-light);
+}
+
+.sleep-consistency-legend i.avg-bed {
+  border-top-color: var(--muted-strong);
+}
+
+.sleep-consistency-legend i.avg-wake {
+  border-top-style: dashed;
+  border-top-color: var(--muted-strong);
 }
 
 @media (max-width: 600px) {
@@ -131,5 +265,15 @@
 
   .sleep-bars-chart {
     grid-template-columns: 30px minmax(0, 1fr);
+  }
+
+  .sleep-consistency-axis-chart {
+    grid-template-columns: 34px minmax(0, 1fr);
+  }
+
+  .sleep-consistency-y,
+  .sleep-consistency-plot,
+  .sleep-consistency-columns button {
+    height: 230px;
   }
 }
