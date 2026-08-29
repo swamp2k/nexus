@@ -158,7 +158,8 @@
   color: white;
 }
 
-.primary-action:disabled {
+.primary-action:disabled,
+.secondary-action:disabled {
   opacity: 0.65;
   cursor: wait;
 }
@@ -170,7 +171,7 @@
   color: var(--muted-strong);
 }
 
-.secondary-action:hover {
+.secondary-action:hover:not(:disabled) {
   color: var(--text);
   border-color: var(--border-strong);
 }
@@ -296,6 +297,18 @@
   font-size: 0.82rem;
 }
 
+.import-row-copy .import-row-error {
+  margin-top: 4px;
+  color: #d64545;
+}
+
+.import-row-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .import-status {
   padding: 6px 9px;
   border-radius: 999px;
@@ -376,8 +389,8 @@
     grid-template-columns: auto minmax(0, 1fr);
   }
 
-  .import-status {
+  .import-row-actions {
     grid-column: 2;
-    justify-self: start;
+    justify-content: flex-start;
   }
 }
