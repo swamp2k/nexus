@@ -51,6 +51,16 @@
   max-width: 760px;
 }
 
+.garmin-settings-form {
+  max-width: none;
+}
+
+.garmin-settings-history {
+  margin-top: 6px;
+  padding-top: 22px;
+  border-top: 1px solid var(--border);
+}
+
 .settings-form label {
   display: grid;
   gap: 7px;
