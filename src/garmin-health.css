@@ -31,16 +31,32 @@
   gap: 10px;
 }
 
-.garmin-metric-grid article {
+.garmin-metric-grid article,
+.garmin-metric-card {
   padding: 16px;
   border: 1px solid var(--border);
   border-radius: 12px;
   background: var(--surface-soft);
+  color: var(--text);
+  text-align: left;
+}
+
+.garmin-metric-action,
+.garmin-summary-action {
+  cursor: pointer;
+  font: inherit;
+}
+
+.garmin-metric-action:hover,
+.garmin-summary-action:hover {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent-soft) 55%, var(--surface-soft));
 }
 
 .garmin-metric-grid span,
 .garmin-metric-grid strong,
-.garmin-metric-grid small {
+.garmin-metric-grid small,
+.garmin-metric-grid em {
   display: block;
 }
 
@@ -60,6 +76,20 @@
 .garmin-metric-grid small {
   color: var(--muted);
   line-height: 1.4;
+}
+
+.garmin-metric-grid em {
+  margin-top: 9px;
+  color: var(--accent);
+  font-size: 0.72rem;
+  font-style: normal;
+  font-weight: 800;
+}
+
+.garmin-summary-action {
+  width: 100%;
+  color: var(--text);
+  text-align: left;
 }
 
 .garmin-recent-activities {
@@ -91,6 +121,233 @@
   font-size: 0.8rem;
 }
 
+.garmin-deep-dive {
+  display: grid;
+  gap: 16px;
+  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-soft);
+}
+
+.garmin-deep-heading,
+.sleep-card-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.garmin-deep-heading h3,
+.sleep-card-heading h4 {
+  margin: 0;
+}
+
+.garmin-deep-heading > div > p:last-child {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 0.88rem;
+}
+
+.sleep-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.sleep-summary-grid article,
+.sleep-detail-card {
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-soft);
+}
+
+.sleep-summary-grid span,
+.sleep-summary-grid strong,
+.sleep-summary-grid small {
+  display: block;
+}
+
+.sleep-summary-grid span {
+  color: var(--muted);
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.sleep-summary-grid strong {
+  margin: 5px 0;
+  font-size: 1.15rem;
+}
+
+.sleep-summary-grid small {
+  color: var(--muted);
+}
+
+.sleep-composition {
+  display: flex;
+  height: 18px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--surface-soft);
+}
+
+.sleep-composition > span {
+  min-width: 2px;
+}
+
+.sleep-stage-deep { background: #3156a6; fill: #3156a6; }
+.sleep-stage-light { background: #5688dc; fill: #5688dc; }
+.sleep-stage-rem { background: #9a74db; fill: #9a74db; }
+.sleep-stage-awake { background: #d38a54; fill: #d38a54; }
+
+.sleep-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.sleep-legend span {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.sleep-legend i {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+
+.sleep-stage-chart {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.sleep-stage-labels {
+  display: grid;
+  grid-template-rows: repeat(4, 1fr);
+  align-items: center;
+  height: 150px;
+  color: var(--muted);
+  font-size: 0.68rem;
+}
+
+.sleep-stage-chart svg {
+  width: 100%;
+  height: 150px;
+  overflow: visible;
+}
+
+.sleep-stage-times {
+  grid-column: 2;
+  display: flex;
+  justify-content: space-between;
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+
+.sleep-chart-grid {
+  stroke: var(--border);
+  stroke-width: 1;
+}
+
+.sleep-signal-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.sleep-card-heading strong {
+  color: var(--muted-strong);
+  font-size: 0.9rem;
+}
+
+.sleep-mini-chart {
+  margin-top: 12px;
+}
+
+.sleep-mini-chart svg {
+  width: 100%;
+  height: 130px;
+  overflow: visible;
+}
+
+.sleep-chart-line {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 3;
+  vector-effect: non-scaling-stroke;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.sleep-mini-chart > div {
+  display: flex;
+  justify-content: space-between;
+  color: var(--muted);
+  font-size: 0.68rem;
+}
+
+.sleep-chart-empty {
+  display: grid;
+  min-height: 130px;
+  margin-top: 12px;
+  place-items: center;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.sleep-history-chart {
+  display: grid;
+  grid-template-columns: repeat(30, minmax(14px, 1fr));
+  align-items: end;
+  gap: 4px;
+  height: 190px;
+  margin-top: 14px;
+  overflow-x: auto;
+}
+
+.sleep-history-chart button {
+  display: grid;
+  grid-template-rows: 150px auto;
+  align-items: end;
+  min-width: 14px;
+  height: 185px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+}
+
+.sleep-history-chart button > span {
+  width: 100%;
+  min-height: 3px;
+  border-radius: 4px 4px 2px 2px;
+  background: color-mix(in srgb, var(--accent) 58%, var(--surface));
+}
+
+.sleep-history-chart button:hover > span,
+.sleep-history-chart button.active > span {
+  background: var(--accent);
+}
+
+.sleep-history-chart small {
+  overflow: hidden;
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 0.58rem;
+  text-overflow: clip;
+  white-space: nowrap;
+  writing-mode: vertical-rl;
+  transform: rotate(180deg);
+}
+
 .inventory-file-row {
   grid-template-columns: 54px minmax(0, 1fr) auto auto;
 }
@@ -101,13 +358,16 @@
 }
 
 @media (max-width: 850px) {
-  .garmin-metric-grid {
+  .garmin-metric-grid,
+  .sleep-summary-grid,
+  .sleep-signal-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }
 
 @media (max-width: 600px) {
-  .garmin-health-heading {
+  .garmin-health-heading,
+  .garmin-deep-heading {
     display: block;
   }
 
@@ -116,7 +376,9 @@
     margin-top: 6px;
   }
 
-  .garmin-metric-grid {
+  .garmin-metric-grid,
+  .sleep-summary-grid,
+  .sleep-signal-grid {
     grid-template-columns: 1fr;
   }
 
@@ -130,5 +392,9 @@
 
   .inventory-file-row {
     grid-template-columns: 44px minmax(0, 1fr);
+  }
+
+  .garmin-deep-heading .secondary-action {
+    margin-top: 12px;
   }
 }
