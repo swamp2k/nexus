@@ -100,11 +100,41 @@
   font-weight: 800;
 }
 
-.settings-coordinate-grid {
+.settings-coordinate-grid,
+.settings-choice-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 12px;
+}
+
+.settings-coordinate-grid {
   margin-top: 14px;
+}
+
+.settings-choice {
+  display: grid;
+  gap: 5px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-soft);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.settings-choice strong {
+  font-size: 1rem;
+}
+
+.settings-choice span {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.settings-choice.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
 }
 
 .settings-feedback {
@@ -124,10 +154,20 @@
   color: #d64545;
 }
 
-.settings-save-row {
+.settings-save-bar {
   display: flex;
-  justify-content: flex-start;
-  padding-top: 2px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-soft);
+}
+
+.settings-save-bar > div {
+  min-width: 0;
 }
 
 .settings-loading {
@@ -140,11 +180,13 @@
     padding: 20px;
   }
 
-  .settings-coordinate-grid {
+  .settings-coordinate-grid,
+  .settings-choice-grid {
     grid-template-columns: 1fr;
   }
 
-  .settings-location-actions {
+  .settings-location-actions,
+  .settings-save-bar {
     align-items: stretch;
     flex-direction: column;
   }
