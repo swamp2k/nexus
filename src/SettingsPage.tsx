@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import GarminImportSettings from "./GarminImportSettings";
 
 type GridProviderOption = { key: string; label: string };
 type SettingsResponse = {
@@ -11,9 +12,7 @@ type SettingsResponse = {
     energySupplierMarkupOere: number | null;
     updatedAt: string | null;
   };
-  options?: {
-    gridProviders?: GridProviderOption[];
-  };
+  options?: { gridProviders?: GridProviderOption[] };
 };
 
 type SaveState = "idle" | "saving" | "saved" | "error";
@@ -50,16 +49,10 @@ export default function SettingsPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  function changed() {
-    setSaveState("idle");
-  }
+  function changed() { setSaveState("idle"); }
 
   function useCurrentLocation() {
-    if (!navigator.geolocation) {
-      setLocateState("error");
-      return;
-    }
-
+    if (!navigator.geolocation) { setLocateState("error"); return; }
     setLocateState("locating");
     navigator.geolocation.getCurrentPosition(
       (position) => {
@@ -98,9 +91,7 @@ export default function SettingsPage() {
       setEnergyGridProvider(settings.energyGridProvider || "Konstant");
       setEnergySupplierMarkupOere(String(settings.energySupplierMarkupOere ?? 0));
       setSaveState("saved");
-    } catch {
-      setSaveState("error");
-    }
+    } catch { setSaveState("error"); }
   }
 
   return (
@@ -113,56 +104,31 @@ export default function SettingsPage() {
         {loading ? <p className="settings-loading">Henter indstillinger…</p> : (
           <div className="settings-form">
             <label><span>Navn på stedet</span><input value={label} onChange={(event) => { setLabel(event.target.value); changed(); }} placeholder="Hjem" maxLength={80} /></label>
-            <div className="settings-location-actions">
-              <button className="primary-action" type="button" onClick={useCurrentLocation} disabled={locateState === "locating"}>{locateState === "locating" ? "Finder placering…" : "Brug min aktuelle placering"}</button>
-              <span>Browseren spørger om tilladelse til lokation.</span>
-            </div>
-            <details className="settings-advanced">
-              <summary>Avanceret: koordinater</summary>
-              <div className="settings-coordinate-grid">
-                <label><span>Breddegrad</span><input inputMode="decimal" value={latitude} onChange={(event) => { setLatitude(event.target.value); changed(); }} /></label>
-                <label><span>Længdegrad</span><input inputMode="decimal" value={longitude} onChange={(event) => { setLongitude(event.target.value); changed(); }} /></label>
-              </div>
-            </details>
+            <div className="settings-location-actions"><button className="primary-action" type="button" onClick={useCurrentLocation} disabled={locateState === "locating"}>{locateState === "locating" ? "Finder placering…" : "Brug min aktuelle placering"}</button><span>Browseren spørger om tilladelse til lokation.</span></div>
+            <details className="settings-advanced"><summary>Avanceret: koordinater</summary><div className="settings-coordinate-grid"><label><span>Breddegrad</span><input inputMode="decimal" value={latitude} onChange={(event) => { setLatitude(event.target.value); changed(); }} /></label><label><span>Længdegrad</span><input inputMode="decimal" value={longitude} onChange={(event) => { setLongitude(event.target.value); changed(); }} /></label></div></details>
             {locateState === "error" && <p className="settings-feedback error">Placeringen kunne ikke læses fra browseren.</p>}
           </div>
         )}
       </article>
 
       <article className="settings-card">
-        <div className="settings-card-heading">
-          <div><p className="section-label">Strøm</p><h2>Elpris</h2><p>Nexus kombinerer spotpris med dit netselskabs aktuelle tarif, Energinet, elafgift, moms og dit elselskabs kWh-tillæg.</p></div>
-          <span className="settings-icon" aria-hidden="true">ϟ</span>
-        </div>
+        <div className="settings-card-heading"><div><p className="section-label">Strøm</p><h2>Elpris</h2><p>Nexus kombinerer spotpris med dit netselskabs aktuelle tarif, Energinet, elafgift, moms og dit elselskabs kWh-tillæg.</p></div><span className="settings-icon" aria-hidden="true">ϟ</span></div>
         {loading ? <p className="settings-loading">Henter indstillinger…</p> : (
           <div className="settings-form">
             <div className="settings-choice-grid" role="radiogroup" aria-label="Elprisområde">
               <button className={`settings-choice ${energyPriceArea === "DK1" ? "active" : ""}`} type="button" onClick={() => { setEnergyPriceArea("DK1"); changed(); }}><strong>DK1</strong><span>Vestdanmark · Jylland og Fyn</span></button>
               <button className={`settings-choice ${energyPriceArea === "DK2" ? "active" : ""}`} type="button" onClick={() => { setEnergyPriceArea("DK2"); changed(); }}><strong>DK2</strong><span>Østdanmark · Sjælland og Bornholm</span></button>
             </div>
-
-            <label>
-              <span>Netselskab</span>
-              <select value={energyGridProvider} onChange={(event) => { setEnergyGridProvider(event.target.value); changed(); }}>
-                {(gridProviders.length ? gridProviders : [{ key: "Konstant", label: "Konstant" }]).map((provider) => <option key={provider.key} value={provider.key}>{provider.label}</option>)}
-              </select>
-            </label>
-
-            <label>
-              <span>Elselskabets tillæg · øre/kWh ekskl. moms</span>
-              <input inputMode="decimal" type="number" min="0" max="500" step="0.01" value={energySupplierMarkupOere} onChange={(event) => { setEnergySupplierMarkupOere(event.target.value); changed(); }} />
-            </label>
+            <label><span>Netselskab</span><select value={energyGridProvider} onChange={(event) => { setEnergyGridProvider(event.target.value); changed(); }}>{(gridProviders.length ? gridProviders : [{ key: "Konstant", label: "Konstant" }]).map((provider) => <option key={provider.key} value={provider.key}>{provider.label}</option>)}</select></label>
+            <label><span>Elselskabets tillæg · øre/kWh ekskl. moms</span><input inputMode="decimal" type="number" min="0" max="500" step="0.01" value={energySupplierMarkupOere} onChange={(event) => { setEnergySupplierMarkupOere(event.target.value); changed(); }} /></label>
             <p className="settings-help">Faste abonnementer påvirker ikke, om det er billigt at bruge 1 kWh lige nu, og fordeles derfor ikke ind i timeprisen.</p>
           </div>
         )}
       </article>
 
-      {!loading && (
-        <div className="settings-save-bar">
-          <div>{saveState === "saved" && <p className="settings-feedback success">Indstillingerne er gemt.</p>}{saveState === "error" && <p className="settings-feedback error">Indstillingerne kunne ikke gemmes.</p>}</div>
-          <button className="primary-action" type="button" onClick={() => void save()} disabled={saveState === "saving" || !latitude || !longitude}>{saveState === "saving" ? "Gemmer…" : "Gem indstillinger"}</button>
-        </div>
-      )}
+      <GarminImportSettings />
+
+      {!loading && <div className="settings-save-bar"><div>{saveState === "saved" && <p className="settings-feedback success">Indstillingerne er gemt.</p>}{saveState === "error" && <p className="settings-feedback error">Indstillingerne kunne ikke gemmes.</p>}</div><button className="primary-action" type="button" onClick={() => void save()} disabled={saveState === "saving" || !latitude || !longitude}>{saveState === "saving" ? "Gemmer…" : "Gem indstillinger"}</button></div>}
     </section>
   );
 }
