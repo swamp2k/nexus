@@ -1,12 +1,16 @@
 import { getAuthenticatedUser } from "../auth/session";
 import { getElectricityUsage } from "./eloverblik";
 import { getEnergyPrices } from "./energy-prices";
+import { getWeatherForecast } from "./weather";
 
 type SourceEnv = Env & {
   ENERGY_PRICE_AREA?: string;
   ELOVERBLIK_REFRESH_TOKEN?: string;
   ELOVERBLIK_METERING_POINT?: string;
   WASTE_CALENDAR_ICS_URL?: string;
+  WEATHER_LAT?: string;
+  WEATHER_LON?: string;
+  WEATHER_LABEL?: string;
 };
 
 function json(body: unknown, init: ResponseInit = {}): Response {
@@ -37,6 +41,11 @@ export async function handleSourceRoute(request: Request, env: SourceEnv): Promi
   if (pathname === "/api/sources/status") {
     return json({
       sources: {
+        weather: {
+          configured: Boolean(env.WEATHER_LAT && env.WEATHER_LON),
+          provider: "MET Norway",
+          label: String(env.WEATHER_LABEL ?? "Hjem"),
+        },
         energyPrices: {
           configured: true,
           area: normalizePriceArea(env.ENERGY_PRICE_AREA),
@@ -50,6 +59,12 @@ export async function handleSourceRoute(request: Request, env: SourceEnv): Promi
         },
       },
     });
+  }
+
+  if (pathname === "/api/sources/weather") {
+    const result = await getWeatherForecast(env);
+    if (!result) return json({ error: "source_not_configured" }, { status: 503 });
+    return json(result);
   }
 
   if (pathname === "/api/sources/energy/prices") {
