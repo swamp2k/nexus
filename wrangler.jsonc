@@ -5,7 +5,10 @@
   "main": "./worker/index.ts",
   "vars": {
     "MAIL_FROM": "login@nexus.starrewards.app",
-    "ENERGY_PRICE_AREA": "DK1"
+    "ENERGY_PRICE_AREA": "DK1",
+    "WEATHER_LAT": "56.1944",
+    "WEATHER_LON": "10.6821",
+    "WEATHER_LABEL": "Ebeltoft"
   },
   "assets": {
     "not_found_handling": "single-page-application",
