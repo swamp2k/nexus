@@ -1,6 +1,5 @@
 import { readSourceCache, recordSourceError, writeSourceCache } from "./cache";
 
-const CACHE_KEY = "energy:day-ahead";
 const CACHE_TTL_MS = 60 * 60 * 1000;
 const EUR_DKK_REFERENCE = 7.46038;
 
@@ -13,6 +12,14 @@ type EnergyDataResponse = {
   records?: unknown;
 };
 
+type EnergyEnv = Env & {
+  ENERGY_PRICE_AREA?: string;
+};
+
+type EnergySettingsRow = {
+  energyPriceArea: string | null;
+};
+
 export type EnergyPricePoint = {
   timeUtc: string;
   eurPerMwh: number;
@@ -21,7 +28,7 @@ export type EnergyPricePoint = {
 
 export type EnergyPriceData = {
   source: "Energi Data Service";
-  area: string;
+  area: "DK1" | "DK2";
   resolutionMinutes: 15;
   currencyNote: string;
   intervals: EnergyPricePoint[];
@@ -52,11 +59,25 @@ function cleanRecord(record: unknown): EnergyPricePoint | null {
   };
 }
 
-function normalizePriceArea(value: string | undefined): "DK1" | "DK2" {
+export function normalizePriceArea(value: string | undefined | null): "DK1" | "DK2" {
   return String(value ?? "DK1").toUpperCase() === "DK2" ? "DK2" : "DK1";
 }
 
-async function fetchEnergyPrices(area: string): Promise<EnergyPriceData> {
+async function resolvePriceArea(env: EnergyEnv, userId: string): Promise<"DK1" | "DK2"> {
+  try {
+    const row = await env.DB.prepare(
+      `SELECT energy_price_area AS energyPriceArea
+       FROM user_settings
+       WHERE user_id = ?`,
+    ).bind(userId).first<EnergySettingsRow>();
+    if (row?.energyPriceArea) return normalizePriceArea(row.energyPriceArea);
+  } catch {
+    // Keep the configured fallback working before migration 0005 is applied.
+  }
+  return normalizePriceArea(env.ENERGY_PRICE_AREA);
+}
+
+async function fetchEnergyPrices(area: "DK1" | "DK2"): Promise<EnergyPriceData> {
   const start = new Date();
   start.setUTCDate(start.getUTCDate() - 1);
   const end = new Date();
@@ -76,9 +97,7 @@ async function fetchEnergyPrices(area: string): Promise<EnergyPriceData> {
     },
   });
 
-  if (!response.ok) {
-    throw new Error(`energidataservice_http_${response.status}`);
-  }
+  if (!response.ok) throw new Error(`energidataservice_http_${response.status}`);
 
   const body = await response.json() as EnergyDataResponse;
   if (!Array.isArray(body.records)) throw new Error("energidataservice_invalid_response");
@@ -98,18 +117,18 @@ async function fetchEnergyPrices(area: string): Promise<EnergyPriceData> {
   };
 }
 
-export async function getEnergyPrices(env: Env & { ENERGY_PRICE_AREA?: string }) {
-  const cached = await readSourceCache<EnergyPriceData>(env.DB, CACHE_KEY);
+export async function getEnergyPrices(env: EnergyEnv, userId: string) {
+  const area = await resolvePriceArea(env, userId);
+  const cacheKey = `energy:day-ahead:${area}`;
+  const cached = await readSourceCache<EnergyPriceData>(env.DB, cacheKey);
   if (cached && !cached.stale) return cached;
-
-  const area = normalizePriceArea(env.ENERGY_PRICE_AREA);
 
   try {
     const data = await fetchEnergyPrices(area);
-    return await writeSourceCache(env.DB, CACHE_KEY, data, CACHE_TTL_MS);
+    return await writeSourceCache(env.DB, cacheKey, data, CACHE_TTL_MS);
   } catch (error) {
     const message = error instanceof Error ? error.message : "energy_price_fetch_failed";
-    await recordSourceError(env.DB, CACHE_KEY, message);
+    await recordSourceError(env.DB, cacheKey, message);
     if (cached) return { ...cached, stale: true, lastErrorAt: new Date().toISOString(), lastErrorMessage: message };
     throw error;
   }
