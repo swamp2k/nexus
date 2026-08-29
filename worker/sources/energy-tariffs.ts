@@ -112,6 +112,30 @@ async function fetchGridTariff(providerKey: GridProviderKey): Promise<GridTariff
   return first;
 }
 
+function konstant2026Fallback(): GridTariff {
+  const month = new Date().getUTCMonth() + 1;
+  const summer = month >= 4 && month <= 9;
+  // Published consumer tariffs incl. VAT: 7.56 øre low, 11.35/29.51 summer,
+  // 22.70/68.11 winter. Convert back to DKK/kWh ex VAT for the common calculation.
+  const low = 0.0756 / 1.25;
+  const high = (summer ? 0.1135 : 0.2270) / 1.25;
+  const peak = (summer ? 0.2951 : 0.6811) / 1.25;
+  const hourly = Array.from({ length: 24 }, (_, hour) => {
+    if (hour < 6) return low;
+    if (hour >= 17 && hour < 21) return peak;
+    return high;
+  });
+  return {
+    providerKey: "Konstant",
+    providerLabel: "Konstant",
+    chargeOwner: "Konstant Net A/S - 151",
+    chargeTypeCode: GRID_PROVIDERS.Konstant.chargeTypeCode,
+    validFrom: "2026-01-01T00:00:00",
+    validTo: "2027-01-01T00:00:00",
+    hourlyExVatDkkPerKwh: hourly,
+  };
+}
+
 export async function getGridTariff(db: D1Database, providerKey: GridProviderKey) {
   const key = cacheKey(providerKey);
   const cached = await readSourceCache<GridTariff>(db, key);
@@ -124,6 +148,17 @@ export async function getGridTariff(db: D1Database, providerKey: GridProviderKey
     const message = error instanceof Error ? error.message : "datahub_tariff_fetch_failed";
     await recordSourceError(db, key, message);
     if (cached) return { ...cached, stale: true, lastErrorAt: new Date().toISOString(), lastErrorMessage: message };
+    if (providerKey === "Konstant") {
+      const now = new Date().toISOString();
+      return {
+        data: konstant2026Fallback(),
+        fetchedAt: now,
+        expiresAt: now,
+        stale: true,
+        lastErrorAt: now,
+        lastErrorMessage: message,
+      };
+    }
     throw error;
   }
 }
