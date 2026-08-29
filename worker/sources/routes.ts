@@ -1,6 +1,6 @@
 import { getAuthenticatedUser } from "../auth/session";
 import { getElectricityUsage } from "./eloverblik";
-import { getEnergyPrices } from "./energy-prices";
+import { getEnergyPrices, resolvePriceArea } from "./energy-prices";
 import { getWeatherForecast, resolveWeatherLocation } from "./weather";
 
 type SourceEnv = Env & {
@@ -19,10 +19,6 @@ function json(body: unknown, init: ResponseInit = {}): Response {
   return Response.json(body, { ...init, headers });
 }
 
-function normalizePriceArea(value: string | undefined): "DK1" | "DK2" {
-  return String(value ?? "DK1").toUpperCase() === "DK2" ? "DK2" : "DK1";
-}
-
 async function requireUser(request: Request, env: SourceEnv) {
   return getAuthenticatedUser(request, env.DB);
 }
@@ -39,7 +35,10 @@ export async function handleSourceRoute(request: Request, env: SourceEnv): Promi
   if (!user) return json({ error: "unauthorized" }, { status: 401 });
 
   if (pathname === "/api/sources/status") {
-    const weatherLocation = await resolveWeatherLocation(env, user.id);
+    const [weatherLocation, energyArea] = await Promise.all([
+      resolveWeatherLocation(env, user.id),
+      resolvePriceArea(env, user.id),
+    ]);
     return json({
       sources: {
         weather: {
@@ -49,7 +48,7 @@ export async function handleSourceRoute(request: Request, env: SourceEnv): Promi
         },
         energyPrices: {
           configured: true,
-          area: normalizePriceArea(env.ENERGY_PRICE_AREA),
+          area: energyArea,
         },
         electricityUsage: {
           configured: Boolean(env.ELOVERBLIK_REFRESH_TOKEN && env.ELOVERBLIK_METERING_POINT),
@@ -69,8 +68,7 @@ export async function handleSourceRoute(request: Request, env: SourceEnv): Promi
   }
 
   if (pathname === "/api/sources/energy/prices") {
-    const result = await getEnergyPrices(env);
-    return json(result);
+    return json(await getEnergyPrices(env, user.id));
   }
 
   if (pathname === "/api/sources/energy/usage") {
