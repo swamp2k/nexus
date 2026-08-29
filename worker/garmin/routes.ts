@@ -1,4 +1,5 @@
 import { getAuthenticatedUser } from "../auth/session";
+import { inventoryZip } from "./zip-inventory";
 
 const PART_SIZE_BYTES = 10 * 1024 * 1024;
 const MAX_FILE_SIZE_BYTES = 20 * 1024 * 1024 * 1024;
@@ -237,6 +238,122 @@ async function abortUpload(request: Request, env: Env): Promise<Response> {
   return new Response(null, { status: 204 });
 }
 
+async function inventoryImport(request: Request, env: Env): Promise<Response> {
+  if (request.method !== "POST") return json({ error: "method_not_allowed" }, { status: 405 });
+
+  const user = await requireUser(request, env);
+  if (!user) return json({ error: "unauthorized" }, { status: 401 });
+
+  const importId = new URL(request.url).searchParams.get("importId") ?? "";
+  if (!UUID_RE.test(importId)) return json({ error: "invalid_import_id" }, { status: 400 });
+
+  const row = await env.DB.prepare(
+    `SELECT id, storage_key AS storageKey
+     FROM garmin_imports
+     WHERE id = ? AND user_id = ?`,
+  ).bind(importId, user.id).first<{ id: string; storageKey: string | null }>();
+
+  if (!row?.storageKey) return json({ error: "import_not_found" }, { status: 404 });
+
+  const startedAt = new Date().toISOString();
+  await env.DB.prepare(
+    `UPDATE garmin_imports
+     SET status = 'inventorying', error_message = NULL, updated_at = ?
+     WHERE id = ? AND user_id = ?`,
+  ).bind(startedAt, importId, user.id).run();
+
+  try {
+    const inventory = await inventoryZip(env.DATA, row.storageKey);
+
+    await env.DB.prepare(`DELETE FROM garmin_import_files WHERE import_id = ?`).bind(importId).run();
+
+    for (let offset = 0; offset < inventory.entries.length; offset += 50) {
+      const chunk = inventory.entries.slice(offset, offset + 50);
+      await env.DB.batch(chunk.map((entry) => env.DB.prepare(
+        `INSERT INTO garmin_import_files (
+           id, import_id, path, size_bytes, file_type, status, created_at
+         ) VALUES (?, ?, ?, ?, ?, 'discovered', ?)`,
+      ).bind(
+        crypto.randomUUID(),
+        importId,
+        entry.path,
+        entry.sizeBytes,
+        entry.fileType,
+        startedAt,
+      )));
+    }
+
+    const finishedAt = new Date().toISOString();
+    await env.DB.prepare(
+      `UPDATE garmin_imports
+       SET status = 'ready', file_count = ?, detected_from = ?, detected_to = ?,
+           error_message = NULL, updated_at = ?
+       WHERE id = ? AND user_id = ?`,
+    ).bind(
+      inventory.entries.length,
+      inventory.detectedFrom,
+      inventory.detectedTo,
+      finishedAt,
+      importId,
+      user.id,
+    ).run();
+
+    return json({
+      ok: true,
+      importId,
+      status: "ready",
+      fileCount: inventory.entries.length,
+      detectedFrom: inventory.detectedFrom,
+      detectedTo: inventory.detectedTo,
+      sample: inventory.entries.slice(0, 25),
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "inventory_failed";
+    await env.DB.prepare(
+      `UPDATE garmin_imports
+       SET status = 'failed', error_message = ?, updated_at = ?
+       WHERE id = ? AND user_id = ?`,
+    ).bind(message, new Date().toISOString(), importId, user.id).run();
+
+    console.error(JSON.stringify({
+      event: "garmin_inventory_failed",
+      userId: user.id,
+      importId,
+      error: message,
+    }));
+
+    return json({ error: "inventory_failed", detail: message }, { status: 422 });
+  }
+}
+
+async function listImportFiles(request: Request, env: Env): Promise<Response> {
+  if (request.method !== "GET") return json({ error: "method_not_allowed" }, { status: 405 });
+
+  const user = await requireUser(request, env);
+  if (!user) return json({ error: "unauthorized" }, { status: 401 });
+
+  const importId = new URL(request.url).searchParams.get("importId") ?? "";
+  if (!UUID_RE.test(importId)) return json({ error: "invalid_import_id" }, { status: 400 });
+
+  const owned = await env.DB.prepare(
+    `SELECT id FROM garmin_imports WHERE id = ? AND user_id = ?`,
+  ).bind(importId, user.id).first();
+  if (!owned) return json({ error: "import_not_found" }, { status: 404 });
+
+  const result = await env.DB.prepare(
+    `SELECT path,
+            size_bytes AS sizeBytes,
+            file_type AS fileType,
+            status
+     FROM garmin_import_files
+     WHERE import_id = ?
+     ORDER BY path
+     LIMIT 5000`,
+  ).bind(importId).all();
+
+  return json({ files: result.results });
+}
+
 async function listImports(request: Request, env: Env): Promise<Response> {
   if (request.method !== "GET") return json({ error: "method_not_allowed" }, { status: 405 });
 
@@ -273,6 +390,8 @@ export async function handleGarminRoute(request: Request, env: Env): Promise<Res
   if (pathname === "/api/garmin/uploads/part") return uploadPart(request, env);
   if (pathname === "/api/garmin/uploads/complete") return completeUpload(request, env);
   if (pathname === "/api/garmin/uploads") return abortUpload(request, env);
+  if (pathname === "/api/garmin/imports/inventory") return inventoryImport(request, env);
+  if (pathname === "/api/garmin/imports/files") return listImportFiles(request, env);
   if (pathname === "/api/garmin/imports") return listImports(request, env);
 
   return null;
