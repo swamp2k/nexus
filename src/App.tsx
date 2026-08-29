@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import GarminPage from "./GarminPage";
+import WeatherPage from "./WeatherPage";
 import KitchenDisplay from "./KitchenDisplay";
 
 type User = {
@@ -27,8 +28,8 @@ type Page = "Hjem" | "Garmin" | "Vejr" | "Strøm" | "DBA" | "Unraid" | "PC Watch
 
 const modules: Module[] = [
   { name: "Garmin", status: "First data module", detail: "Import, historik og analyse", tone: "blue", icon: "⌖" },
-  { name: "Vejr", status: "Planned", detail: "Varsler og historik", tone: "sky", icon: "☁" },
-  { name: "Strøm", status: "Planned", detail: "Priser og bedste tidspunkter", tone: "amber", icon: "ϟ" },
+  { name: "Vejr", status: "Active", detail: "MET Norway prognose", tone: "sky", icon: "☁" },
+  { name: "Strøm", status: "In progress", detail: "Priser og bedste tidspunkter", tone: "amber", icon: "ϟ" },
   { name: "DBA", status: "Later integration", detail: "Fund og monitorering", tone: "green", icon: "◇" },
   { name: "Unraid", status: "Later integration", detail: "Serverstatus og advarsler", tone: "violet", icon: "▤" },
   { name: "PC Watch", status: "Later integration", detail: "Maskinstatus samlet ét sted", tone: "teal", icon: "▣" },
@@ -50,10 +51,10 @@ function Dashboard({ onOpen }: { onOpen: (page: Page) => void }) {
       <section className="hero-card" aria-labelledby="today-heading">
         <div>
           <p className="section-label">I dag</p>
-          <h2 id="today-heading">Nexus er klar til første modul</h2>
-          <p>Grundskallen kører. Garmin bliver første rigtige datapipeline, mens de øvrige projekter forbliver selvstændige.</p>
+          <h2 id="today-heading">Nexus samler de første rigtige datakilder</h2>
+          <p>Garmin, vejr og strøm bygges som selvstændige kilder, mens Nexus står for præsentation, cache og historik.</p>
         </div>
-        <span className="status-pill">Phase 0</span>
+        <span className="status-pill">Building</span>
       </section>
 
       <section className="modules-section" aria-labelledby="modules-heading">
@@ -163,7 +164,9 @@ function App() {
     ? "Én rolig indgang til data, overvågning og de små værktøjer familien faktisk bruger."
     : page === "Garmin"
       ? "Din sundheds- og aktivitetshistorik samlet, importeret og klar til analyse."
-      : "Modulet er planlagt, men endnu ikke bygget.";
+      : page === "Vejr"
+        ? "Prognosen fra MET Norway, pakket roligt ind til Nexus og køkkendisplayet."
+        : "Modulet er planlagt, men endnu ikke bygget.";
 
   return (
     <div className="app-frame">
@@ -195,7 +198,8 @@ function App() {
         <main className="main-content">
           {page === "Hjem" && <Dashboard onOpen={setPage} />}
           {page === "Garmin" && <GarminPage />}
-          {!isHome && page !== "Garmin" && <section className="placeholder-card"><p className="section-label">Planlagt</p><h2>{page}</h2><p>Vi kommer hertil efter Garmin-pipelinen er på plads.</p></section>}
+          {page === "Vejr" && <WeatherPage />}
+          {!isHome && page !== "Garmin" && page !== "Vejr" && <section className="placeholder-card"><p className="section-label">Planlagt</p><h2>{page}</h2><p>Modulet er på vej ind i Nexus.</p></section>}
         </main>
 
         <footer><span>Nexus v0.1</span><span>Simple by design.</span></footer>
