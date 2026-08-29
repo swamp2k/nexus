@@ -13,6 +13,12 @@ type SettingsBody = {
   weatherLon?: unknown;
 };
 
+type SettingsEnv = Env & {
+  WEATHER_LABEL?: string;
+  WEATHER_LAT?: string;
+  WEATHER_LON?: string;
+};
+
 function json(body: unknown, init: ResponseInit = {}): Response {
   const headers = new Headers(init.headers);
   headers.set("Cache-Control", "no-store");
@@ -34,25 +40,34 @@ function cleanCoordinate(value: unknown, min: number, max: number): number | nul
   return Math.round(parsed * 100000) / 100000;
 }
 
-async function readSettings(env: Env, userId: string): Promise<SettingsRow> {
-  const row = await env.DB.prepare(
-    `SELECT weather_label AS weatherLabel,
-            weather_lat AS weatherLat,
-            weather_lon AS weatherLon,
-            updated_at AS updatedAt
-     FROM user_settings
-     WHERE user_id = ?`,
-  ).bind(userId).first<SettingsRow>();
-
-  return row ?? {
-    weatherLabel: null,
-    weatherLat: null,
-    weatherLon: null,
+function fallbackSettings(env: SettingsEnv): SettingsRow {
+  return {
+    weatherLabel: String(env.WEATHER_LABEL ?? "Hjem").trim() || "Hjem",
+    weatherLat: cleanCoordinate(env.WEATHER_LAT, -90, 90),
+    weatherLon: cleanCoordinate(env.WEATHER_LON, -180, 180),
     updatedAt: null,
   };
 }
 
-export async function handleSettingsRoute(request: Request, env: Env): Promise<Response | null> {
+async function readSettings(env: SettingsEnv, userId: string): Promise<SettingsRow> {
+  try {
+    const row = await env.DB.prepare(
+      `SELECT weather_label AS weatherLabel,
+              weather_lat AS weatherLat,
+              weather_lon AS weatherLon,
+              updated_at AS updatedAt
+       FROM user_settings
+       WHERE user_id = ?`,
+    ).bind(userId).first<SettingsRow>();
+
+    return row ?? fallbackSettings(env);
+  } catch {
+    // Keep the current configured location visible during a deploy before migration 0004 is applied.
+    return fallbackSettings(env);
+  }
+}
+
+export async function handleSettingsRoute(request: Request, env: SettingsEnv): Promise<Response | null> {
   const pathname = new URL(request.url).pathname;
   if (pathname !== "/api/settings") return null;
 
