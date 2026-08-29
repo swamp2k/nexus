@@ -1,5 +1,6 @@
 import { handleAuthRoute } from "./auth/routes";
 import { handleGarminRoute } from "./garmin/routes";
+import { handleSettingsRoute } from "./settings/routes";
 import { handleSourceRoute } from "./sources/routes";
 
 type HealthResponse = {
@@ -35,6 +36,11 @@ export default {
       if (url.pathname.startsWith("/api/garmin/")) {
         const garminResponse = await handleGarminRoute(request, env);
         if (garminResponse) return garminResponse;
+      }
+
+      if (url.pathname === "/api/settings") {
+        const settingsResponse = await handleSettingsRoute(request, env);
+        if (settingsResponse) return settingsResponse;
       }
 
       if (url.pathname.startsWith("/api/sources/")) {
