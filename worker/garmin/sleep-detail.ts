@@ -18,7 +18,6 @@ type SleepRow = {
 
 type ImportRow = { storageKey: string | null };
 type FileRow = { path: string };
-
 type RawPoint = Record<string, unknown>;
 
 function object(value: unknown): Record<string, unknown> | null {
@@ -59,7 +58,7 @@ function normalizeSeries(value: unknown, valueKey: string, timeKey = "startGMT")
 }
 
 export async function getSleepDetail(env: Env, userId: string, requestedDate: string | null, days = 30) {
-  const safeDays = Math.max(7, Math.min(90, Math.trunc(days) || 30));
+  const safeDays = Math.max(1, Math.min(365, Math.trunc(days) || 30));
   const historyResult = await env.DB.prepare(
     `SELECT date, import_id, sleep_start_ms, sleep_end_ms, sleep_seconds, nap_seconds,
             deep_seconds, light_seconds, rem_seconds, awake_seconds,
