@@ -4,6 +4,7 @@ type SettingsRow = {
   weatherLabel: string | null;
   weatherLat: number | null;
   weatherLon: number | null;
+  energyPriceArea: "DK1" | "DK2" | null;
   updatedAt: string | null;
 };
 
@@ -11,12 +12,14 @@ type SettingsBody = {
   weatherLabel?: unknown;
   weatherLat?: unknown;
   weatherLon?: unknown;
+  energyPriceArea?: unknown;
 };
 
 type SettingsEnv = Env & {
   WEATHER_LABEL?: string;
   WEATHER_LAT?: string;
   WEATHER_LON?: string;
+  ENERGY_PRICE_AREA?: string;
 };
 
 function json(body: unknown, init: ResponseInit = {}): Response {
@@ -40,11 +43,16 @@ function cleanCoordinate(value: unknown, min: number, max: number): number | nul
   return Math.round(parsed * 100000) / 100000;
 }
 
+function cleanPriceArea(value: unknown): "DK1" | "DK2" {
+  return String(value ?? "DK1").toUpperCase() === "DK2" ? "DK2" : "DK1";
+}
+
 function fallbackSettings(env: SettingsEnv): SettingsRow {
   return {
     weatherLabel: String(env.WEATHER_LABEL ?? "Hjem").trim() || "Hjem",
     weatherLat: cleanCoordinate(env.WEATHER_LAT, -90, 90),
     weatherLon: cleanCoordinate(env.WEATHER_LON, -180, 180),
+    energyPriceArea: cleanPriceArea(env.ENERGY_PRICE_AREA),
     updatedAt: null,
   };
 }
@@ -55,14 +63,18 @@ async function readSettings(env: SettingsEnv, userId: string): Promise<SettingsR
       `SELECT weather_label AS weatherLabel,
               weather_lat AS weatherLat,
               weather_lon AS weatherLon,
+              energy_price_area AS energyPriceArea,
               updated_at AS updatedAt
        FROM user_settings
        WHERE user_id = ?`,
     ).bind(userId).first<SettingsRow>();
 
-    return row ?? fallbackSettings(env);
+    if (!row) return fallbackSettings(env);
+    return {
+      ...row,
+      energyPriceArea: cleanPriceArea(row.energyPriceArea ?? env.ENERGY_PRICE_AREA),
+    };
   } catch {
-    // Keep the current configured location visible during a deploy before migration 0004 is applied.
     return fallbackSettings(env);
   }
 }
@@ -92,6 +104,7 @@ export async function handleSettingsRoute(request: Request, env: SettingsEnv): P
   const weatherLabel = cleanLabel(body.weatherLabel);
   const weatherLat = cleanCoordinate(body.weatherLat, -90, 90);
   const weatherLon = cleanCoordinate(body.weatherLon, -180, 180);
+  const energyPriceArea = cleanPriceArea(body.energyPriceArea);
 
   if (weatherLat === null || weatherLon === null) {
     return json({ error: "invalid_weather_location" }, { status: 400 });
@@ -99,20 +112,22 @@ export async function handleSettingsRoute(request: Request, env: SettingsEnv): P
 
   const updatedAt = new Date().toISOString();
   await env.DB.prepare(
-    `INSERT INTO user_settings (user_id, weather_label, weather_lat, weather_lon, updated_at)
-     VALUES (?, ?, ?, ?, ?)
+    `INSERT INTO user_settings (user_id, weather_label, weather_lat, weather_lon, energy_price_area, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?)
      ON CONFLICT(user_id) DO UPDATE SET
        weather_label = excluded.weather_label,
        weather_lat = excluded.weather_lat,
        weather_lon = excluded.weather_lon,
+       energy_price_area = excluded.energy_price_area,
        updated_at = excluded.updated_at`,
-  ).bind(user.id, weatherLabel ?? "Hjem", weatherLat, weatherLon, updatedAt).run();
+  ).bind(user.id, weatherLabel ?? "Hjem", weatherLat, weatherLon, energyPriceArea, updatedAt).run();
 
   return json({
     settings: {
       weatherLabel: weatherLabel ?? "Hjem",
       weatherLat,
       weatherLon,
+      energyPriceArea,
       updatedAt,
     },
   });
