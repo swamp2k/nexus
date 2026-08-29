@@ -32,7 +32,7 @@ function readUint64(view: DataView, offset: number): number {
 
 async function readRange(bucket: R2Bucket, key: string, offset: number, length: number): Promise<ArrayBuffer> {
   const object = await bucket.get(key, { range: { offset, length } });
-  if (!object || !('body' in object) || !object.body) throw new Error("garmin_source_missing");
+  if (!object || !("body" in object) || !object.body) throw new Error("garmin_source_missing");
   return object.arrayBuffer();
 }
 
@@ -126,7 +126,7 @@ function detectDate(path: string): string | null {
 }
 
 function decodeFilename(bytes: Uint8Array): string {
-  return new TextDecoder("utf-8", { fatal: false }).decode(bytes).replace(/\\/g, "/");
+  return new TextDecoder("utf-8", { fatal: false, ignoreBOM: false }).decode(bytes).replace(/\\/g, "/");
 }
 
 function parseCentralDirectory(buffer: ArrayBuffer, expectedEntries: number): ZipInventory {
