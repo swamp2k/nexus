@@ -63,7 +63,7 @@ export function normalizePriceArea(value: string | undefined | null): "DK1" | "D
   return String(value ?? "DK1").toUpperCase() === "DK2" ? "DK2" : "DK1";
 }
 
-async function resolvePriceArea(env: EnergyEnv, userId: string): Promise<"DK1" | "DK2"> {
+export async function resolvePriceArea(env: EnergyEnv, userId: string): Promise<"DK1" | "DK2"> {
   try {
     const row = await env.DB.prepare(
       `SELECT energy_price_area AS energyPriceArea
