@@ -5,18 +5,19 @@ type SettingsResponse = {
     weatherLabel: string | null;
     weatherLat: number | null;
     weatherLon: number | null;
+    energyPriceArea: "DK1" | "DK2" | null;
     updatedAt: string | null;
   };
 };
 
 type SaveState = "idle" | "saving" | "saved" | "error";
-
 type LocateState = "idle" | "locating" | "error";
 
 export default function SettingsPage() {
   const [label, setLabel] = useState("Hjem");
   const [latitude, setLatitude] = useState("");
   const [longitude, setLongitude] = useState("");
+  const [energyPriceArea, setEnergyPriceArea] = useState<"DK1" | "DK2">("DK1");
   const [loading, setLoading] = useState(true);
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [locateState, setLocateState] = useState<LocateState>("idle");
@@ -31,10 +32,15 @@ export default function SettingsPage() {
         setLabel(settings.weatherLabel || "Hjem");
         setLatitude(settings.weatherLat === null ? "" : String(settings.weatherLat));
         setLongitude(settings.weatherLon === null ? "" : String(settings.weatherLon));
+        setEnergyPriceArea(settings.energyPriceArea === "DK2" ? "DK2" : "DK1");
       })
       .catch(() => undefined)
       .finally(() => setLoading(false));
   }, []);
+
+  function changed() {
+    setSaveState("idle");
+  }
 
   function useCurrentLocation() {
     if (!navigator.geolocation) {
@@ -48,7 +54,7 @@ export default function SettingsPage() {
         setLatitude(position.coords.latitude.toFixed(5));
         setLongitude(position.coords.longitude.toFixed(5));
         setLocateState("idle");
-        setSaveState("idle");
+        changed();
       },
       () => setLocateState("error"),
       { enableHighAccuracy: false, timeout: 10_000, maximumAge: 5 * 60 * 1000 },
@@ -68,6 +74,7 @@ export default function SettingsPage() {
           weatherLabel: label,
           weatherLat,
           weatherLon,
+          energyPriceArea,
         }),
       });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -75,6 +82,7 @@ export default function SettingsPage() {
       setLabel(settings.weatherLabel || "Hjem");
       setLatitude(String(settings.weatherLat));
       setLongitude(String(settings.weatherLon));
+      setEnergyPriceArea(settings.energyPriceArea === "DK2" ? "DK2" : "DK1");
       setSaveState("saved");
     } catch {
       setSaveState("error");
@@ -99,7 +107,7 @@ export default function SettingsPage() {
           <div className="settings-form">
             <label>
               <span>Navn på stedet</span>
-              <input value={label} onChange={(event) => { setLabel(event.target.value); setSaveState("idle"); }} placeholder="Hjem" maxLength={80} />
+              <input value={label} onChange={(event) => { setLabel(event.target.value); changed(); }} placeholder="Hjem" maxLength={80} />
             </label>
 
             <div className="settings-location-actions">
@@ -114,27 +122,57 @@ export default function SettingsPage() {
               <div className="settings-coordinate-grid">
                 <label>
                   <span>Breddegrad</span>
-                  <input inputMode="decimal" value={latitude} onChange={(event) => { setLatitude(event.target.value); setSaveState("idle"); }} placeholder="56.19440" />
+                  <input inputMode="decimal" value={latitude} onChange={(event) => { setLatitude(event.target.value); changed(); }} placeholder="56.19440" />
                 </label>
                 <label>
                   <span>Længdegrad</span>
-                  <input inputMode="decimal" value={longitude} onChange={(event) => { setLongitude(event.target.value); setSaveState("idle"); }} placeholder="10.68210" />
+                  <input inputMode="decimal" value={longitude} onChange={(event) => { setLongitude(event.target.value); changed(); }} placeholder="10.68210" />
                 </label>
               </div>
             </details>
 
             {locateState === "error" && <p className="settings-feedback error">Placeringen kunne ikke læses fra browseren. Du kan indtaste koordinaterne manuelt.</p>}
-            {saveState === "saved" && <p className="settings-feedback success">Lokationen er gemt. Vejrmodulet bruger den ved næste opdatering.</p>}
-            {saveState === "error" && <p className="settings-feedback error">Indstillingerne kunne ikke gemmes.</p>}
+          </div>
+        )}
+      </article>
 
-            <div className="settings-save-row">
-              <button className="primary-action" type="button" onClick={() => void save()} disabled={saveState === "saving" || !latitude || !longitude}>
-                {saveState === "saving" ? "Gemmer…" : "Gem lokation"}
+      <article className="settings-card">
+        <div className="settings-card-heading">
+          <div>
+            <p className="section-label">Strøm</p>
+            <h2>Prisområde</h2>
+            <p>Vælg det danske elprisområde der bruges til spotpriser. DK1 er vest for Storebælt, DK2 er øst for Storebælt.</p>
+          </div>
+          <span className="settings-icon" aria-hidden="true">ϟ</span>
+        </div>
+
+        {loading ? (
+          <p className="settings-loading">Henter indstillinger…</p>
+        ) : (
+          <div className="settings-form">
+            <div className="settings-choice-grid" role="radiogroup" aria-label="Elprisområde">
+              <button className={`settings-choice ${energyPriceArea === "DK1" ? "active" : ""}`} type="button" onClick={() => { setEnergyPriceArea("DK1"); changed(); }}>
+                <strong>DK1</strong><span>Vestdanmark · Jylland og Fyn</span>
+              </button>
+              <button className={`settings-choice ${energyPriceArea === "DK2" ? "active" : ""}`} type="button" onClick={() => { setEnergyPriceArea("DK2"); changed(); }}>
+                <strong>DK2</strong><span>Østdanmark · Sjælland og Bornholm</span>
               </button>
             </div>
           </div>
         )}
       </article>
+
+      {!loading && (
+        <div className="settings-save-bar">
+          <div>
+            {saveState === "saved" && <p className="settings-feedback success">Indstillingerne er gemt.</p>}
+            {saveState === "error" && <p className="settings-feedback error">Indstillingerne kunne ikke gemmes.</p>}
+          </div>
+          <button className="primary-action" type="button" onClick={() => void save()} disabled={saveState === "saving" || !latitude || !longitude}>
+            {saveState === "saving" ? "Gemmer…" : "Gem indstillinger"}
+          </button>
+        </div>
+      )}
     </section>
   );
 }
