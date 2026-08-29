@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { SleepDurationBars, SleepMetricChart } from "./GarminSleepCharts";
 
 type Stage = "deep" | "light" | "rem" | "awake";
 type Point = { time: number; value: number };
@@ -89,25 +90,6 @@ function formatSecondsOfDay(seconds: number | null): string {
   return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
 }
 
-function Sparkline({ points, min, max }: { points: Point[]; min?: number; max?: number }) {
-  if (points.length < 2) return <div className="sleep-chart-empty">Ingen målinger</div>;
-  const width = 720;
-  const height = 120;
-  const pad = 8;
-  const start = points[0].time;
-  const end = points.at(-1)?.time ?? start + 1;
-  const values = points.map((point) => point.value);
-  const low = min ?? Math.min(...values);
-  const high = max ?? Math.max(...values);
-  const span = Math.max(1, high - low);
-  const path = points.map((point, index) => {
-    const x = pad + ((point.time - start) / Math.max(1, end - start)) * (width - pad * 2);
-    const y = height - pad - ((point.value - low) / span) * (height - pad * 2);
-    return `${index === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
-  }).join(" ");
-  return <div className="sleep-sparkline"><svg viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none"><path d={path} /></svg></div>;
-}
-
 function StageTimeline({ stages, start, end }: { stages: StagePoint[]; start: number; end: number }) {
   const row = { awake: 3, rem: 2, light: 1, deep: 0 } as const;
   return <div className="sleep-stage-timeline">
@@ -143,61 +125,29 @@ function DailyView({ row }: { row: SleepRow }) {
   const sleepTotal = row.sleep_seconds ?? 0;
   const windowTotal = sleepTotal + (row.awake_seconds ?? 0);
   return <div className="sleep-daily-view">
-    <div className="sleep-daily-top">
-      <SleepRing row={row} />
-      <div className="sleep-stage-summary">
-        {STAGES.map((stage) => <div key={stage}><span><i className={`sleep-stage-${stage}`} />{stageLabel(stage)}</span><strong>{duration(stageSeconds(row, stage))}</strong><small>{windowTotal ? `${Math.round((stageSeconds(row, stage) / windowTotal) * 100)} %` : ""}</small></div>)}
-      </div>
-    </div>
-
+    <div className="sleep-daily-top"><SleepRing row={row} /><div className="sleep-stage-summary">{STAGES.map((stage) => <div key={stage}><span><i className={`sleep-stage-${stage}`} />{stageLabel(stage)}</span><strong>{duration(stageSeconds(row, stage))}</strong><small>{windowTotal ? `${Math.round((stageSeconds(row, stage) / windowTotal) * 100)} %` : ""}</small></div>)}</div></div>
     {detail?.stages?.length ? <article className="sleep-garmin-section"><h4>Søvnstadier</h4><StageTimeline stages={detail.stages} start={detail.sleepStartMs ?? row.sleep_start_ms ?? detail.stages[0].start} end={detail.sleepEndMs ?? row.sleep_end_ms ?? detail.stages.at(-1)!.end} /></article> : null}
-
-    <div className="sleep-signal-pills">
-      <span>Bevægelse</span><span>Hvilepuls {detail?.restingHeartRate ? `${detail.restingHeartRate} bpm` : ""}</span><span>Body Battery {detail?.bodyBatteryChange === null || detail?.bodyBatteryChange === undefined ? "" : `${detail.bodyBatteryChange > 0 ? "+" : ""}${detail.bodyBatteryChange}`}</span>
-    </div>
-
-    <article className="sleep-garmin-section">
-      <h4>Søvnmålinger</h4>
-      <div className="sleep-metrics-grid">
-        <div><strong>{detail?.restingHeartRate ? `${detail.restingHeartRate} bpm` : "—"}</strong><span>Hvilepuls</span></div>
-        <div><strong>{detail?.bodyBatteryChange === null || detail?.bodyBatteryChange === undefined ? "—" : `${detail.bodyBatteryChange > 0 ? "+" : ""}${detail.bodyBatteryChange}`}</strong><span>Body Battery ændring</span></div>
-        <div><strong>{row.avg_respiration === null ? "—" : `${row.avg_respiration.toFixed(0)} brpm`}</strong><span>Gns. respiration</span></div>
-        <div><strong>{row.low_respiration === null ? "—" : `${row.low_respiration.toFixed(0)} brpm`}</strong><span>Laveste respiration</span></div>
-      </div>
-    </article>
-
+    <div className="sleep-signal-pills"><span>Bevægelse</span><span>Hvilepuls {detail?.restingHeartRate ? `${detail.restingHeartRate} bpm` : ""}</span><span>Body Battery {detail?.bodyBatteryChange === null || detail?.bodyBatteryChange === undefined ? "" : `${detail.bodyBatteryChange > 0 ? "+" : ""}${detail.bodyBatteryChange}`}</span></div>
+    <article className="sleep-garmin-section"><h4>Søvnmålinger</h4><div className="sleep-metrics-grid"><div><strong>{detail?.restingHeartRate ? `${detail.restingHeartRate} bpm` : "—"}</strong><span>Hvilepuls</span></div><div><strong>{detail?.bodyBatteryChange === null || detail?.bodyBatteryChange === undefined ? "—" : `${detail.bodyBatteryChange > 0 ? "+" : ""}${detail.bodyBatteryChange}`}</strong><span>Body Battery ændring</span></div><div><strong>{row.avg_respiration === null ? "—" : `${row.avg_respiration.toFixed(0)} brpm`}</strong><span>Gns. respiration</span></div><div><strong>{row.low_respiration === null ? "—" : `${row.low_respiration.toFixed(0)} brpm`}</strong><span>Laveste respiration</span></div></div></article>
     <div className="sleep-signal-grid compact">
-      <article className="sleep-garmin-section"><h4>Puls gennem natten</h4><Sparkline points={detail?.heartRate ?? []} /></article>
-      <article className="sleep-garmin-section"><h4>Body Battery</h4><Sparkline points={detail?.bodyBattery ?? []} min={0} max={100} /></article>
-      <article className="sleep-garmin-section"><h4>Stress</h4><Sparkline points={detail?.stress ?? []} min={0} max={100} /></article>
-      <article className="sleep-garmin-section"><h4>Respiration</h4><Sparkline points={detail?.respiration ?? []} /></article>
+      <article className="sleep-garmin-section"><h4>Puls gennem natten</h4><SleepMetricChart points={detail?.heartRate ?? []} unit=" bpm" /></article>
+      <article className="sleep-garmin-section"><h4>Body Battery</h4><SleepMetricChart points={detail?.bodyBattery ?? []} min={0} max={100} /></article>
+      <article className="sleep-garmin-section"><h4>Stress</h4><SleepMetricChart points={detail?.stress ?? []} min={0} max={100} /></article>
+      <article className="sleep-garmin-section"><h4>Respiration</h4><SleepMetricChart points={detail?.respiration ?? []} unit="/min" /></article>
     </div>
   </div>;
 }
 
 function RangeView({ history, onSelect }: { history: SleepRow[]; onSelect: (date: string) => void }) {
   const valid = history.filter((row) => (row.sleep_seconds ?? 0) > 0);
-  const max = Math.max(12 * 3600, ...valid.map((row) => row.sleep_seconds ?? 0));
   const avg = valid.length ? valid.reduce((sum, row) => sum + (row.sleep_seconds ?? 0), 0) / valid.length : 0;
   const bedtimes = valid.map((row) => secondsOfDay(row.sleep_start_ms)).filter((value): value is number => value !== null).map((value) => value < 12 * 3600 ? value + 86400 : value);
   const wakeTimes = valid.map((row) => secondsOfDay(row.sleep_end_ms)).filter((value): value is number => value !== null);
   const avgBed = circularMean(bedtimes.map((value) => value % 86400));
   const avgWake = circularMean(wakeTimes);
-
   return <div className="sleep-range-view">
-    <article className="sleep-garmin-section"><h4>Søvnvarighed</h4><div className="sleep-duration-bars">{history.map((row) => <button key={row.date} type="button" onClick={() => onSelect(row.date)} title={`${shortDate(row.date)} · ${duration(row.sleep_seconds)}`}><span style={{ height: `${Math.max(2, ((row.sleep_seconds ?? 0) / max) * 100)}%` }} /><small>{shortDate(row.date)}</small></button>)}</div><div className="sleep-range-stat"><strong>{duration(avg)}</strong><span>Gns. søvnvarighed</span></div></article>
-
-    <article className="sleep-garmin-section"><h4>Søvnrytme</h4><div className="sleep-consistency-chart">{history.map((row) => {
-      let bed = secondsOfDay(row.sleep_start_ms);
-      const wake = secondsOfDay(row.sleep_end_ms);
-      if (bed === null || wake === null) return <span key={row.date} className="empty" />;
-      if (bed < 12 * 3600) bed += 86400;
-      const wakeAdjusted = wake < 12 * 3600 ? wake + 86400 : wake;
-      const startPct = ((bed - 18 * 3600) / (18 * 3600)) * 100;
-      const endPct = ((wakeAdjusted - 18 * 3600) / (18 * 3600)) * 100;
-      return <span key={row.date}><i style={{ top: `${Math.max(0, Math.min(100, startPct))}%`, height: `${Math.max(2, Math.min(100, endPct) - Math.max(0, startPct))}%` }} /></span>;
-    })}</div><div className="sleep-range-stat split"><div><strong>{formatSecondsOfDay(avgBed)}</strong><span>Gns. sengetid</span></div><div><strong>{formatSecondsOfDay(avgWake)}</strong><span>Gns. opvågning</span></div></div></article>
-
+    <article className="sleep-garmin-section"><h4>Søvnvarighed</h4><SleepDurationBars rows={history.map((row) => ({ date: row.date, seconds: row.sleep_seconds }))} onSelect={onSelect} /><div className="sleep-range-stat"><strong>{duration(avg)}</strong><span>Gns. søvnvarighed</span></div></article>
+    <article className="sleep-garmin-section"><h4>Søvnrytme</h4><div className="sleep-consistency-chart">{history.map((row) => { let bed = secondsOfDay(row.sleep_start_ms); const wake = secondsOfDay(row.sleep_end_ms); if (bed === null || wake === null) return <span key={row.date} className="empty" />; if (bed < 12 * 3600) bed += 86400; const wakeAdjusted = wake < 12 * 3600 ? wake + 86400 : wake; const startPct = ((bed - 18 * 3600) / (18 * 3600)) * 100; const endPct = ((wakeAdjusted - 18 * 3600) / (18 * 3600)) * 100; return <span key={row.date}><i style={{ top: `${Math.max(0, Math.min(100, startPct))}%`, height: `${Math.max(2, Math.min(100, endPct) - Math.max(0, startPct))}%` }} /></span>; })}</div><div className="sleep-range-stat split"><div><strong>{formatSecondsOfDay(avgBed)}</strong><span>Gns. sengetid</span></div><div><strong>{formatSecondsOfDay(avgWake)}</strong><span>Gns. opvågning</span></div></div></article>
     <div className="sleep-night-list">{[...history].reverse().map((row) => <button key={row.date} type="button" onClick={() => onSelect(row.date)}><div><strong>{longDate(row.date)}</strong><span>{shortDate(row.date)}</span></div><strong>{duration(row.sleep_seconds)}</strong><i className="sleep-mini-ring" /></button>)}</div>
   </div>;
 }
@@ -207,46 +157,12 @@ export default function GarminSleepDetail({ initialDate, onClose }: { initialDat
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [selectedDate, setSelectedDate] = useState(initialDate);
   const [range, setRange] = useState<RangeKey>("1d");
-
-  async function load(date: string, nextRange = range) {
-    setState("loading");
-    try {
-      const query = new URLSearchParams({ date, days: String(RANGE_DAYS[nextRange]) });
-      const response = await fetch(`/api/garmin/sleep?${query}`, { credentials: "same-origin", cache: "no-store" });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      setData(await response.json() as SleepResponse);
-      setSelectedDate(date);
-      setState("ready");
-    } catch { setState("error"); }
-  }
-
+  async function load(date: string, nextRange = range) { setState("loading"); try { const query = new URLSearchParams({ date, days: String(RANGE_DAYS[nextRange]) }); const response = await fetch(`/api/garmin/sleep?${query}`, { credentials: "same-origin", cache: "no-store" }); if (!response.ok) throw new Error(`HTTP ${response.status}`); setData(await response.json() as SleepResponse); setSelectedDate(date); setState("ready"); } catch { setState("error"); } }
   useEffect(() => { void load(initialDate, "1d"); }, [initialDate]);
-
-  function changeRange(next: RangeKey) {
-    setRange(next);
-    void load(selectedDate, next);
-  }
-
-  function selectNight(date: string) {
-    setRange("1d");
-    void load(date, "1d");
-  }
-
+  function changeRange(next: RangeKey) { setRange(next); void load(selectedDate, next); }
+  function selectNight(date: string) { setRange("1d"); void load(date, "1d"); }
   const selected = data?.selected ?? null;
   const history = data?.history ?? [];
-  const rangeLabel = useMemo(() => {
-    if (!history.length) return "";
-    if (range === "1d") return longDate(selectedDate);
-    return `${shortDate(history[0].date)} – ${shortDate(history.at(-1)!.date)}`;
-  }, [history, range, selectedDate]);
-
-  return <section className="garmin-deep-dive garmin-sleep-screen" aria-labelledby="sleep-detail-heading">
-    <div className="garmin-deep-heading"><div><p className="section-label">Dig deeper</p><h3 id="sleep-detail-heading">Søvn</h3></div><button className="secondary-action" type="button" onClick={onClose}>Luk</button></div>
-    <div className="sleep-range-tabs" role="tablist">{(["1d", "7d", "4w", "1y"] as RangeKey[]).map((key) => <button key={key} type="button" role="tab" aria-selected={range === key} className={range === key ? "active" : ""} onClick={() => changeRange(key)}>{key}</button>)}</div>
-    <div className="sleep-range-label">{rangeLabel}</div>
-
-    {state === "loading" && <p className="empty-state">Henter søvndata…</p>}
-    {state === "error" && <p className="empty-state">Søvndata kunne ikke hentes.</p>}
-    {state === "ready" && selected && (range === "1d" ? <DailyView row={selected} /> : <RangeView history={history} onSelect={selectNight} />)}
-  </section>;
+  const rangeLabel = useMemo(() => { if (!history.length) return ""; if (range === "1d") return longDate(selectedDate); return `${shortDate(history[0].date)} – ${shortDate(history.at(-1)!.date)}`; }, [history, range, selectedDate]);
+  return <section className="garmin-deep-dive garmin-sleep-screen" aria-labelledby="sleep-detail-heading"><div className="garmin-deep-heading"><div><p className="section-label">Dig deeper</p><h3 id="sleep-detail-heading">Søvn</h3></div><button className="secondary-action" type="button" onClick={onClose}>Luk</button></div><div className="sleep-range-tabs" role="tablist">{(["1d", "7d", "4w", "1y"] as RangeKey[]).map((key) => <button key={key} type="button" role="tab" aria-selected={range === key} className={range === key ? "active" : ""} onClick={() => changeRange(key)}>{key}</button>)}</div><div className="sleep-range-label">{rangeLabel}</div>{state === "loading" && <p className="empty-state">Henter søvndata…</p>}{state === "error" && <p className="empty-state">Søvndata kunne ikke hentes.</p>}{state === "ready" && selected && (range === "1d" ? <DailyView row={selected} /> : <RangeView history={history} onSelect={selectNight} />)}</section>;
 }
