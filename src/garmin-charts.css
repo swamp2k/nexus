@@ -1,0 +1,135 @@
+.sleep-axis-chart,
+.sleep-bars-chart {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+}
+
+.sleep-axis-chart svg {
+  display: block;
+  width: 100%;
+  height: 180px;
+  touch-action: none;
+  user-select: none;
+}
+
+.sleep-axis-text {
+  fill: var(--muted);
+  font-size: 11px;
+}
+
+.sleep-axis-chart .sleep-chart-grid {
+  stroke: var(--border);
+  stroke-width: 1;
+}
+
+.sleep-axis-chart .sleep-chart-line {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 3;
+  vector-effect: non-scaling-stroke;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.sleep-crosshair {
+  stroke: var(--muted-strong);
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
+
+.sleep-crosshair-dot {
+  fill: var(--accent);
+  stroke: var(--surface);
+  stroke-width: 2;
+  vector-effect: non-scaling-stroke;
+}
+
+.sleep-chart-tooltip,
+.sleep-bar-tooltip {
+  position: absolute;
+  z-index: 5;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: 92px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  box-shadow: var(--shadow-soft);
+  pointer-events: none;
+  text-align: center;
+}
+
+.sleep-chart-tooltip strong,
+.sleep-chart-tooltip span,
+.sleep-bar-tooltip strong,
+.sleep-bar-tooltip span {
+  display: block;
+}
+
+.sleep-chart-tooltip span,
+.sleep-bar-tooltip span {
+  margin-top: 2px;
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+
+.sleep-bars-chart {
+  display: grid;
+  grid-template-columns: 34px minmax(0, 1fr);
+  gap: 6px;
+}
+
+.sleep-bars-y,
+.sleep-bars-plot {
+  position: relative;
+  height: 210px;
+}
+
+.sleep-bars-y span {
+  position: absolute;
+  right: 0;
+  transform: translateY(-50%);
+  color: var(--muted);
+  font-size: 0.65rem;
+}
+
+.sleep-bars-plot > i {
+  position: absolute;
+  left: 0;
+  right: 0;
+  border-top: 1px solid var(--border);
+  pointer-events: none;
+}
+
+.sleep-duration-bars.interactive {
+  position: relative;
+  z-index: 1;
+  height: 210px;
+  padding-top: 0;
+  touch-action: pan-x;
+}
+
+.sleep-duration-bars.interactive button.active > span {
+  background: var(--accent);
+}
+
+.sleep-duration-bars.interactive button {
+  touch-action: none;
+}
+
+@media (max-width: 600px) {
+  .sleep-axis-chart svg {
+    height: 165px;
+  }
+
+  .sleep-axis-text {
+    font-size: 10px;
+  }
+
+  .sleep-bars-chart {
+    grid-template-columns: 30px minmax(0, 1fr);
+  }
+}
