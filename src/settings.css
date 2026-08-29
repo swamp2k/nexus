@@ -63,7 +63,8 @@
   font-weight: 700;
 }
 
-.settings-form input {
+.settings-form input,
+.settings-form select {
   width: 100%;
   padding: 12px 13px;
   border: 1px solid var(--border);
@@ -74,9 +75,17 @@
   font: inherit;
 }
 
-.settings-form input:focus {
+.settings-form input:focus,
+.settings-form select:focus {
   border-color: var(--accent);
   box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.settings-help {
+  margin: -6px 0 0;
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.5;
 }
 
 .settings-location-actions {
