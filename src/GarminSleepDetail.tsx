@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { SleepDurationBars, SleepMetricChart } from "./GarminSleepCharts";
+import { SleepConsistencyChart, SleepDurationBars, SleepMetricChart } from "./GarminSleepCharts";
 
 type Stage = "deep" | "light" | "rem" | "awake";
 type Point = { time: number; value: number };
@@ -141,13 +141,14 @@ function DailyView({ row }: { row: SleepRow }) {
 function RangeView({ history, onSelect }: { history: SleepRow[]; onSelect: (date: string) => void }) {
   const valid = history.filter((row) => (row.sleep_seconds ?? 0) > 0);
   const avg = valid.length ? valid.reduce((sum, row) => sum + (row.sleep_seconds ?? 0), 0) / valid.length : 0;
-  const bedtimes = valid.map((row) => secondsOfDay(row.sleep_start_ms)).filter((value): value is number => value !== null).map((value) => value < 12 * 3600 ? value + 86400 : value);
+  const bedtimes = valid.map((row) => secondsOfDay(row.sleep_start_ms)).filter((value): value is number => value !== null);
   const wakeTimes = valid.map((row) => secondsOfDay(row.sleep_end_ms)).filter((value): value is number => value !== null);
-  const avgBed = circularMean(bedtimes.map((value) => value % 86400));
+  const avgBed = circularMean(bedtimes);
   const avgWake = circularMean(wakeTimes);
+  const consistencyRows = history.map((row) => ({ date: row.date, bedSeconds: secondsOfDay(row.sleep_start_ms), wakeSeconds: secondsOfDay(row.sleep_end_ms) }));
   return <div className="sleep-range-view">
     <article className="sleep-garmin-section"><h4>Søvnvarighed</h4><SleepDurationBars rows={history.map((row) => ({ date: row.date, seconds: row.sleep_seconds }))} onSelect={onSelect} /><div className="sleep-range-stat"><strong>{duration(avg)}</strong><span>Gns. søvnvarighed</span></div></article>
-    <article className="sleep-garmin-section"><h4>Søvnrytme</h4><div className="sleep-consistency-chart">{history.map((row) => { let bed = secondsOfDay(row.sleep_start_ms); const wake = secondsOfDay(row.sleep_end_ms); if (bed === null || wake === null) return <span key={row.date} className="empty" />; if (bed < 12 * 3600) bed += 86400; const wakeAdjusted = wake < 12 * 3600 ? wake + 86400 : wake; const startPct = ((bed - 18 * 3600) / (18 * 3600)) * 100; const endPct = ((wakeAdjusted - 18 * 3600) / (18 * 3600)) * 100; return <span key={row.date}><i style={{ top: `${Math.max(0, Math.min(100, startPct))}%`, height: `${Math.max(2, Math.min(100, endPct) - Math.max(0, startPct))}%` }} /></span>; })}</div><div className="sleep-range-stat split"><div><strong>{formatSecondsOfDay(avgBed)}</strong><span>Gns. sengetid</span></div><div><strong>{formatSecondsOfDay(avgWake)}</strong><span>Gns. opvågning</span></div></div></article>
+    <article className="sleep-garmin-section"><h4>Søvnrytme</h4><SleepConsistencyChart rows={consistencyRows} avgBed={avgBed} avgWake={avgWake} onSelect={onSelect} /><div className="sleep-range-stat split"><div><strong>{formatSecondsOfDay(avgBed)}</strong><span>Gns. sengetid</span></div><div><strong>{formatSecondsOfDay(avgWake)}</strong><span>Gns. opvågning</span></div></div></article>
     <div className="sleep-night-list">{[...history].reverse().map((row) => <button key={row.date} type="button" onClick={() => onSelect(row.date)}><div><strong>{longDate(row.date)}</strong><span>{shortDate(row.date)}</span></div><strong>{duration(row.sleep_seconds)}</strong><i className="sleep-mini-ring" /></button>)}</div>
   </div>;
 }
