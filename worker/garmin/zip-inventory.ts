@@ -183,7 +183,9 @@ async function allEntryMeta(bucket: R2Bucket, key: string): Promise<ZipEntryMeta
 }
 
 async function inflateRaw(buffer: ArrayBuffer): Promise<string> {
-  const stream = new Blob([buffer]).stream().pipeThrough(new DecompressionStream("deflate-raw" as CompressionFormat));
+  // Cloudflare supports deflate-raw at runtime, while the generated TypeScript
+  // definitions currently expose a narrower constructor union.
+  const stream = new Blob([buffer]).stream().pipeThrough(new DecompressionStream("deflate-raw" as any));
   return new Response(stream).text();
 }
 
