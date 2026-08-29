@@ -1,0 +1,242 @@
+.electricity-page {
+  display: grid;
+  gap: 18px;
+}
+
+.electricity-hero,
+.electricity-card,
+.electricity-day-card,
+.electricity-state {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-soft);
+}
+
+.electricity-hero {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(300px, 0.9fr);
+  gap: 24px;
+  padding: 28px;
+}
+
+.electricity-hero h2 {
+  margin: 8px 0 6px;
+  font-size: clamp(3rem, 7vw, 5.8rem);
+  line-height: 0.95;
+  letter-spacing: -0.065em;
+}
+
+.electricity-hero > div > strong {
+  color: var(--muted-strong);
+  font-size: 1.05rem;
+}
+
+.electricity-hero > div > p:last-child {
+  margin: 14px 0 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.electricity-hero-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  align-content: center;
+}
+
+.electricity-hero-metrics > div {
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  background: var(--surface-soft);
+}
+
+.electricity-hero-metrics span,
+.electricity-hero-metrics strong,
+.electricity-hero-metrics small {
+  display: block;
+}
+
+.electricity-hero-metrics span {
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.electricity-hero-metrics strong {
+  font-size: 1.25rem;
+}
+
+.electricity-hero-metrics small {
+  margin-top: 4px;
+  color: var(--muted);
+}
+
+.electricity-card {
+  min-width: 0;
+  padding: 24px;
+}
+
+.electricity-card-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.electricity-card-heading h3 {
+  margin: 0;
+  font-size: 1.28rem;
+  letter-spacing: -0.025em;
+}
+
+.electricity-chart-wrap {
+  min-width: 0;
+}
+
+.electricity-chart {
+  display: block;
+  width: 100%;
+  min-height: 220px;
+}
+
+.electricity-gridline {
+  stroke: var(--border);
+  stroke-width: 1;
+}
+
+.electricity-line {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 5;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.electricity-axis {
+  display: flex;
+  justify-content: space-between;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.electricity-price-strip {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(66px, 1fr);
+  gap: 6px;
+  overflow-x: auto;
+  margin-top: 18px;
+  padding-bottom: 6px;
+  scrollbar-width: thin;
+}
+
+.electricity-price-cell {
+  padding: 10px 7px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-soft);
+  text-align: center;
+}
+
+.electricity-price-cell span,
+.electricity-price-cell strong {
+  display: block;
+}
+
+.electricity-price-cell span {
+  margin-bottom: 5px;
+  color: var(--muted);
+  font-size: 0.68rem;
+}
+
+.electricity-price-cell strong {
+  font-size: 0.84rem;
+}
+
+.electricity-days {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.electricity-day-card {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  padding: 22px;
+}
+
+.electricity-day-card .section-label {
+  grid-column: 1 / -1;
+  text-transform: capitalize;
+}
+
+.electricity-day-card div {
+  padding: 12px;
+  border-radius: 11px;
+  background: var(--surface-soft);
+}
+
+.electricity-day-card span,
+.electricity-day-card strong {
+  display: block;
+}
+
+.electricity-day-card span {
+  margin-bottom: 5px;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.electricity-note {
+  margin: 0;
+  padding: 0 4px;
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+.electricity-state,
+.electricity-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  min-height: 220px;
+  padding: 30px;
+  color: var(--muted);
+}
+
+.electricity-empty {
+  min-height: 160px;
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  background: var(--surface-soft);
+}
+
+@media (max-width: 900px) {
+  .electricity-hero,
+  .electricity-days {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .electricity-hero,
+  .electricity-card,
+  .electricity-day-card {
+    padding: 20px;
+  }
+
+  .electricity-hero-metrics,
+  .electricity-day-card {
+    grid-template-columns: 1fr;
+  }
+
+  .electricity-day-card .section-label {
+    grid-column: auto;
+  }
+}
