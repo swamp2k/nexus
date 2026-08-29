@@ -31,6 +31,15 @@ type CompleteUploadResponse = {
   import: GarminImport;
 };
 
+type InventoryResponse = {
+  ok: true;
+  importId: string;
+  status: "ready";
+  fileCount: number;
+  detectedFrom: string | null;
+  detectedTo: string | null;
+};
+
 type UploadState = "idle" | "uploading" | "complete" | "error";
 
 function formatBytes(bytes: number | null): string {
@@ -58,8 +67,8 @@ function formatDate(value: string): string {
 
 async function responseError(response: Response): Promise<string> {
   try {
-    const body = await response.json() as { error?: string };
-    return body.error ?? `HTTP ${response.status}`;
+    const body = await response.json() as { error?: string; detail?: string };
+    return body.detail ?? body.error ?? `HTTP ${response.status}`;
   } catch {
     return `HTTP ${response.status}`;
   }
@@ -73,6 +82,7 @@ export default function GarminPage() {
   const [progress, setProgress] = useState(0);
   const [uploadFilename, setUploadFilename] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [inventoryingId, setInventoryingId] = useState<string | null>(null);
 
   async function refreshImports() {
     try {
@@ -89,6 +99,41 @@ export default function GarminPage() {
   useEffect(() => {
     void refreshImports();
   }, []);
+
+  async function inventoryImport(importId: string) {
+    setInventoryingId(importId);
+    setImports((current) => current.map((item) => item.id === importId ? { ...item, status: "inventorying", errorMessage: null } : item));
+
+    try {
+      const query = new URLSearchParams({ importId });
+      const response = await fetch(`/api/garmin/imports/inventory?${query}`, {
+        method: "POST",
+        credentials: "same-origin",
+      });
+      if (!response.ok) throw new Error(await responseError(response));
+      const result = await response.json() as InventoryResponse;
+
+      setImports((current) => current.map((item) => item.id === importId ? {
+        ...item,
+        status: "ready",
+        fileCount: result.fileCount,
+        detectedFrom: result.detectedFrom,
+        detectedTo: result.detectedTo,
+        errorMessage: null,
+        updatedAt: new Date().toISOString(),
+      } : item));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "inventory_failed";
+      setImports((current) => current.map((item) => item.id === importId ? {
+        ...item,
+        status: "failed",
+        errorMessage: message,
+      } : item));
+    } finally {
+      setInventoryingId(null);
+      void refreshImports();
+    }
+  }
 
   async function uploadFile(file: File) {
     setUploadState("uploading");
@@ -157,6 +202,7 @@ export default function GarminPage() {
       setImports((current) => [complete.import, ...current.filter((item) => item.id !== complete.import.id)]);
       setProgress(100);
       setUploadState("complete");
+      await inventoryImport(complete.import.id);
     } catch (error) {
       if (importId && uploadId) {
         const query = new URLSearchParams({ importId, uploadId });
@@ -196,8 +242,8 @@ export default function GarminPage() {
         </article>
         <article className="summary-card">
           <span className="summary-kicker">Analyse</span>
-          <strong>Næste trin</strong>
-          <p>Vi inventerer en rigtig Garmin-export først og bygger derefter schema og parser efter de data, Garmin faktisk leverer.</p>
+          <strong>Inventory først</strong>
+          <p>Nexus læser ZIP-metadata direkte fra R2 og bygger parseren efter de datatyper Garmin faktisk leverer.</p>
         </article>
       </div>
 
@@ -205,13 +251,13 @@ export default function GarminPage() {
         <div>
           <p className="section-label">Import</p>
           <h3>Upload din Garmin-export</h3>
-          <p>Nexus uploader store exports i mindre dele, samler dem direkte i R2 og registrerer først importen i D1, når hele filen er gemt korrekt.</p>
+          <p>Nexus uploader store exports i mindre dele, samler dem direkte i R2 og inventerer derefter ZIP'en uden at hente hele arkivet ind i Worker-memory.</p>
         </div>
 
         <div className="import-steps">
           <div><span>1</span><p>Hent en komplet Garmin-dataexport.</p></div>
           <div><span>2</span><p>Upload arkivet her. Store filer deles automatisk op.</p></div>
-          <div><span>3</span><p>Næste pipeline inventerer filerne og viser hvilke datatyper der blev fundet.</p></div>
+          <div><span>3</span><p>Nexus inventerer ZIP'en og registrerer filtyperne.</p></div>
           <div><span>4</span><p>Derefter bygger vi parser, historik og analyse på de faktiske data.</p></div>
         </div>
 
@@ -240,7 +286,7 @@ export default function GarminPage() {
             <span style={{ width: `${progress}%` }} />
           </div>
         )}
-        {uploadState === "complete" && <p className="import-feedback success">{uploadFilename} er gemt sikkert. Klar til inventering.</p>}
+        {uploadState === "complete" && <p className="import-feedback success">{uploadFilename} er uploadet. Inventory kører automatisk.</p>}
         {uploadState === "error" && <p className="import-feedback error">Upload fejlede: {uploadError}</p>}
         <small className="import-note">Råfilen gemmes under din bruger i den fælles <code>nexus-data</code> bucket.</small>
       </article>
@@ -264,9 +310,26 @@ export default function GarminPage() {
                 <div className="import-file-icon">ZIP</div>
                 <div className="import-row-copy">
                   <strong>{item.filename}</strong>
-                  <span>{formatBytes(item.sizeBytes)} · {formatDate(item.createdAt)}</span>
+                  <span>
+                    {formatBytes(item.sizeBytes)} · {formatDate(item.createdAt)}
+                    {item.fileCount !== null ? ` · ${item.fileCount} filer` : ""}
+                    {item.detectedFrom && item.detectedTo ? ` · ${item.detectedFrom} → ${item.detectedTo}` : ""}
+                  </span>
+                  {item.errorMessage && <span className="import-row-error">{item.errorMessage}</span>}
                 </div>
-                <span className={`import-status status-${item.status}`}>{item.status}</span>
+                <div className="import-row-actions">
+                  {(item.status === "uploaded" || item.status === "failed") && (
+                    <button
+                      className="secondary-action"
+                      type="button"
+                      disabled={inventoryingId === item.id}
+                      onClick={() => void inventoryImport(item.id)}
+                    >
+                      {inventoryingId === item.id ? "Analyserer…" : "Analysér"}
+                    </button>
+                  )}
+                  <span className={`import-status status-${item.status}`}>{item.status}</span>
+                </div>
               </article>
             ))}
           </div>
