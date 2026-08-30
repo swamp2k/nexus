@@ -29,6 +29,7 @@ export default function GarminAgentSettings() {
   const [agents, setAgents] = useState<Agent[]>([]);
   const [job, setJob] = useState<SyncJob | null>(null);
   const [token, setToken] = useState<string | null>(null);
+  const [showSetup, setShowSetup] = useState(false);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -66,8 +67,23 @@ export default function GarminAgentSettings() {
       if (!response.ok) throw new Error(await errorText(response));
       const body = await response.json() as { token: string };
       setToken(body.token);
+      setShowSetup(true);
       await refresh();
     } catch (error) { setMessage(error instanceof Error ? error.message : "agent_create_failed"); }
+    finally { setBusy(false); }
+  }
+
+  async function rotateToken(agentId: string) {
+    if (!window.confirm("Generér et nyt agent-token? Det gamle token stopper med at virke med det samme.")) return;
+    setBusy(true); setMessage(null);
+    try {
+      const response = await fetch(`/api/garmin/agents/${agentId}/token`, { method: "POST", credentials: "same-origin" });
+      if (!response.ok) throw new Error(await errorText(response));
+      const body = await response.json() as { token: string };
+      setToken(body.token);
+      setShowSetup(true);
+      await refresh();
+    } catch (error) { setMessage(error instanceof Error ? error.message : "agent_token_rotate_failed"); }
     finally { setBusy(false); }
   }
 
@@ -108,21 +124,25 @@ export default function GarminAgentSettings() {
       </div>
       <div className="garmin-agent-actions">
         <button className="primary-action" type="button" disabled={busy || !!active} onClick={() => void requestSync()}>{active ? `Garmin sync: ${job?.status}` : "Opdatér fra Garmin"}</button>
+        <button className="secondary-action" type="button" onClick={() => setShowSetup((value) => !value)}>{showSetup ? "Skjul setup" : "Vis setup"}</button>
+        <button className="secondary-action" type="button" disabled={busy} onClick={() => void rotateToken(agent.id)}>Generér nyt token</button>
         {!online && <span>Agenten behøver ikke være online for at sætte jobbet i kø; den tager det næste gang den starter.</span>}
       </div>
       {job?.status === "failed" && <p className="settings-feedback error">Seneste Garmin-sync fejlede{job.message ? `: ${job.message}` : "."}</p>}
     </>}
 
-    {token && <div className="garmin-agent-token">
-      <p className="section-label">Vises kun én gang</p>
-      <strong>Kopiér agent-tokenet nu</strong>
-      <code>{token}</code>
+    {showSetup && <div className="garmin-agent-token">
+      <p className="section-label">Agent setup</p>
+      <strong>{token ? "Nyt token er klar — kopiér det nu" : "Installationsvejledning"}</strong>
+      {token ? <code>{token}</code> : <p>Det aktive token kan ikke vises igen, fordi Nexus kun gemmer det som hash. Brug “Generér nyt token” for at få et nyt.</p>}
       <div className="garmin-agent-setup">
         <code>NEXUS_URL=https://nexus.sr-goodjob.workers.dev</code>
-        <code>NEXUS_GARMIN_AGENT_TOKEN={token}</code>
+        <code>NEXUS_GARMIN_AGENT_TOKEN={token ?? "<generér-nyt-token>"}</code>
         <code>python3 tools/nexus-garmin-agent.py</code>
       </div>
-      <p>Tokenet lagres kun som SHA-256 hash i Nexus. GarminDB-login forbliver lokalt.</p>
+      <p>Et nyt token invaliderer det gamle med det samme. GarminDB-login forbliver lokalt på agentmaskinen.</p>
     </div>}
+
+    {message && state === "ready" && <p className="settings-feedback error">{message}</p>}
   </section>;
 }
