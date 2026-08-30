@@ -73,11 +73,11 @@ export default function GarminAgentSettings() {
     finally { setBusy(false); }
   }
 
-  async function rotateToken(agentId: string) {
+  async function rotateToken() {
     if (!window.confirm("Generér et nyt agent-token? Det gamle token stopper med at virke med det samme.")) return;
     setBusy(true); setMessage(null);
     try {
-      const response = await fetch(`/api/garmin/agents/${agentId}/token`, { method: "POST", credentials: "same-origin" });
+      const response = await fetch("/api/garmin/agents/token", { method: "POST", credentials: "same-origin" });
       if (!response.ok) throw new Error(await errorText(response));
       const body = await response.json() as { token: string };
       setToken(body.token);
@@ -125,7 +125,7 @@ export default function GarminAgentSettings() {
       <div className="garmin-agent-actions">
         <button className="primary-action" type="button" disabled={busy || !!active} onClick={() => void requestSync()}>{active ? `Garmin sync: ${job?.status}` : "Opdatér fra Garmin"}</button>
         <button className="secondary-action" type="button" onClick={() => setShowSetup((value) => !value)}>{showSetup ? "Skjul setup" : "Vis setup"}</button>
-        <button className="secondary-action" type="button" disabled={busy} onClick={() => void rotateToken(agent.id)}>Generér nyt token</button>
+        <button className="secondary-action" type="button" disabled={busy} onClick={() => void rotateToken()}>Generér nyt token</button>
         {!online && <span>Agenten behøver ikke være online for at sætte jobbet i kø; den tager det næste gang den starter.</span>}
       </div>
       {job?.status === "failed" && <p className="settings-feedback error">Seneste Garmin-sync fejlede{job.message ? `: ${job.message}` : "."}</p>}
