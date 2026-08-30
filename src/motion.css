@@ -1,0 +1,93 @@
+.motion-page {
+  display: grid;
+  gap: 18px;
+}
+
+.motion-overview {
+  display: grid;
+  gap: 16px;
+  padding: 24px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-soft);
+}
+
+.motion-heading h3 {
+  margin: 0;
+  font-size: 1.35rem;
+}
+
+.motion-activity-list {
+  display: grid;
+  gap: 10px;
+}
+
+.motion-activity-card {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 18px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-soft);
+}
+
+.motion-activity-copy,
+.motion-activity-stats span {
+  min-width: 0;
+}
+
+.motion-activity-copy strong,
+.motion-activity-copy span,
+.motion-activity-stats strong,
+.motion-activity-stats small {
+  display: block;
+}
+
+.motion-activity-copy span,
+.motion-activity-stats small {
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.motion-activity-stats {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  text-align: right;
+}
+
+.motion-activity-stats strong {
+  white-space: nowrap;
+}
+
+@media (max-width: 760px) {
+  .motion-page-hero {
+    display: none;
+  }
+
+  .motion-overview {
+    padding: 18px;
+  }
+
+  .motion-activity-card {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .motion-activity-stats {
+    display: grid;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 10px;
+    text-align: left;
+  }
+}
+
+@media (max-width: 420px) {
+  .motion-activity-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
