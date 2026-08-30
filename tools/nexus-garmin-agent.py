@@ -37,7 +37,7 @@ POLL_SECONDS = max(5, int(os.environ.get("NEXUS_GARMIN_POLL_SECONDS", "15")))
 
 
 def request(path: str, *, method: str = "GET", data: bytes | None = None, content_type: str | None = None):
-    headers = {"Authorization": f"Bearer {TOKEN}", "User-Agent": "Nexus-Garmin-Agent/0.3"}
+    headers = {"Authorization": f"Bearer {TOKEN}", "User-Agent": "Nexus-Garmin-Agent/0.4"}
     if content_type:
         headers["Content-Type"] = content_type
     req = urllib.request.Request(f"{NEXUS_URL}{path}", data=data, headers=headers, method=method)
@@ -194,10 +194,36 @@ def fail_job(job_id: str, message: str) -> None:
     request(f"/api/garmin/agent/jobs/{job_id}/fail", method="POST", data=payload, content_type="application/json")
 
 
-def process_job(job_id: str, user_id: str) -> None:
+def process_import(job_id: str, user_id: str, *, resumed: bool = False) -> None:
+    if resumed:
+        print(f"[nexus] Resuming Nexus import for {user_id[:8]}…", flush=True)
+        report_progress(job_id, "Genoptager Nexus-import efter agent-genstart")
+    else:
+        report_progress(job_id, "Importerer data i Nexus")
+
+    total_processed = 0
+    while True:
+        status, body = request(f"/api/garmin/agent/jobs/{job_id}/process", method="POST", data=b"")
+        if status >= 300:
+            raise RuntimeError(f"Nexus processing failed ({status}): {body}")
+        processed = int((body or {}).get("processed", 0))
+        failed = int((body or {}).get("failed", 0))
+        total_processed += processed + failed
+        print(f"[nexus] Parsed batch: {processed} processed, {failed} failed", flush=True)
+        if (body or {}).get("completed"):
+            print(f"[nexus] Sync complete for {user_id[:8]}.", flush=True)
+            break
+        report_progress(job_id, f"Importerer data i Nexus · {total_processed} filer behandlet")
+
+
+def process_job(job_id: str, user_id: str, job_status: str) -> None:
     zip_path: Path | None = None
     config_path: Path | None = None
     try:
+        if job_status == "processing":
+            process_import(job_id, user_id, resumed=True)
+            return
+
         report_progress(job_id, "Forbereder Garmin-konto")
         status, body = request(f"/api/garmin/agent/jobs/{job_id}/credentials")
         if status >= 300:
@@ -228,20 +254,7 @@ def process_job(job_id: str, user_id: str) -> None:
             raise RuntimeError(f"Nexus upload failed ({status}): {body}")
         print(f"[nexus] Upload ready: {body}", flush=True)
 
-        report_progress(job_id, "Importerer data i Nexus")
-        total_processed = 0
-        while True:
-            status, body = request(f"/api/garmin/agent/jobs/{job_id}/process", method="POST", data=b"")
-            if status >= 300:
-                raise RuntimeError(f"Nexus processing failed ({status}): {body}")
-            processed = int((body or {}).get("processed", 0))
-            failed = int((body or {}).get("failed", 0))
-            total_processed += processed + failed
-            print(f"[nexus] Parsed batch: {processed} processed, {failed} failed", flush=True)
-            if (body or {}).get("completed"):
-                print(f"[nexus] Sync complete for {user_id[:8]}.", flush=True)
-                break
-            report_progress(job_id, f"Importerer data i Nexus · {total_processed} filer behandlet")
+        process_import(job_id, user_id)
     except Exception as error:  # agent boundary: report all failures back to Nexus
         message = str(error)
         print(f"[nexus] Sync failed: {message}", file=sys.stderr, flush=True)
@@ -280,10 +293,11 @@ def main() -> int:
             job = (body or {}).get("job", {})
             job_id = str(job.get("id", ""))
             user_id = str(job.get("userId", ""))
+            job_status = str(job.get("status", "running"))
             if not job_id or not user_id:
                 time.sleep(POLL_SECONDS)
                 continue
-            process_job(job_id, user_id)
+            process_job(job_id, user_id, job_status)
         except KeyboardInterrupt:
             return 0
         except Exception as error:
