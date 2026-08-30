@@ -9,8 +9,9 @@ services:
       TZ: Europe/Copenhagen
       NEXUS_URL: https://nexus.sr-goodjob.workers.dev
       NEXUS_GARMIN_AGENT_TOKEN: ${NEXUS_GARMIN_AGENT_TOKEN}
-      NEXUS_GARMIN_DATA_DIR: /data
+      NEXUS_GARMIN_STATE_ROOT: /state/users
+      NEXUS_GARMIN_DATA_ROOT: /data/users
       NEXUS_GARMIN_POLL_SECONDS: 15
     volumes:
-      - /mnt/user/appdata/nexus-garmin/config:/root/.GarminDb
+      - /mnt/user/appdata/nexus-garmin/state:/state
       - /mnt/user/appdata/nexus-garmin/data:/data
