@@ -37,7 +37,7 @@ POLL_SECONDS = max(5, int(os.environ.get("NEXUS_GARMIN_POLL_SECONDS", "15")))
 
 
 def request(path: str, *, method: str = "GET", data: bytes | None = None, content_type: str | None = None):
-    headers = {"Authorization": f"Bearer {TOKEN}", "User-Agent": "Nexus-Garmin-Agent/0.2"}
+    headers = {"Authorization": f"Bearer {TOKEN}", "User-Agent": "Nexus-Garmin-Agent/0.3"}
     if content_type:
         headers["Content-Type"] = content_type
     req = urllib.request.Request(f"{NEXUS_URL}{path}", data=data, headers=headers, method=method)
@@ -57,6 +57,21 @@ def request(path: str, *, method: str = "GET", data: bytes | None = None, conten
 def upload_file(path: str, file_path: Path):
     data = file_path.read_bytes()
     return request(path, method="PUT", data=data, content_type="application/zip")
+
+
+def report_progress(job_id: str, message: str) -> None:
+    payload = json.dumps({"message": message}).encode()
+    try:
+        status, body = request(
+            f"/api/garmin/agent/jobs/{job_id}/progress",
+            method="POST",
+            data=payload,
+            content_type="application/json",
+        )
+        if status >= 300:
+            print(f"[nexus] Progress update failed ({status}): {body}", file=sys.stderr, flush=True)
+    except Exception as error:
+        print(f"[nexus] Progress update failed: {error}", file=sys.stderr, flush=True)
 
 
 def safe_user_id(value: str) -> str:
@@ -183,6 +198,7 @@ def process_job(job_id: str, user_id: str) -> None:
     zip_path: Path | None = None
     config_path: Path | None = None
     try:
+        report_progress(job_id, "Forbereder Garmin-konto")
         status, body = request(f"/api/garmin/agent/jobs/{job_id}/credentials")
         if status >= 300:
             raise RuntimeError(f"Could not fetch Garmin credentials ({status}): {body}")
@@ -198,25 +214,34 @@ def process_job(job_id: str, user_id: str) -> None:
         home, config_dir, data_dir = user_paths(user_id)
         config_path = write_config(config_dir, data_dir, username, password)
         print(f"[nexus] Syncing isolated Garmin profile {user_id[:8]}…", flush=True)
+
+        report_progress(job_id, "Henter data fra Garmin")
         run_garmindb(home)
         scrub_password(config_path)
 
+        report_progress(job_id, "Pakker Garmin-data")
         zip_path = build_zip(data_dir, user_id)
+
+        report_progress(job_id, "Uploader Garmin-data til Nexus")
         status, body = upload_file(f"/api/garmin/agent/jobs/{job_id}/upload", zip_path)
         if status >= 300:
             raise RuntimeError(f"Nexus upload failed ({status}): {body}")
         print(f"[nexus] Upload ready: {body}", flush=True)
 
+        report_progress(job_id, "Importerer data i Nexus")
+        total_processed = 0
         while True:
             status, body = request(f"/api/garmin/agent/jobs/{job_id}/process", method="POST", data=b"")
             if status >= 300:
                 raise RuntimeError(f"Nexus processing failed ({status}): {body}")
             processed = int((body or {}).get("processed", 0))
             failed = int((body or {}).get("failed", 0))
+            total_processed += processed + failed
             print(f"[nexus] Parsed batch: {processed} processed, {failed} failed", flush=True)
             if (body or {}).get("completed"):
                 print(f"[nexus] Sync complete for {user_id[:8]}.", flush=True)
                 break
+            report_progress(job_id, f"Importerer data i Nexus · {total_processed} filer behandlet")
     except Exception as error:  # agent boundary: report all failures back to Nexus
         message = str(error)
         print(f"[nexus] Sync failed: {message}", file=sys.stderr, flush=True)
