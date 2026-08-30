@@ -18,7 +18,9 @@ Mount them as:
 /mnt/user/appdata/nexus-garmin/data   -> /data
 ```
 
-The container image itself is disposable. GarminDB configuration, downloaded JSON/FIT files and generated databases must live in those mounts.
+The container image itself is disposable. GarminDB configuration, OAuth/session state, downloaded JSON/FIT files and generated databases must live in those mounts.
+
+GarminDB stores both `GarminConnectConfig.json` and its token store (`garmin_tokens.json`) below `~/.GarminDb`, so mounting the whole directory is intentional.
 
 ## GarminDB configuration
 
@@ -28,18 +30,24 @@ GarminDB reads:
 /root/.GarminDb/GarminConnectConfig.json
 ```
 
-In `GarminConnectConfig.json`, configure the directories section to use the persistent `/data` mount:
+In `GarminConnectConfig.json`, ensure the `directories` section contains these values so GarminDB uses the persistent `/data` mount:
 
 ```json
-"directories": {
-  "relative_to_home": false,
-  "base_dir": "/data"
-}
+"relative_to_home": false,
+"base_dir": "/data"
 ```
 
-Keep the rest of the user's existing GarminDB configuration, including Garmin Connect credentials and date settings. Do not commit this file to Git.
+Keep the rest of the user's existing `directories` settings and the rest of the GarminDB configuration intact. Do not commit this file to Git.
 
-If GarminDB has already been configured on another machine, copying the existing `~/.GarminDb/GarminConnectConfig.json` into the Unraid config directory is the simplest starting point, then change its directory settings to `/data`.
+If GarminDB has already been configured and authenticated on another Linux machine, copy the entire existing `~/.GarminDb/` directory into:
+
+```text
+/mnt/user/appdata/nexus-garmin/config/
+```
+
+This preserves `GarminConnectConfig.json`, `garmin_tokens.json` and any other GarminDB config state. Then change only the directory settings needed to point `base_dir` at `/data`.
+
+Existing GarminDB data can also be copied into `/mnt/user/appdata/nexus-garmin/data/` before first start, avoiding a new full historical download.
 
 ## Nexus settings
 
@@ -117,4 +125,4 @@ docker build --pull -f docker/garmin-agent/Dockerfile -t nexus-garmin-agent:loca
 # run/create again with the same mounts and environment variables
 ```
 
-Because `/root/.GarminDb` and `/data` are bind-mounted from Unraid, replacing the container does not remove GarminDB configuration or data.
+Because `/root/.GarminDb` and `/data` are bind-mounted from Unraid, replacing the container does not remove GarminDB configuration, tokens or downloaded data.
