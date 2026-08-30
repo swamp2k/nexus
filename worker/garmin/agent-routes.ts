@@ -9,6 +9,16 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f
 type AgentEnv = Env & { GARMIN_CREDENTIALS_KEY?: string };
 type AgentPrincipal = { id: string; ownerUserId: string; name: string };
 type JobRow = { id: string; userId: string; importId?: string | null; requestedAt?: string };
+type SyncStatusRow = {
+  id: string;
+  status: "queued" | "running" | "processing" | "complete" | "failed";
+  message: string | null;
+  importId: string | null;
+  requestedAt: string;
+  startedAt: string | null;
+  completedAt: string | null;
+  updatedAt: string;
+};
 
 function json(body: unknown, init: ResponseInit = {}): Response {
   const headers = new Headers(init.headers);
@@ -149,14 +159,51 @@ async function syncStatus(request: Request, env: AgentEnv): Promise<Response> {
     `SELECT id, status, message, import_id AS importId, requested_at AS requestedAt,
             started_at AS startedAt, completed_at AS completedAt, updated_at AS updatedAt
      FROM garmin_sync_jobs WHERE user_id = ? ORDER BY requested_at DESC LIMIT 1`,
-  ).bind(user.id).first();
-  return json({ job: job ?? null });
+  ).bind(user.id).first<SyncStatusRow>();
+
+  if (!job) return json({ job: null });
+  if (job.status !== "queued") return json({ job: { ...job, queuePosition: null, queueAhead: null } });
+
+  const ahead = await env.DB.prepare(
+    `SELECT COUNT(*) AS count
+     FROM garmin_sync_jobs
+     WHERE status IN ('running', 'processing')
+        OR (status = 'queued' AND (requested_at < ? OR (requested_at = ? AND id < ?)))`,
+  ).bind(job.requestedAt, job.requestedAt, job.id).first<{ count: number }>();
+  const queueAhead = Number(ahead?.count ?? 0);
+  return json({ job: { ...job, queuePosition: queueAhead + 1, queueAhead } });
 }
 
 async function nextJob(request: Request, env: AgentEnv): Promise<Response> {
   if (request.method !== "GET") return json({ error: "method_not_allowed" }, { status: 405 });
   const agent = await requireAgent(request, env);
   if (!agent) return json({ error: "unauthorized" }, { status: 401 });
+
+  const interruptedProcessing = await env.DB.prepare(
+    `SELECT j.id, j.user_id AS userId, j.import_id AS importId, j.requested_at AS requestedAt
+     FROM garmin_sync_jobs j
+     WHERE j.agent_id = ? AND j.status = 'processing' AND j.import_id IS NOT NULL
+     ORDER BY j.started_at
+     LIMIT 1`,
+  ).bind(agent.id).first<JobRow>();
+
+  if (interruptedProcessing) {
+    const now = new Date().toISOString();
+    await env.DB.prepare(
+      `UPDATE garmin_sync_jobs
+       SET message = 'Genoptager Nexus-import efter agent-genstart', updated_at = ?
+       WHERE id = ? AND agent_id = ? AND status = 'processing'`,
+    ).bind(now, interruptedProcessing.id, agent.id).run();
+    return json({
+      job: {
+        id: interruptedProcessing.id,
+        userId: interruptedProcessing.userId,
+        requestedAt: interruptedProcessing.requestedAt,
+        status: "processing",
+        resumed: true,
+      },
+    });
+  }
 
   const interrupted = await env.DB.prepare(
     `SELECT j.id, j.user_id AS userId, j.requested_at AS requestedAt
@@ -190,7 +237,7 @@ async function nextJob(request: Request, env: AgentEnv): Promise<Response> {
      FROM garmin_sync_jobs j
      JOIN garmin_credentials c ON c.user_id = j.user_id
      WHERE j.status = 'queued'
-     ORDER BY j.requested_at
+     ORDER BY j.requested_at, j.id
      LIMIT 1`,
   ).first<JobRow>();
   if (!job) return new Response(null, { status: 204 });
