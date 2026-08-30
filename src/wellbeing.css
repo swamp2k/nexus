@@ -43,15 +43,15 @@
 
 .wellbeing-checkin {
   display: grid;
-  gap: 12px;
+  gap: 4px;
+  padding: 16px 22px;
 }
 
 .wellbeing-metric {
   display: grid;
-  grid-template-columns: minmax(170px, 0.7fr) minmax(0, 1.3fr);
-  align-items: center;
-  gap: 16px;
-  padding: 14px 0;
+  grid-template-columns: 1fr;
+  gap: 6px;
+  padding: 8px 0 10px;
   border-bottom: 1px solid var(--border);
 }
 
@@ -62,37 +62,47 @@
 .wellbeing-metric-name {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
+  min-height: 22px;
 }
 
 .wellbeing-metric-name > span {
-  font-size: 1.35rem;
+  font-size: 1.1rem;
+}
+
+.wellbeing-metric-name strong {
+  line-height: 1.2;
 }
 
 .wellbeing-score-row {
   display: grid;
   grid-template-columns: repeat(5, minmax(0, 1fr));
-  gap: 7px;
+  gap: 6px;
 }
 
 .wellbeing-score-row button {
   display: grid;
-  gap: 3px;
-  place-items: center;
+  grid-template-columns: auto auto;
+  gap: 5px;
+  place-content: center;
+  align-items: center;
   min-width: 0;
-  padding: 10px 6px;
+  min-height: 40px;
+  padding: 6px 8px;
   border: 1px solid var(--border);
-  border-radius: 11px;
+  border-radius: 9px;
   background: var(--surface-soft);
   cursor: pointer;
 }
 
 .wellbeing-score-row button > span {
-  font-size: 1.4rem;
+  font-size: 1.15rem;
+  line-height: 1;
 }
 
 .wellbeing-score-row button small {
   color: var(--muted);
+  line-height: 1;
 }
 
 .wellbeing-score-row button.active {
@@ -103,6 +113,7 @@
 
 .wellbeing-save {
   justify-self: end;
+  margin-top: 4px;
 }
 
 .wellbeing-journal {
@@ -266,17 +277,28 @@
     width: 100%;
   }
 
+  .wellbeing-checkin {
+    padding: 14px;
+  }
+
   .wellbeing-metric {
-    grid-template-columns: 1fr;
-    gap: 10px;
+    gap: 6px;
+    padding: 8px 0;
+  }
+
+  .wellbeing-score-row {
+    gap: 4px;
   }
 
   .wellbeing-score-row button {
-    padding: 9px 3px;
+    grid-template-columns: 1fr;
+    gap: 2px;
+    min-height: 46px;
+    padding: 6px 2px;
   }
 
   .wellbeing-score-row button > span {
-    font-size: 1.25rem;
+    font-size: 1.2rem;
   }
 
   .wellbeing-new-metric {
