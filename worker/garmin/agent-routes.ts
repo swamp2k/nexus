@@ -57,6 +57,23 @@ async function createAgent(request: Request, env: Env): Promise<Response> {
   return json({ agent: { id, name, createdAt: now }, token }, { status: 201 });
 }
 
+async function rotateAgentToken(request: Request, env: Env, agentId: string): Promise<Response> {
+  if (request.method !== "POST") return json({ error: "method_not_allowed" }, { status: 405 });
+  const user = await getAuthenticatedUser(request, env.DB);
+  if (!user) return json({ error: "unauthorized" }, { status: 401 });
+  const agent = await env.DB.prepare(
+    `SELECT id, name FROM garmin_agents WHERE id = ? AND user_id = ? AND revoked_at IS NULL`,
+  ).bind(agentId, user.id).first<{ id: string; name: string }>();
+  if (!agent) return json({ error: "garmin_agent_not_found" }, { status: 404 });
+
+  const token = createToken();
+  await env.DB.prepare(
+    `UPDATE garmin_agents SET token_hash = ?, last_seen_at = NULL WHERE id = ? AND user_id = ?`,
+  ).bind(await sha256(token), agent.id, user.id).run();
+
+  return json({ agent: { id: agent.id, name: agent.name }, token });
+}
+
 async function listAgents(request: Request, env: Env): Promise<Response> {
   if (request.method !== "GET") return json({ error: "method_not_allowed" }, { status: 405 });
   const user = await getAuthenticatedUser(request, env.DB);
@@ -207,6 +224,9 @@ export async function handleGarminAgentRoute(request: Request, env: Env): Promis
   if (pathname === "/api/garmin/sync" && request.method === "POST") return requestSync(request, env);
   if (pathname === "/api/garmin/sync" && request.method === "GET") return syncStatus(request, env);
   if (pathname === "/api/garmin/agent/jobs/next") return nextJob(request, env);
+
+  const rotateMatch = pathname.match(/^\/api\/garmin\/agents\/([0-9a-f-]+)\/token$/i);
+  if (rotateMatch && UUID_RE.test(rotateMatch[1])) return rotateAgentToken(request, env, rotateMatch[1]);
 
   const match = pathname.match(/^\/api\/garmin\/agent\/jobs\/([0-9a-f-]+)\/(upload|process|fail)$/i);
   if (!match || !UUID_RE.test(match[1])) return null;
