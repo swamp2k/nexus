@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import GarminImportSettings from "./GarminImportSettings";
+import WellbeingMetricSettings from "./WellbeingMetricSettings";
 
 type GridProviderOption = { key: string; label: string };
 type SettingsResponse = {
@@ -163,6 +164,7 @@ export default function SettingsPage() {
         )}
       </article>
 
+      <WellbeingMetricSettings />
       <GarminImportSettings />
 
       {!loading && <div className="settings-save-bar"><div>{saveState === "saved" && <p className="settings-feedback success">Indstillingerne er gemt.</p>}{saveState === "error" && <p className="settings-feedback error">Indstillingerne kunne ikke gemmes: {saveError ?? "ukendt fejl"}.</p>}</div><button className="primary-action" type="button" onClick={() => void save()} disabled={saveState === "saving" || !latitude || !longitude}>{saveState === "saving" ? "Gemmer…" : "Gem indstillinger"}</button></div>}
