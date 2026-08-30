@@ -139,6 +139,65 @@
   align-items: center;
 }
 
+.garmin-sync-progress {
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.garmin-sync-progress-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.garmin-sync-progress-heading > div {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+}
+
+.garmin-sync-progress-heading span,
+.garmin-sync-progress small {
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.garmin-sync-progress-heading strong {
+  overflow-wrap: anywhere;
+  font-size: 0.94rem;
+}
+
+.garmin-sync-track {
+  position: relative;
+  height: 8px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--muted) 13%, var(--surface));
+}
+
+.garmin-sync-track > span {
+  display: block;
+  width: 0;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--accent);
+  transition: width 280ms ease;
+}
+
+.garmin-sync-progress.status-complete .garmin-sync-track > span {
+  background: var(--success);
+}
+
+.garmin-sync-progress.status-failed .garmin-sync-track > span {
+  background: var(--danger);
+}
+
 .garmin-agent-token {
   display: grid;
   gap: 10px;
