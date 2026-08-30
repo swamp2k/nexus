@@ -1,0 +1,16 @@
+services:
+  nexus-garmin-agent:
+    build:
+      context: ../..
+      dockerfile: docker/garmin-agent/Dockerfile
+    container_name: nexus-garmin-agent
+    restart: unless-stopped
+    environment:
+      TZ: Europe/Copenhagen
+      NEXUS_URL: https://nexus.sr-goodjob.workers.dev
+      NEXUS_GARMIN_AGENT_TOKEN: ${NEXUS_GARMIN_AGENT_TOKEN}
+      NEXUS_GARMIN_DATA_DIR: /data
+      NEXUS_GARMIN_POLL_SECONDS: 15
+    volumes:
+      - /mnt/user/appdata/nexus-garmin/config:/root/.GarminDb
+      - /mnt/user/appdata/nexus-garmin/data:/data
