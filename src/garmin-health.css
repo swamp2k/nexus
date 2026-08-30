@@ -602,6 +602,15 @@
 }
 
 @media (max-width: 600px) {
+  .garmin-page > .module-page-hero {
+    display: none;
+  }
+
+  .garmin-health-overview {
+    gap: 14px;
+    padding: 16px;
+  }
+
   .garmin-health-heading,
   .garmin-deep-heading {
     display: block;
@@ -617,7 +626,20 @@
     padding: 16px;
   }
 
-  .garmin-metric-grid,
+  .garmin-metric-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .garmin-metric-grid article,
+  .garmin-metric-card {
+    padding: 12px;
+  }
+
+  .garmin-metric-grid strong {
+    font-size: 1.15rem;
+  }
+
   .sleep-daily-top,
   .sleep-signal-grid.compact {
     grid-template-columns: 1fr;
