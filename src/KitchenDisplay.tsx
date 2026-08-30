@@ -23,16 +23,10 @@ type EnergyPriceData = {
   intervals: EnergyPricePoint[];
 };
 
-type UsageDay = {
-  date: string;
-  kwh: number;
-};
-
-type UsageData = {
-  source: "Eloverblik";
-  days: UsageDay[];
-};
-
+type PriceBands = { low: number; high: number };
+type SettingsResponse = { settings: { energyLowPriceDkk: number | null; energyHighPriceDkk: number | null } };
+type UsageDay = { date: string; kwh: number };
+type UsageData = { source: "Eloverblik"; days: UsageDay[] };
 type WeatherData = {
   source: "MET Norway";
   location: { label: string; latitude: number; longitude: number };
@@ -61,12 +55,21 @@ type KitchenData = {
   usage: CachedEnvelope<UsageData> | null;
   weather: CachedEnvelope<WeatherData> | null;
   status: SourceStatus | null;
+  bands: PriceBands;
 };
 
 const REFRESH_MS = 60_000;
+const CHART_MAX_DKK = 6;
+const DEFAULT_BANDS: PriceBands = { low: 1, high: 2 };
 
 function localHourLabel(iso: string): string {
   return new Intl.DateTimeFormat("da-DK", { hour: "2-digit", minute: "2-digit" }).format(new Date(iso));
+}
+
+function localHourKey(value: string): string {
+  const parts = new Intl.DateTimeFormat("en-CA", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", hour12: false, timeZone: "Europe/Copenhagen" }).formatToParts(new Date(value));
+  const map = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${map.year}-${map.month}-${map.day}-${map.hour}`;
 }
 
 function shortDate(date: string): string {
@@ -79,8 +82,7 @@ function ageLabel(iso?: string | null): string {
   if (seconds < 60) return `${seconds} sek siden`;
   const minutes = Math.round(seconds / 60);
   if (minutes < 60) return `${minutes} min siden`;
-  const hours = Math.round(minutes / 60);
-  return `${hours} t siden`;
+  return `${Math.round(minutes / 60)} t siden`;
 }
 
 function weatherIcon(symbol: string | null): string {
@@ -119,7 +121,13 @@ async function fetchJson<T>(url: string): Promise<T | null> {
   return response.json() as Promise<T>;
 }
 
-function PriceChart({ envelope }: { envelope: CachedEnvelope<EnergyPriceData> | null }) {
+function bandClass(value: number, bands: PriceBands): string {
+  if (value <= bands.low) return "low";
+  if (value >= bands.high) return "high";
+  return "medium";
+}
+
+function PriceChart({ envelope, bands }: { envelope: CachedEnvelope<EnergyPriceData> | null; bands: PriceBands }) {
   const points = useMemo(() => {
     if (!envelope) return [];
     const now = Date.now();
@@ -129,12 +137,24 @@ function PriceChart({ envelope }: { envelope: CachedEnvelope<EnergyPriceData> | 
     });
   }, [envelope]);
 
-  if (!envelope || points.length === 0) return <div className="display-empty">Ingen strømpriser endnu</div>;
+  const bars = useMemo(() => {
+    const grouped = new Map<string, EnergyPricePoint[]>();
+    for (const point of points) {
+      const key = localHourKey(point.timeUtc);
+      const list = grouped.get(key) ?? [];
+      list.push(point);
+      grouped.set(key, list);
+    }
+    return [...grouped.values()].map((items) => ({
+      start: items[0].timeUtc,
+      average: items.reduce((sum, item) => sum + item.approxDkkPerKwh, 0) / items.length,
+    })).slice(0, 25);
+  }, [points]);
+
+  if (!envelope || points.length === 0 || bars.length === 0) return <div className="display-empty">Ingen strømpriser endnu</div>;
 
   const values = points.map((point) => point.approxDkkPerKwh);
   const min = Math.min(...values);
-  const max = Math.max(...values);
-  const span = Math.max(0.01, max - min);
   const current = points.find((point, index) => {
     const start = new Date(point.timeUtc).getTime();
     const next = points[index + 1] ? new Date(points[index + 1].timeUtc).getTime() : start + 15 * 60 * 1000;
@@ -142,14 +162,17 @@ function PriceChart({ envelope }: { envelope: CachedEnvelope<EnergyPriceData> | 
   }) ?? points[0];
 
   const width = 760;
-  const height = 220;
-  const paddingX = 16;
-  const paddingY = 22;
-  const path = points.map((point, index) => {
-    const x = paddingX + (index / Math.max(1, points.length - 1)) * (width - paddingX * 2);
-    const y = height - paddingY - ((point.approxDkkPerKwh - min) / span) * (height - paddingY * 2);
-    return `${index === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
-  }).join(" ");
+  const height = 240;
+  const left = 42;
+  const right = 8;
+  const top = 8;
+  const bottom = 30;
+  const plotW = width - left - right;
+  const plotH = height - top - bottom;
+  const slot = plotW / bars.length;
+  const barW = Math.max(8, slot * 0.72);
+  const y = (value: number) => top + (1 - Math.max(0, Math.min(CHART_MAX_DKK, value)) / CHART_MAX_DKK) * plotH;
+  const ticks = [6, 5, 4, 3, 2, 1, 0];
 
   return (
     <div className="display-chart-block">
@@ -157,12 +180,21 @@ function PriceChart({ envelope }: { envelope: CachedEnvelope<EnergyPriceData> | 
         <div><span className="display-metric-label">Lige nu</span><strong>{current.approxDkkPerKwh.toFixed(2)} kr/kWh</strong></div>
         <div><span className="display-metric-label">Billigst næste 24 t</span><strong>{min.toFixed(2)} kr/kWh</strong></div>
       </div>
-      <svg className="display-line-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Samlet elpris næste 24 timer">
-        <line x1="16" y1="198" x2="744" y2="198" className="display-gridline" />
-        <line x1="16" y1="110" x2="744" y2="110" className="display-gridline" />
-        <path d={path} className="display-line" />
+      <div className="display-price-legend"><span className="low">Lav ≤ {bands.low.toFixed(2)}</span><span className="medium">Middel</span><span className="high">Høj ≥ {bands.high.toFixed(2)}</span></div>
+      <svg className="display-price-bars" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Samlet elpris pr. time med farver for lav, middel og høj pris">
+        {ticks.map((tick) => {
+          const yy = y(tick);
+          return <g key={tick}><line x1={left} y1={yy} x2={width-right} y2={yy} className="display-gridline" /><text x={left-6} y={yy+4} textAnchor="end" className="display-price-axis">{tick}</text></g>;
+        })}
+        {bars.map((bar, index) => {
+          const xx = left + index * slot + (slot - barW) / 2;
+          const yy = y(bar.average);
+          return <g key={bar.start} className={`display-price-bar display-price-bar--${bandClass(bar.average, bands)}`}>
+            <rect x={xx} y={yy} width={barW} height={Math.max(1, height-bottom-yy)} rx="3"><title>{localHourLabel(bar.start)} · {bar.average.toFixed(2)} kr/kWh</title></rect>
+            <text x={xx + barW/2} y={height-9} textAnchor="middle" className="display-price-axis">{new Intl.DateTimeFormat("da-DK", { hour: "2-digit" }).format(new Date(bar.start))}</text>
+          </g>;
+        })}
       </svg>
-      <div className="display-chart-axis"><span>{localHourLabel(points[0].timeUtc)}</span><span>{localHourLabel(points[Math.floor(points.length / 2)].timeUtc)}</span><span>{localHourLabel(points[points.length - 1].timeUtc)}</span></div>
     </div>
   );
 }
@@ -170,40 +202,32 @@ function PriceChart({ envelope }: { envelope: CachedEnvelope<EnergyPriceData> | 
 function UsageChart({ envelope }: { envelope: CachedEnvelope<UsageData> | null }) {
   const days = envelope?.data.days.slice(-7) ?? [];
   if (!envelope || days.length === 0) return <div className="display-empty">Elforbrug er ikke konfigureret endnu</div>;
-
   const max = Math.max(...days.map((day) => day.kwh), 1);
-  return (
-    <div className="usage-bars" aria-label="Elforbrug sidste 7 dage">
-      {days.map((day) => (
-        <div className="usage-bar-item" key={day.date}>
-          <strong>{day.kwh.toFixed(1)}</strong>
-          <div className="usage-bar-track"><span style={{ height: `${Math.max(5, (day.kwh / max) * 100)}%` }} /></div>
-          <small>{shortDate(day.date)}</small>
-        </div>
-      ))}
-    </div>
-  );
+  return <div className="usage-bars" aria-label="Elforbrug sidste 7 dage">{days.map((day) => <div className="usage-bar-item" key={day.date}><strong>{day.kwh.toFixed(1)}</strong><div className="usage-bar-track"><span style={{ height: `${Math.max(5, (day.kwh / max) * 100)}%` }} /></div><small>{shortDate(day.date)}</small></div>)}</div>;
 }
 
 function KitchenDisplay() {
-  const [data, setData] = useState<KitchenData>({ prices: null, usage: null, weather: null, status: null });
+  const [data, setData] = useState<KitchenData>({ prices: null, usage: null, weather: null, status: null, bands: DEFAULT_BANDS });
   const [loading, setLoading] = useState(true);
   const [lastRefresh, setLastRefresh] = useState<Date | null>(null);
   const [error, setError] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
-
     async function refresh() {
       try {
-        const [prices, usage, weather, status] = await Promise.all([
+        const [prices, usage, weather, status, settings] = await Promise.all([
           fetchJson<CachedEnvelope<EnergyPriceData>>("/api/sources/energy/prices"),
           fetchJson<CachedEnvelope<UsageData>>("/api/sources/energy/usage"),
           fetchJson<CachedEnvelope<WeatherData>>("/api/sources/weather"),
           fetchJson<SourceStatus>("/api/sources/status"),
+          fetchJson<SettingsResponse>("/api/settings"),
         ]);
+        const low = Number(settings?.settings.energyLowPriceDkk ?? DEFAULT_BANDS.low);
+        const high = Number(settings?.settings.energyHighPriceDkk ?? DEFAULT_BANDS.high);
+        const bands = Number.isFinite(low) && Number.isFinite(high) && low >= 0 && high > low ? { low, high } : DEFAULT_BANDS;
         if (!cancelled) {
-          setData({ prices, usage, weather, status });
+          setData({ prices, usage, weather, status, bands });
           setLastRefresh(new Date());
           setError(false);
         }
@@ -213,13 +237,9 @@ function KitchenDisplay() {
         if (!cancelled) setLoading(false);
       }
     }
-
     void refresh();
     const timer = window.setInterval(() => void refresh(), REFRESH_MS);
-    return () => {
-      cancelled = true;
-      window.clearInterval(timer);
-    };
+    return () => { cancelled = true; window.clearInterval(timer); };
   }, []);
 
   const currentPrice = data.prices?.data.intervals.find((point, index, all) => {
@@ -227,54 +247,20 @@ function KitchenDisplay() {
     const next = all[index + 1] ? new Date(all[index + 1].timeUtc).getTime() : t + 15 * 60 * 1000;
     return Date.now() >= t && Date.now() < next;
   });
-
   const currentWeather = data.weather?.data.current;
 
   return (
     <div className="kitchen-display">
-      <header className="display-header">
-        <div><span className="display-brand">NEXUS</span><h1>Køkken</h1></div>
-        <div className="display-clock"><strong>{new Intl.DateTimeFormat("da-DK", { hour: "2-digit", minute: "2-digit" }).format(new Date())}</strong><span>{new Intl.DateTimeFormat("da-DK", { weekday: "long", day: "numeric", month: "long" }).format(new Date())}</span></div>
-      </header>
-
+      <header className="display-header"><div><span className="display-brand">NEXUS</span><h1>Køkken</h1></div><div className="display-clock"><strong>{new Intl.DateTimeFormat("da-DK", { hour: "2-digit", minute: "2-digit" }).format(new Date())}</strong><span>{new Intl.DateTimeFormat("da-DK", { weekday: "long", day: "numeric", month: "long" }).format(new Date())}</span></div></header>
       {error && <div className="display-alert">Kunne ikke opdatere alle kilder. Viser seneste kendte data.</div>}
-
       <main className="display-grid">
-        <section className="display-card display-card--wide">
-          <div className="display-card-header"><div><span className="display-kicker">Strøm</span><h2>Samlet pris næste 24 timer</h2></div><span className={`freshness ${data.prices?.stale ? "stale" : ""}`}>{data.prices?.stale ? "Forsinket" : `Opdateret ${ageLabel(data.prices?.fetchedAt)}`}</span></div>
-          {loading ? <div className="display-empty">Henter priser…</div> : <PriceChart envelope={data.prices} />}
-        </section>
-
-        <section className="display-card">
-          <div className="display-card-header"><div><span className="display-kicker">Forbrug</span><h2>Sidste 7 dage</h2></div><span className={`freshness ${data.usage?.stale ? "stale" : ""}`}>{data.usage ? `Opdateret ${ageLabel(data.usage.fetchedAt)}` : "Ikke klar"}</span></div>
-          {loading ? <div className="display-empty">Henter forbrug…</div> : <UsageChart envelope={data.usage} />}
-        </section>
-
-        <section className="display-card display-card--compact">
-          <span className="display-kicker">Lige nu</span>
-          <div className="display-big-number">{currentPrice ? `${currentPrice.approxDkkPerKwh.toFixed(2)} kr` : "—"}</div>
-          <p>pr. kWh inkl. moms, net og afgifter</p>
-        </section>
-
-        <section className="display-card display-card--compact">
-          <span className="display-kicker">Affald</span>
-          <div className="display-big-number display-big-number--text">{data.status?.sources.wasteCalendar.configured ? "Kalender klar" : "Ikke sat op"}</div>
-          <p>Næste tømning kommer her, når kalenderfeedet er koblet på.</p>
-        </section>
-
-        <section className="display-card display-card--compact">
-          <span className="display-kicker">Vejr · {data.weather?.data.location.label ?? "Hjem"}</span>
-          <div className="display-big-number display-big-number--text">{currentWeather ? `${weatherIcon(currentWeather.symbol)} ${Math.round(currentWeather.temperature)}°C` : "Ikke klar"}</div>
-          <p>{currentWeather ? `${weatherDescription(currentWeather.symbol)} · opdateret ${ageLabel(data.weather?.fetchedAt)}` : "Venter på MET Norway."}</p>
-        </section>
-
-        <section className="display-card display-card--compact">
-          <span className="display-kicker">Varmepumpe</span>
-          <div className="display-big-number display-big-number--text">Afventer Mitsubishi</div>
-          <p>Plads reserveret til varmt vand og udendørstemperatur.</p>
-        </section>
+        <section className="display-card display-card--wide"><div className="display-card-header"><div><span className="display-kicker">Strøm</span><h2>Samlet pris næste 24 timer</h2></div><span className={`freshness ${data.prices?.stale ? "stale" : ""}`}>{data.prices?.stale ? "Forsinket" : `Opdateret ${ageLabel(data.prices?.fetchedAt)}`}</span></div>{loading ? <div className="display-empty">Henter priser…</div> : <PriceChart envelope={data.prices} bands={data.bands} />}</section>
+        <section className="display-card"><div className="display-card-header"><div><span className="display-kicker">Forbrug</span><h2>Sidste 7 dage</h2></div><span className={`freshness ${data.usage?.stale ? "stale" : ""}`}>{data.usage ? `Opdateret ${ageLabel(data.usage.fetchedAt)}` : "Ikke klar"}</span></div>{loading ? <div className="display-empty">Henter forbrug…</div> : <UsageChart envelope={data.usage} />}</section>
+        <section className="display-card display-card--compact"><span className="display-kicker">Lige nu</span><div className="display-big-number">{currentPrice ? `${currentPrice.approxDkkPerKwh.toFixed(2)} kr` : "—"}</div><p>pr. kWh inkl. moms, net og afgifter</p></section>
+        <section className="display-card display-card--compact"><span className="display-kicker">Affald</span><div className="display-big-number display-big-number--text">{data.status?.sources.wasteCalendar.configured ? "Kalender klar" : "Ikke sat op"}</div><p>Næste tømning kommer her, når kalenderfeedet er koblet på.</p></section>
+        <section className="display-card display-card--compact"><span className="display-kicker">Vejr · {data.weather?.data.location.label ?? "Hjem"}</span><div className="display-big-number display-big-number--text">{currentWeather ? `${weatherIcon(currentWeather.symbol)} ${Math.round(currentWeather.temperature)}°C` : "Ikke klar"}</div><p>{currentWeather ? `${weatherDescription(currentWeather.symbol)} · opdateret ${ageLabel(data.weather?.fetchedAt)}` : "Venter på MET Norway."}</p></section>
+        <section className="display-card display-card--compact"><span className="display-kicker">Varmepumpe</span><div className="display-big-number display-big-number--text">Afventer Mitsubishi</div><p>Plads reserveret til varmt vand og udendørstemperatur.</p></section>
       </main>
-
       <footer className="display-footer"><span>Nexus display · auto-refresh hvert minut</span><span>{lastRefresh ? `Sidst hentet ${lastRefresh.toLocaleTimeString("da-DK", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}` : "Venter på første opdatering"}</span></footer>
     </div>
   );
