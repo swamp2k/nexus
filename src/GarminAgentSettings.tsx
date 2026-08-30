@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 
 type Agent = { id: string; name: string; lastSeenAt: string | null; createdAt: string };
 type SyncJob = { id: string; status: "queued" | "running" | "processing" | "complete" | "failed"; message: string | null; requestedAt: string; startedAt: string | null; completedAt: string | null; updatedAt: string };
+type CredentialState = { configured: boolean; username: string | null; updatedAt: string | null };
 
 function age(value: string | null): string {
   if (!value) return "aldrig";
@@ -27,23 +28,37 @@ async function errorText(response: Response): Promise<string> {
 
 export default function GarminAgentSettings() {
   const [agents, setAgents] = useState<Agent[]>([]);
+  const [canManageAgent, setCanManageAgent] = useState(false);
   const [job, setJob] = useState<SyncJob | null>(null);
+  const [credentials, setCredentials] = useState<CredentialState>({ configured: false, username: null, updatedAt: null });
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
   const [token, setToken] = useState<string | null>(null);
   const [showSetup, setShowSetup] = useState(false);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [busy, setBusy] = useState(false);
+  const [credentialBusy, setCredentialBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [credentialMessage, setCredentialMessage] = useState<string | null>(null);
 
   async function refresh() {
     try {
-      const [agentsResponse, syncResponse] = await Promise.all([
+      const [agentsResponse, syncResponse, credentialsResponse] = await Promise.all([
         fetch("/api/garmin/agents", { credentials: "same-origin", cache: "no-store" }),
         fetch("/api/garmin/sync", { credentials: "same-origin", cache: "no-store" }),
+        fetch("/api/garmin/credentials", { credentials: "same-origin", cache: "no-store" }),
       ]);
       if (!agentsResponse.ok) throw new Error(await errorText(agentsResponse));
       if (!syncResponse.ok) throw new Error(await errorText(syncResponse));
-      setAgents((await agentsResponse.json() as { agents: Agent[] }).agents);
+      if (!credentialsResponse.ok) throw new Error(await errorText(credentialsResponse));
+
+      const agentBody = await agentsResponse.json() as { agents: Agent[]; canManage?: boolean };
+      const credentialBody = await credentialsResponse.json() as CredentialState;
+      setAgents(agentBody.agents);
+      setCanManageAgent(!!agentBody.canManage);
       setJob((await syncResponse.json() as { job: SyncJob | null }).job);
+      setCredentials(credentialBody);
+      if (credentialBody.username) setUsername(credentialBody.username);
       setState("ready");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "agent_status_failed");
@@ -57,12 +72,51 @@ export default function GarminAgentSettings() {
     return () => window.clearInterval(timer);
   }, []);
 
+  async function saveCredentials() {
+    if (!username.trim() || !password) {
+      setCredentialMessage("Indtast både Garmin-login og password.");
+      return;
+    }
+    setCredentialBusy(true); setCredentialMessage(null);
+    try {
+      const response = await fetch("/api/garmin/credentials", {
+        method: "PUT",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: username.trim(), password }),
+      });
+      if (!response.ok) throw new Error(await errorText(response));
+      const body = await response.json() as CredentialState;
+      setCredentials(body);
+      setUsername(body.username ?? username.trim());
+      setPassword("");
+      setCredentialMessage("Garmin-login er gemt krypteret i Nexus.");
+    } catch (error) {
+      setCredentialMessage(error instanceof Error ? error.message : "garmin_credentials_save_failed");
+    } finally { setCredentialBusy(false); }
+  }
+
+  async function removeCredentials() {
+    if (!window.confirm("Fjern dit gemte Garmin-login fra Nexus? Eksisterende importerede data bliver ikke slettet.")) return;
+    setCredentialBusy(true); setCredentialMessage(null);
+    try {
+      const response = await fetch("/api/garmin/credentials", { method: "DELETE", credentials: "same-origin" });
+      if (!response.ok) throw new Error(await errorText(response));
+      setCredentials({ configured: false, username: null, updatedAt: null });
+      setUsername("");
+      setPassword("");
+      setCredentialMessage("Garmin-login er fjernet.");
+    } catch (error) {
+      setCredentialMessage(error instanceof Error ? error.message : "garmin_credentials_delete_failed");
+    } finally { setCredentialBusy(false); }
+  }
+
   async function createAgent() {
     setBusy(true); setMessage(null);
     try {
       const response = await fetch("/api/garmin/agents", {
         method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: "GarminDB agent" }),
+        body: JSON.stringify({ name: "Nexus Garmin agent" }),
       });
       if (!response.ok) throw new Error(await errorText(response));
       const body = await response.json() as { token: string };
@@ -100,47 +154,68 @@ export default function GarminAgentSettings() {
   const agent = agents[0] ?? null;
   const online = isOnline(agent);
   const active = job && ["queued", "running", "processing"].includes(job.status);
-  const statusLabel = !agent ? "Ikke sat op" : online ? "Online" : "Offline";
+  const statusLabel = !agent ? "Ikke installeret" : online ? "Online" : "Offline";
 
-  if (state === "loading") return <div className="garmin-agent-panel"><p className="settings-loading">Henter Garmin-agent…</p></div>;
+  if (state === "loading") return <div className="garmin-agent-panel"><p className="settings-loading">Henter Garmin-indstillinger…</p></div>;
 
   return <section className="garmin-agent-panel">
     <div className="garmin-agent-heading">
-      <div><p className="section-label">Automatisk synkronisering</p><h3>GarminDB-agent</h3><p>Agenten kører GarminDB på din egen maskine og sender kun de hentede Garmin-data til Nexus.</p></div>
+      <div><p className="section-label">Garmin Connect</p><h3>Din Garmin-konto</h3><p>Nexus bruger loginet til at lade den fælles GarminDB-agent hente og opdatere dine egne data.</p></div>
+      <span className={`garmin-agent-status ${credentials.configured ? "online" : ""}`}><i />{credentials.configured ? "Konto gemt" : "Ikke sat op"}</span>
+    </div>
+
+    <div className="garmin-credential-form">
+      <label><span>Garmin Connect login</span><input type="email" autoComplete="username" value={username} onChange={(event) => setUsername(event.target.value)} placeholder="navn@example.com" /></label>
+      <label><span>Garmin Connect password</span><input type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder={credentials.configured ? "Indtast kun for at ændre/gemme igen" : "Password"} /></label>
+      <div className="garmin-agent-actions">
+        <button className="primary-action" type="button" disabled={credentialBusy || !username.trim() || !password} onClick={() => void saveCredentials()}>{credentialBusy ? "Gemmer…" : credentials.configured ? "Opdatér Garmin-login" : "Gem Garmin-login"}</button>
+        {credentials.configured && <button className="secondary-action" type="button" disabled={credentialBusy} onClick={() => void removeCredentials()}>Fjern login</button>}
+        {credentials.updatedAt && <span>Sidst ændret {age(credentials.updatedAt)}.</span>}
+      </div>
+      <p className="settings-help">Login og password krypteres med AES-GCM før de gemmes i D1. Passwordet sendes kun til den godkendte Garmin-agent, når et sync-job for din bruger kører.</p>
+      {credentialMessage && <p className={`settings-feedback ${credentialMessage.includes("gemt") || credentialMessage.includes("fjernet") ? "success" : "error"}`}>{credentialMessage}</p>}
+    </div>
+
+    <div className="garmin-agent-heading garmin-agent-heading--service">
+      <div><p className="section-label">Automatisk synkronisering</p><h3>Fælles GarminDB-agent</h3><p>Én persistent container kan servicere alle Nexus-brugere. GarminDB-state og data holdes isoleret pr. bruger inde i agenten.</p></div>
       <span className={`garmin-agent-status ${online ? "online" : ""}`}><i />{statusLabel}</span>
     </div>
 
-    {state === "error" && <p className="settings-feedback error">Agent-status kunne ikke hentes: {message}</p>}
+    {state === "error" && <p className="settings-feedback error">Garmin-status kunne ikke hentes: {message}</p>}
 
-    {state === "ready" && !agent && <div className="garmin-agent-empty">
-      <div><strong>Ingen agent registreret</strong><span>Opret agenten her. Garmin-login bliver på maskinen hvor GarminDB kører.</span></div>
+    {state === "ready" && !agent && canManageAgent && <div className="garmin-agent-empty">
+      <div><strong>Ingen fælles agent registreret</strong><span>Opret installation-tokenet og brug det i den ene Nexus Garmin-container på Unraid.</span></div>
       <button className="primary-action" type="button" disabled={busy} onClick={() => void createAgent()}>{busy ? "Opretter…" : "Opsæt Garmin-agent"}</button>
     </div>}
 
+    {state === "ready" && !agent && !canManageAgent && <p className="settings-feedback error">Nexus-administratoren har ikke installeret Garmin-agenten endnu.</p>}
+
     {agent && <>
       <div className="garmin-agent-grid">
-        <div><span>Status</span><strong>{statusLabel}</strong><small>{agent.lastSeenAt ? `Sidst set ${age(agent.lastSeenAt)}` : "Agenten har ikke checket ind endnu"}</small></div>
-        <div><span>Seneste sync</span><strong>{job?.status === "complete" ? "Færdig" : job?.status === "failed" ? "Fejlet" : job ? job.status : "Ingen endnu"}</strong><small>{job?.completedAt ? age(job.completedAt) : job?.requestedAt ? `Startet ${age(job.requestedAt)}` : "—"}</small></div>
+        <div><span>Agent</span><strong>{statusLabel}</strong><small>{agent.lastSeenAt ? `Sidst set ${age(agent.lastSeenAt)}` : "Containeren har ikke checket ind endnu"}</small></div>
+        <div><span>Din seneste sync</span><strong>{job?.status === "complete" ? "Færdig" : job?.status === "failed" ? "Fejlet" : job ? job.status : "Ingen endnu"}</strong><small>{job?.completedAt ? age(job.completedAt) : job?.requestedAt ? `Startet ${age(job.requestedAt)}` : "—"}</small></div>
       </div>
       <div className="garmin-agent-actions">
-        <button className="primary-action" type="button" disabled={busy || !!active} onClick={() => void requestSync()}>{active ? `Garmin sync: ${job?.status}` : "Opdatér fra Garmin"}</button>
-        <button className="secondary-action" type="button" onClick={() => setShowSetup((value) => !value)}>{showSetup ? "Skjul setup" : "Vis setup"}</button>
-        <button className="secondary-action" type="button" disabled={busy} onClick={() => void rotateToken()}>Generér nyt token</button>
-        {!online && <span>Agenten behøver ikke være online for at sætte jobbet i kø; den tager det næste gang den starter.</span>}
+        <button className="primary-action" type="button" disabled={busy || !!active || !credentials.configured} onClick={() => void requestSync()}>{active ? `Garmin sync: ${job?.status}` : "Opdatér fra Garmin"}</button>
+        {canManageAgent && <button className="secondary-action" type="button" onClick={() => setShowSetup((value) => !value)}>{showSetup ? "Skjul agent-setup" : "Vis agent-setup"}</button>}
+        {canManageAgent && <button className="secondary-action" type="button" disabled={busy} onClick={() => void rotateToken()}>Generér nyt agent-token</button>}
+        {!credentials.configured && <span>Gem først dit Garmin-login.</span>}
+        {credentials.configured && !online && <span>Sync kan sættes i kø; agenten tager jobbet næste gang containeren er online.</span>}
       </div>
       {job?.status === "failed" && <p className="settings-feedback error">Seneste Garmin-sync fejlede{job.message ? `: ${job.message}` : "."}</p>}
     </>}
 
-    {showSetup && <div className="garmin-agent-token">
-      <p className="section-label">Agent setup</p>
-      <strong>{token ? "Nyt token er klar — kopiér det nu" : "Installationsvejledning"}</strong>
-      {token ? <code>{token}</code> : <p>Det aktive token kan ikke vises igen, fordi Nexus kun gemmer det som hash. Brug “Generér nyt token” for at få et nyt.</p>}
+    {canManageAgent && showSetup && <div className="garmin-agent-token">
+      <p className="section-label">Unraid agent setup</p>
+      <strong>{token ? "Nyt installation-token er klar — kopiér det nu" : "Installationsvejledning"}</strong>
+      {token ? <code>{token}</code> : <p>Det aktive agent-token kan ikke vises igen, fordi Nexus kun gemmer hash'en. Brug “Generér nyt agent-token” hvis du mangler det.</p>}
       <div className="garmin-agent-setup">
         <code>NEXUS_URL=https://nexus.sr-goodjob.workers.dev</code>
         <code>NEXUS_GARMIN_AGENT_TOKEN={token ?? "<generér-nyt-token>"}</code>
-        <code>python3 tools/nexus-garmin-agent.py</code>
+        <code>/mnt/user/appdata/nexus-garmin/state → /state</code>
+        <code>/mnt/user/appdata/nexus-garmin/data → /data</code>
       </div>
-      <p>Et nyt token invaliderer det gamle med det samme. GarminDB-login forbliver lokalt på agentmaskinen.</p>
+      <p>Dette token tilhører installationen, ikke en bestemt Garmin-bruger. Ét token og én container servicerer alle Nexus-brugere.</p>
     </div>}
 
     {message && state === "ready" && <p className="settings-feedback error">{message}</p>}
