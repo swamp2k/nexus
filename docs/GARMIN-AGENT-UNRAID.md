@@ -1,82 +1,89 @@
 # Nexus GarminDB agent on Unraid
 
-The GarminDB agent is designed to survive container updates and restarts without losing GarminDB configuration or downloaded data.
+Nexus uses one shared GarminDB container for all Nexus users. Each user's GarminDB configuration/token state and downloaded Garmin data are isolated in separate persistent subdirectories.
 
-## Persistent paths
+## Persistence model
 
-Create these Unraid directories:
+Create:
 
 ```text
-/mnt/user/appdata/nexus-garmin/config
+/mnt/user/appdata/nexus-garmin/state
 /mnt/user/appdata/nexus-garmin/data
 ```
 
-Mount them as:
+Mount:
 
 ```text
-/mnt/user/appdata/nexus-garmin/config -> /root/.GarminDb
-/mnt/user/appdata/nexus-garmin/data   -> /data
+/mnt/user/appdata/nexus-garmin/state -> /state
+/mnt/user/appdata/nexus-garmin/data  -> /data
 ```
 
-The container image itself is disposable. GarminDB configuration, OAuth/session state, downloaded JSON/FIT files and generated databases must live in those mounts.
-
-GarminDB stores both `GarminConnectConfig.json` and its token store (`garmin_tokens.json`) below `~/.GarminDb`, so mounting the whole directory is intentional.
-
-## GarminDB configuration
-
-GarminDB reads:
+The container image itself is disposable. For a Nexus user `<user-id>`, the agent creates:
 
 ```text
-/root/.GarminDb/GarminConnectConfig.json
+/state/users/<user-id>/.GarminDb/
+  GarminConnectConfig.json
+  garmin_tokens.json
+  ...
+
+/data/users/<user-id>/
+  DBs/
+  FitFiles/
+  Sleep/
+  RHR/
+  Weight/
+  ...
 ```
 
-In `GarminConnectConfig.json`, ensure the `directories` section contains these values so GarminDB uses the persistent `/data` mount:
+Replacing or updating the container therefore does not remove GarminDB state or downloaded data.
 
-```json
-"relative_to_home": false,
-"base_dir": "/data"
-```
+## Credentials
 
-Keep the rest of the user's existing `directories` settings and the rest of the GarminDB configuration intact. Do not commit this file to Git.
+Users enter their own Garmin Connect login under **Nexus -> Indstillinger -> Garmin**.
 
-If GarminDB has already been configured and authenticated on another Linux machine, copy the entire existing `~/.GarminDb/` directory into:
+Nexus encrypts username and password with AES-GCM before writing them to D1. The encryption key is a Worker secret and must never be committed to Git. During a sync, the authenticated installation agent receives credentials only for the specific claimed job/user.
+
+The agent writes the credentials into that user's temporary GarminDB config before invoking GarminDB. After GarminDB returns, the plaintext password is scrubbed from the local config again. GarminDB's OAuth token store remains persistent under that user's `.GarminDb` directory.
+
+## Cloudflare secret
+
+Generate a random 32-byte key and store its base64 value as:
 
 ```text
-/mnt/user/appdata/nexus-garmin/config/
+GARMIN_CREDENTIALS_KEY
 ```
 
-This preserves `GarminConnectConfig.json`, `garmin_tokens.json` and any other GarminDB config state. Then change only the directory settings needed to point `base_dir` at `/data`.
+For example, on a trusted machine:
 
-Existing GarminDB data can also be copied into `/mnt/user/appdata/nexus-garmin/data/` before first start, avoiding a new full historical download.
+```bash
+openssl rand -base64 32
+npx wrangler secret put GARMIN_CREDENTIALS_KEY
+```
 
-## Nexus settings
+Paste the generated value into Wrangler's secret prompt. Do not place it in `wrangler.jsonc` or source control. If this secret is lost or rotated without re-encrypting existing rows, saved Garmin credentials can no longer be decrypted and users must save them again.
 
-In Nexus:
+## Nexus agent token
+
+The agent token belongs to the single Unraid installation, not to an individual Garmin user.
+
+As a Nexus admin:
 
 1. Open **Indstillinger -> Garmin**.
-2. Open **Vis setup**.
-3. Generate a new agent token if required.
-4. Copy the `nxa_...` token. Nexus only stores its SHA-256 hash, so the plaintext token cannot be shown again later.
+2. Open/generate the shared Garmin-agent setup.
+3. Copy the `nxa_...` installation token.
+4. Put that token into the container environment as `NEXUS_GARMIN_AGENT_TOKEN`.
 
-Container environment variables:
-
-```text
-NEXUS_URL=https://nexus.sr-goodjob.workers.dev
-NEXUS_GARMIN_AGENT_TOKEN=nxa_...
-NEXUS_GARMIN_DATA_DIR=/data
-NEXUS_GARMIN_POLL_SECONDS=15
-TZ=Europe/Copenhagen
-```
+Only its SHA-256 hash is stored in Nexus. Generating a new installation token invalidates the old one immediately.
 
 ## Build on Unraid
 
-Clone/pull the Nexus repository somewhere convenient, then from the repository root:
+From a clone of the Nexus repository:
 
 ```bash
 docker build -f docker/garmin-agent/Dockerfile -t nexus-garmin-agent:local .
 ```
 
-Create the container:
+Example run:
 
 ```bash
 docker run -d \
@@ -85,44 +92,63 @@ docker run -d \
   -e TZ=Europe/Copenhagen \
   -e NEXUS_URL=https://nexus.sr-goodjob.workers.dev \
   -e NEXUS_GARMIN_AGENT_TOKEN='nxa_REPLACE_ME' \
-  -e NEXUS_GARMIN_DATA_DIR=/data \
+  -e NEXUS_GARMIN_STATE_ROOT=/state/users \
+  -e NEXUS_GARMIN_DATA_ROOT=/data/users \
   -e NEXUS_GARMIN_POLL_SECONDS=15 \
-  -v /mnt/user/appdata/nexus-garmin/config:/root/.GarminDb \
+  -v /mnt/user/appdata/nexus-garmin/state:/state \
   -v /mnt/user/appdata/nexus-garmin/data:/data \
   nexus-garmin-agent:local
 ```
 
 Or use `docker/garmin-agent/docker-compose.example.yml` as a template.
 
-## First start
+## Runtime flow
 
-The container deliberately refuses to start if `GarminConnectConfig.json` is missing. This prevents an apparently healthy but non-persistent GarminDB setup.
+```text
+Nexus user clicks "Opdatér fra Garmin"
+          |
+          v
+D1 job queue (user-specific)
+          |
+          v
+shared Unraid agent claims oldest job
+          |
+          +-> fetches credentials for that job only
+          +-> HOME=/state/users/<user-id>
+          +-> GarminDB data=/data/users/<user-id>
+          +-> garmindb_cli.py --all --download --import --analyze --latest
+          +-> uploads JSON/FIT ZIP to Nexus
+          +-> Nexus inventories and parses it into that same user's D1 records
+```
 
-After start, check:
+The agent deliberately processes jobs sequentially. This keeps GarminDB state isolated and avoids multiple concurrent syncs competing for CPU, network, Garmin rate limits, or local files.
+
+## First start / health
+
+Check:
 
 ```bash
 docker logs -f nexus-garmin-agent
 ```
 
-A healthy idle agent should report that it is polling Nexus. Nexus should change the agent status from **Offline** to **Online** within roughly one polling interval.
+A healthy idle agent reports that it is polling Nexus. Nexus should show the shared agent as **Online** within roughly one polling interval.
 
-Then press **Opdatér fra Garmin** in Nexus. The agent will run GarminDB's incremental command:
+A user's **Opdatér fra Garmin** button is enabled once both conditions are true:
 
-```text
-garmindb_cli.py --all --download --import --analyze --latest
-```
+- that user has saved Garmin Connect credentials in Nexus;
+- the shared Garmin agent has been registered.
 
-and upload the resulting GarminDB files to Nexus for inventory and parsing.
+The agent may be offline when the button is pressed; the job remains queued until the container returns.
 
-## Updating the container
+## Updating
 
-Rebuild and recreate it. Do not delete the two Unraid appdata directories.
+Rebuild/recreate the container while keeping both appdata directories:
 
 ```bash
 docker stop nexus-garmin-agent
 docker rm nexus-garmin-agent
 docker build --pull -f docker/garmin-agent/Dockerfile -t nexus-garmin-agent:local .
-# run/create again with the same mounts and environment variables
+# recreate with the same /state and /data mounts + environment
 ```
 
-Because `/root/.GarminDb` and `/data` are bind-mounted from Unraid, replacing the container does not remove GarminDB configuration, tokens or downloaded data.
+Because `/state` and `/data` are bind-mounted from Unraid, container replacement does not remove user profiles, OAuth token stores, GarminDB databases, JSON, or FIT files.
