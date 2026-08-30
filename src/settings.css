@@ -19,194 +19,40 @@
   margin-bottom: 24px;
 }
 
-.settings-card-heading h2 {
-  margin: 0 0 8px;
-  font-size: 1.45rem;
-  letter-spacing: -0.025em;
-}
-
-.settings-card-heading p:last-child {
-  max-width: 680px;
-  margin: 0;
-  color: var(--muted);
-  line-height: 1.55;
-}
-
-.settings-icon {
-  display: grid;
-  width: 52px;
-  height: 52px;
-  flex: 0 0 auto;
-  place-items: center;
-  border-radius: 16px;
-  background: var(--accent-soft);
-  color: var(--accent);
-  font-size: 1.4rem;
-  font-weight: 900;
-}
-
-.settings-form {
-  display: grid;
-  gap: 18px;
-  max-width: 760px;
-}
-
-.garmin-settings-form {
-  max-width: none;
-}
-
-.garmin-settings-history {
-  margin-top: 6px;
-  padding-top: 22px;
-  border-top: 1px solid var(--border);
-}
-
-.settings-form label {
-  display: grid;
-  gap: 7px;
-}
-
-.settings-form label > span,
-.settings-location-actions > span {
-  color: var(--muted-strong);
-  font-size: 0.82rem;
-  font-weight: 700;
-}
-
-.settings-form input,
-.settings-form select {
-  width: 100%;
-  padding: 12px 13px;
-  border: 1px solid var(--border);
-  border-radius: 11px;
-  outline: none;
-  background: var(--surface-soft);
-  color: var(--text);
-  font: inherit;
-}
-
-.settings-form input:focus,
-.settings-form select:focus {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-soft);
-}
-
-.settings-help {
-  margin: -6px 0 0;
-  color: var(--muted);
-  font-size: 0.8rem;
-  line-height: 1.5;
-}
-
-.settings-location-actions {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  flex-wrap: wrap;
-}
-
-.settings-advanced {
-  padding: 14px 16px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--surface-soft);
-}
-
-.settings-advanced summary {
-  cursor: pointer;
-  color: var(--muted-strong);
-  font-size: 0.86rem;
-  font-weight: 800;
-}
-
-.settings-coordinate-grid,
-.settings-choice-grid {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 12px;
-}
-
-.settings-coordinate-grid {
-  margin-top: 14px;
-}
-
-.settings-choice {
-  display: grid;
-  gap: 5px;
-  padding: 16px;
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  background: var(--surface-soft);
-  color: var(--text);
-  text-align: left;
-  cursor: pointer;
-}
-
-.settings-choice strong {
-  font-size: 1rem;
-}
-
-.settings-choice span {
-  color: var(--muted);
-  font-size: 0.82rem;
-}
-
-.settings-choice.active {
-  border-color: var(--accent);
-  background: var(--accent-soft);
-}
-
-.settings-feedback {
-  margin: 0;
-  padding: 11px 13px;
-  border-radius: 11px;
-  font-size: 0.86rem;
-}
-
-.settings-feedback.success {
-  background: color-mix(in srgb, var(--success) 12%, var(--surface));
-  color: var(--success);
-}
-
-.settings-feedback.error {
-  background: color-mix(in srgb, #d64545 12%, var(--surface));
-  color: #d64545;
-}
-
-.settings-save-bar {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 16px 18px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius-md);
-  background: var(--surface);
-  box-shadow: var(--shadow-soft);
-}
-
-.settings-save-bar > div {
-  min-width: 0;
-}
-
-.settings-loading {
-  margin: 0;
-  color: var(--muted);
-}
+.settings-card-heading h2 { margin: 0 0 8px; font-size: 1.45rem; letter-spacing: -0.025em; }
+.settings-card-heading p:last-child { max-width: 680px; margin: 0; color: var(--muted); line-height: 1.55; }
+.settings-icon { display: grid; width: 52px; height: 52px; flex: 0 0 auto; place-items: center; border-radius: 16px; background: var(--accent-soft); color: var(--accent); font-size: 1.4rem; font-weight: 900; }
+.settings-form { display: grid; gap: 18px; max-width: 760px; }
+.garmin-settings-form { max-width: none; }
+.garmin-settings-history { margin-top: 6px; padding-top: 22px; border-top: 1px solid var(--border); }
+.settings-form label { display: grid; gap: 7px; }
+.settings-form label > span, .settings-location-actions > span { color: var(--muted-strong); font-size: 0.82rem; font-weight: 700; }
+.settings-form input, .settings-form select { width: 100%; padding: 12px 13px; border: 1px solid var(--border); border-radius: 11px; outline: none; background: var(--surface-soft); color: var(--text); font: inherit; }
+.settings-form input:focus, .settings-form select:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+.settings-help { margin: -6px 0 0; color: var(--muted); font-size: 0.8rem; line-height: 1.5; }
+.settings-location-actions { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.settings-advanced { padding: 14px 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-soft); }
+.settings-advanced summary { cursor: pointer; color: var(--muted-strong); font-size: 0.86rem; font-weight: 800; }
+.settings-coordinate-grid, .settings-choice-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.settings-coordinate-grid { margin-top: 14px; }
+.settings-choice { display: grid; gap: 5px; padding: 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-soft); color: var(--text); text-align: left; cursor: pointer; }
+.settings-choice strong { font-size: 1rem; }
+.settings-choice span { color: var(--muted); font-size: 0.82rem; }
+.settings-choice.active { border-color: var(--accent); background: var(--accent-soft); }
+.energy-band-preview { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.energy-band-preview span { padding: 9px 10px; border-radius: 10px; text-align: center; font-size: 0.78rem; font-weight: 800; }
+.energy-band-preview .low { background: color-mix(in srgb, #39b866 16%, var(--surface)); color: #39b866; }
+.energy-band-preview .medium { background: color-mix(in srgb, #f1a62a 16%, var(--surface)); color: #d88c13; }
+.energy-band-preview .high { background: color-mix(in srgb, #ef5b4d 16%, var(--surface)); color: #ef5b4d; }
+.settings-feedback { margin: 0; padding: 11px 13px; border-radius: 11px; font-size: 0.86rem; }
+.settings-feedback.success { background: color-mix(in srgb, var(--success) 12%, var(--surface)); color: var(--success); }
+.settings-feedback.error { background: color-mix(in srgb, #d64545 12%, var(--surface)); color: #d64545; }
+.settings-save-bar { display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 16px 18px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); box-shadow: var(--shadow-soft); }
+.settings-save-bar > div { min-width: 0; }
+.settings-loading { margin: 0; color: var(--muted); }
 
 @media (max-width: 650px) {
-  .settings-card {
-    padding: 20px;
-  }
-
-  .settings-coordinate-grid,
-  .settings-choice-grid {
-    grid-template-columns: 1fr;
-  }
-
-  .settings-location-actions,
-  .settings-save-bar {
-    align-items: stretch;
-    flex-direction: column;
-  }
+  .settings-card { padding: 20px; }
+  .settings-coordinate-grid, .settings-choice-grid, .energy-band-preview { grid-template-columns: 1fr; }
+  .settings-location-actions, .settings-save-bar { align-items: stretch; flex-direction: column; }
 }
