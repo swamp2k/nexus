@@ -28,9 +28,14 @@ type EnergyResponse = {
   stale: boolean;
 };
 
+type PriceBands = { low: number; high: number };
+type SettingsResponse = { settings: { energyLowPriceDkk: number | null; energyHighPriceDkk: number | null } };
 type HourWindow = { start: string; average: number };
+type HourBar = { start: string; average: number };
+
 const TIME_ZONE = "Europe/Copenhagen";
 const CHART_MAX_DKK = 6;
+const DEFAULT_BANDS: PriceBands = { low: 1, high: 2 };
 
 function price(point: PricePoint): number {
   return point.totalDkkPerKwh ?? point.approxDkkPerKwh;
@@ -44,9 +49,10 @@ function formatHour(value: string): string {
   return new Intl.DateTimeFormat("da-DK", { hour: "2-digit", timeZone: TIME_ZONE }).format(new Date(value));
 }
 
-function localMinute(value: string): number {
-  const parts = new Intl.DateTimeFormat("en-GB", { minute: "2-digit", timeZone: TIME_ZONE }).formatToParts(new Date(value));
-  return Number(parts.find((part) => part.type === "minute")?.value ?? 0);
+function localHourKey(value: string): string {
+  const parts = new Intl.DateTimeFormat("en-CA", { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", hour12: false, timeZone: TIME_ZONE }).formatToParts(new Date(value));
+  const map = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${map.year}-${map.month}-${map.day}-${map.hour}`;
 }
 
 function formatDate(value: string): string {
@@ -75,8 +81,29 @@ function rollingHours(points: PricePoint[]): HourWindow[] {
   return result;
 }
 
-function PriceChart({ points }: { points: PricePoint[] }) {
-  if (points.length === 0) return <div className="electricity-empty">Ingen priser til grafen.</div>;
+function hourlyBars(points: PricePoint[]): HourBar[] {
+  const grouped = new Map<string, PricePoint[]>();
+  for (const point of points) {
+    const key = localHourKey(point.timeUtc);
+    const list = grouped.get(key) ?? [];
+    list.push(point);
+    grouped.set(key, list);
+  }
+  return [...grouped.values()].map((items) => ({
+    start: items[0].timeUtc,
+    average: items.reduce((sum, item) => sum + price(item), 0) / items.length,
+  })).slice(0, 25);
+}
+
+function bandClass(value: number, bands: PriceBands): string {
+  if (value <= bands.low) return "low";
+  if (value >= bands.high) return "high";
+  return "medium";
+}
+
+function PriceChart({ points, bands }: { points: PricePoint[]; bands: PriceBands }) {
+  const bars = hourlyBars(points);
+  if (bars.length === 0) return <div className="electricity-empty">Ingen priser til grafen.</div>;
 
   const width = 1200;
   const height = 330;
@@ -86,48 +113,30 @@ function PriceChart({ points }: { points: PricePoint[] }) {
   const padBottom = 46;
   const plotWidth = width - padLeft - padRight;
   const plotHeight = height - padTop - padBottom;
-  const firstTime = Date.parse(points[0].timeUtc);
-  const lastTime = Date.parse(points[points.length - 1].timeUtc);
-  const timeSpan = Math.max(1, lastTime - firstTime);
-
-  const xForTime = (timeUtc: string) => padLeft + ((Date.parse(timeUtc) - firstTime) / timeSpan) * plotWidth;
+  const slotWidth = plotWidth / Math.max(1, bars.length);
+  const barWidth = Math.max(8, slotWidth * 0.72);
   const yForPrice = (value: number) => padTop + (1 - Math.max(0, Math.min(CHART_MAX_DKK, value)) / CHART_MAX_DKK) * plotHeight;
-
-  const path = points.map((point, index) => {
-    const x = xForTime(point.timeUtc);
-    const y = yForPrice(price(point));
-    return `${index === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`;
-  }).join(" ");
-
-  const hourTicks = points.filter((point) => localMinute(point.timeUtc) === 0);
   const yTicks = Array.from({ length: CHART_MAX_DKK + 1 }, (_, index) => index);
-  const hasClippedValues = points.some((point) => price(point) > CHART_MAX_DKK);
+  const hasClippedValues = bars.some((bar) => bar.average > CHART_MAX_DKK);
 
   return (
     <div className="electricity-chart-wrap">
+      <div className="electricity-band-legend"><span className="low">Lav ≤ {bands.low.toFixed(2)} kr</span><span className="medium">Middel</span><span className="high">Høj ≥ {bands.high.toFixed(2)} kr</span></div>
       <div className="electricity-chart-scroll">
-        <svg className="electricity-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Samlet variabel elpris de næste 24 timer, med fast skala fra 0 til 6 kroner pr. kWh">
+        <svg className="electricity-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Samlet variabel elpris pr. time med fast skala fra 0 til 6 kroner pr. kWh">
           {yTicks.map((tick) => {
             const y = yForPrice(tick);
-            return (
-              <g key={`y-${tick}`}>
-                <line x1={padLeft} y1={y} x2={width - padRight} y2={y} className="electricity-gridline" />
-                <text x={padLeft - 10} y={y + 4} textAnchor="end" className="electricity-axis-label">{tick} kr</text>
-              </g>
-            );
+            return <g key={`y-${tick}`}><line x1={padLeft} y1={y} x2={width - padRight} y2={y} className="electricity-gridline" /><text x={padLeft - 10} y={y + 4} textAnchor="end" className="electricity-axis-label">{tick} kr</text></g>;
           })}
-
-          {hourTicks.map((point) => {
-            const x = xForTime(point.timeUtc);
-            return (
-              <g key={`x-${point.timeUtc}`}>
-                <line x1={x} y1={padTop} x2={x} y2={height - padBottom} className="electricity-gridline electricity-gridline--hour" />
-                <text x={x} y={height - 18} textAnchor="middle" className="electricity-axis-label electricity-axis-label--hour">{formatHour(point.timeUtc)}</text>
-              </g>
-            );
+          {bars.map((bar, index) => {
+            const x = padLeft + index * slotWidth + (slotWidth - barWidth) / 2;
+            const y = yForPrice(bar.average);
+            const barHeight = height - padBottom - y;
+            return <g key={bar.start} className={`electricity-hour-bar electricity-hour-bar--${bandClass(bar.average, bands)}`}>
+              <rect x={x} y={y} width={barWidth} height={Math.max(1, barHeight)} rx="4"><title>{formatTime(bar.start)} · {bar.average.toFixed(2)} kr/kWh</title></rect>
+              <text x={x + barWidth / 2} y={height - 18} textAnchor="middle" className="electricity-axis-label electricity-axis-label--hour">{formatHour(bar.start)}</text>
+            </g>;
           })}
-
-          <path d={path} className="electricity-line" />
         </svg>
       </div>
       {hasClippedValues && <p className="electricity-chart-cap-note">Priser over {CHART_MAX_DKK} kr/kWh vises ved toppen af grafen.</p>}
@@ -137,13 +146,23 @@ function PriceChart({ points }: { points: PricePoint[] }) {
 
 export default function ElectricityPage() {
   const [response, setResponse] = useState<EnergyResponse | null>(null);
+  const [bands, setBands] = useState<PriceBands>(DEFAULT_BANDS);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
 
   async function refresh() {
     try {
-      const result = await fetch("/api/sources/energy/prices", { credentials: "same-origin", cache: "no-store" });
-      if (!result.ok) throw new Error(`HTTP ${result.status}`);
-      setResponse(await result.json() as EnergyResponse);
+      const [priceResult, settingsResult] = await Promise.all([
+        fetch("/api/sources/energy/prices", { credentials: "same-origin", cache: "no-store" }),
+        fetch("/api/settings", { credentials: "same-origin", cache: "no-store" }),
+      ]);
+      if (!priceResult.ok) throw new Error(`HTTP ${priceResult.status}`);
+      setResponse(await priceResult.json() as EnergyResponse);
+      if (settingsResult.ok) {
+        const settings = (await settingsResult.json() as SettingsResponse).settings;
+        const low = Number(settings.energyLowPriceDkk ?? DEFAULT_BANDS.low);
+        const high = Number(settings.energyHighPriceDkk ?? DEFAULT_BANDS.high);
+        if (Number.isFinite(low) && Number.isFinite(high) && low >= 0 && high > low) setBands({ low, high });
+      }
       setState("ready");
     } catch {
       setState("error");
@@ -191,9 +210,7 @@ export default function ElectricityPage() {
   }, [response]);
 
   if (state === "loading") return <section className="electricity-state">Henter elpriser…</section>;
-  if (state === "error" || !response || !metrics) {
-    return <section className="electricity-state"><strong>Elpriserne kunne ikke hentes.</strong><button className="secondary-action" type="button" onClick={() => void refresh()}>Prøv igen</button></section>;
-  }
+  if (state === "error" || !response || !metrics) return <section className="electricity-state"><strong>Elpriserne kunne ikke hentes.</strong><button className="secondary-action" type="button" onClick={() => void refresh()}>Prøv igen</button></section>;
 
   const current = metrics.current;
   const supplierInclVat = current ? current.supplierMarkupExVatDkkPerKwh * 1.25 : 0;
@@ -201,37 +218,19 @@ export default function ElectricityPage() {
   return (
     <section className="electricity-page" aria-labelledby="electricity-heading">
       <article className="electricity-hero">
-        <div>
-          <p className="section-label">{response.data.area} · {response.data.gridProviderLabel ?? "netselskab ikke valgt"}</p>
-          <h2 id="electricity-heading">{current ? `${price(current).toFixed(2)} kr/kWh` : "—"}</h2>
-          <strong>Samlet variabel pris lige nu</strong>
-          <p>Opdateret {ageLabel(response.fetchedAt)}{response.stale ? " · viser seneste kendte data" : ""}</p>
-        </div>
-        <div className="electricity-hero-metrics">
-          <div><span>Billigste time</span><strong>{metrics.cheapest ? `${metrics.cheapest.average.toFixed(2)} kr` : "—"}</strong><small>{metrics.cheapest ? `fra ${formatTime(metrics.cheapest.start)}` : ""}</small></div>
-          <div><span>Dyreste time</span><strong>{metrics.highest ? `${metrics.highest.average.toFixed(2)} kr` : "—"}</strong><small>{metrics.highest ? `fra ${formatTime(metrics.highest.start)}` : ""}</small></div>
-        </div>
+        <div><p className="section-label">{response.data.area} · {response.data.gridProviderLabel ?? "netselskab ikke valgt"}</p><h2 id="electricity-heading">{current ? `${price(current).toFixed(2)} kr/kWh` : "—"}</h2><strong>Samlet variabel pris lige nu</strong><p>Opdateret {ageLabel(response.fetchedAt)}{response.stale ? " · viser seneste kendte data" : ""}</p></div>
+        <div className="electricity-hero-metrics"><div><span>Billigste time</span><strong>{metrics.cheapest ? `${metrics.cheapest.average.toFixed(2)} kr` : "—"}</strong><small>{metrics.cheapest ? `fra ${formatTime(metrics.cheapest.start)}` : ""}</small></div><div><span>Dyreste time</span><strong>{metrics.highest ? `${metrics.highest.average.toFixed(2)} kr` : "—"}</strong><small>{metrics.highest ? `fra ${formatTime(metrics.highest.start)}` : ""}</small></div></div>
       </article>
 
-      {current && (
-        <div className="electricity-days">
-          <article className="electricity-day-card"><p className="section-label">Pris lige nu</p><div><span>Spot inkl. moms</span><strong>{current.spotInclVatDkkPerKwh.toFixed(2)} kr</strong></div><div><span>Netselskab</span><strong>{current.gridInclVatDkkPerKwh === null ? "—" : `${current.gridInclVatDkkPerKwh.toFixed(2)} kr`}</strong></div><div><span>Energinet</span><strong>{current.energinetInclVatDkkPerKwh.toFixed(2)} kr</strong></div></article>
-          <article className="electricity-day-card"><p className="section-label">Øvrigt</p><div><span>Elafgift</span><strong>{current.electricityTaxInclVatDkkPerKwh.toFixed(2)} kr</strong></div><div><span>Elselskabstillæg</span><strong>{supplierInclVat.toFixed(2)} kr</strong></div><div><span>I alt</span><strong>{price(current).toFixed(2)} kr</strong></div></article>
-        </div>
-      )}
+      {current && <div className="electricity-days"><article className="electricity-day-card"><p className="section-label">Pris lige nu</p><div><span>Spot inkl. moms</span><strong>{current.spotInclVatDkkPerKwh.toFixed(2)} kr</strong></div><div><span>Netselskab</span><strong>{current.gridInclVatDkkPerKwh === null ? "—" : `${current.gridInclVatDkkPerKwh.toFixed(2)} kr`}</strong></div><div><span>Energinet</span><strong>{current.energinetInclVatDkkPerKwh.toFixed(2)} kr</strong></div></article><article className="electricity-day-card"><p className="section-label">Øvrigt</p><div><span>Elafgift</span><strong>{current.electricityTaxInclVatDkkPerKwh.toFixed(2)} kr</strong></div><div><span>Elselskabstillæg</span><strong>{supplierInclVat.toFixed(2)} kr</strong></div><div><span>I alt</span><strong>{price(current).toFixed(2)} kr</strong></div></article></div>}
 
       <article className="electricity-card">
-        <div className="electricity-card-heading"><div><p className="section-label">Næste døgn</p><h3>Faktisk variabel pris hvert 15. minut</h3></div><button className="secondary-action" type="button" onClick={() => void refresh()}>Opdatér</button></div>
-        <PriceChart points={metrics.future} />
-        <div className="electricity-price-strip">
-          {metrics.future.map((point) => <div className="electricity-price-cell" key={point.timeUtc}><span>{formatTime(point.timeUtc)}</span><strong>{price(point).toFixed(2)}</strong></div>)}
-        </div>
+        <div className="electricity-card-heading"><div><p className="section-label">Næste døgn</p><h3>Samlet elpris pr. time</h3></div><button className="secondary-action" type="button" onClick={() => void refresh()}>Opdatér</button></div>
+        <PriceChart points={metrics.future} bands={bands} />
+        <div className="electricity-price-strip">{metrics.future.map((point) => <div className="electricity-price-cell" key={point.timeUtc}><span>{formatTime(point.timeUtc)}</span><strong>{price(point).toFixed(2)}</strong></div>)}</div>
       </article>
 
-      <div className="electricity-days">
-        {days.map((day) => <article className="electricity-day-card" key={day.key}><p className="section-label">{day.label}</p><div><span>Laveste</span><strong>{day.min.toFixed(2)} kr</strong></div><div><span>Gennemsnit</span><strong>{day.average.toFixed(2)} kr</strong></div><div><span>Højeste</span><strong>{day.max.toFixed(2)} kr</strong></div></article>)}
-      </div>
-
+      <div className="electricity-days">{days.map((day) => <article className="electricity-day-card" key={day.key}><p className="section-label">{day.label}</p><div><span>Laveste</span><strong>{day.min.toFixed(2)} kr</strong></div><div><span>Gennemsnit</span><strong>{day.average.toFixed(2)} kr</strong></div><div><span>Højeste</span><strong>{day.max.toFixed(2)} kr</strong></div></article>)}</div>
       <p className="electricity-note">Visningen inkluderer spotpris, moms, nettarif, Energinets system- og nettarif, elafgift og dit konfigurerede kWh-tillæg. Faste månedsabonnementer er ikke fordelt ud på kWh.</p>
     </section>
   );
