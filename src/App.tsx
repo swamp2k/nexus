@@ -41,6 +41,13 @@ const modules: Module[] = [
 const primaryNav: PrimaryPage[] = ["Hjem", "Garmin", "Vejr", "Strøm", "DBA", "Unraid", "PC Watch"];
 const secondaryNav = ["Overblik", "Notifikationer", "Indstillinger"] as const;
 const navIcons = ["⌂", "⌖", "☁", "ϟ", "◇", "▤", "▣"];
+const mobileNav: Array<{ page: Page; icon: string; label: string }> = [
+  { page: "Hjem", icon: "⌂", label: "Hjem" },
+  { page: "Garmin", icon: "⌖", label: "Garmin" },
+  { page: "Vejr", icon: "☁", label: "Vejr" },
+  { page: "Strøm", icon: "ϟ", label: "Strøm" },
+  { page: "Indstillinger", icon: "⚙", label: "Indstillinger" },
+];
 
 function initials(user: User | null): string {
   if (!user) return "N";
@@ -195,6 +202,13 @@ function App() {
               </button>
             );
           })}
+        </nav>
+        <nav className="mobile-nav" aria-label="Mobil navigation">
+          {mobileNav.map((item) => (
+            <button className={page === item.page ? "active" : ""} key={item.page} type="button" onClick={() => setPage(item.page)} aria-current={page === item.page ? "page" : undefined}>
+              <span>{item.icon}</span><strong>{item.label}</strong>
+            </button>
+          ))}
         </nav>
         <div className="system-status"><span className="status-dot" /><div><small>Systemstatus</small><strong>Alt kører</strong></div><span className="status-arrow">›</span></div>
       </aside>
