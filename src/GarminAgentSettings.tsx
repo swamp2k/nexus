@@ -1,7 +1,17 @@
 import { useEffect, useState } from "react";
 
 type Agent = { id: string; name: string; lastSeenAt: string | null; createdAt: string };
-type SyncJob = { id: string; status: "queued" | "running" | "processing" | "complete" | "failed"; message: string | null; requestedAt: string; startedAt: string | null; completedAt: string | null; updatedAt: string };
+type SyncJob = {
+  id: string;
+  status: "queued" | "running" | "processing" | "complete" | "failed";
+  message: string | null;
+  requestedAt: string;
+  startedAt: string | null;
+  completedAt: string | null;
+  updatedAt: string;
+  queuePosition?: number | null;
+  queueAhead?: number | null;
+};
 type CredentialState = { configured: boolean; username: string | null; updatedAt: string | null };
 
 function age(value: string | null): string {
@@ -32,11 +42,22 @@ function isOnline(agent: Agent | null): boolean {
 
 function syncLabel(job: SyncJob): string {
   if (job.status === "failed") return job.message ? `Fejlet: ${job.message}` : "Synkronisering fejlede";
+  if (job.status === "queued") {
+    if (job.queuePosition && job.queuePosition > 1) return `Venter i kø · nr. ${job.queuePosition}`;
+    if (job.queuePosition === 1) return "Næste i køen";
+    return job.message ?? "Venter på Garmin-agent";
+  }
   if (job.message) return job.message;
-  if (job.status === "queued") return "Venter på Garmin-agent";
   if (job.status === "running") return "Henter data fra Garmin";
   if (job.status === "processing") return "Importerer data i Nexus";
   return "Synkronisering færdig";
+}
+
+function queueDescription(job: SyncJob): string | null {
+  if (job.status !== "queued" || job.queueAhead == null) return null;
+  if (job.queueAhead === 0) return "Ingen jobs foran dig. Agenten tager din synkronisering som den næste.";
+  if (job.queueAhead === 1) return "1 synkronisering er foran dig.";
+  return `${job.queueAhead} synkroniseringer er foran dig.`;
 }
 
 function syncPercent(job: SyncJob): number {
@@ -178,6 +199,7 @@ export default function GarminAgentSettings() {
       const response = await fetch("/api/garmin/sync", { method: "POST", credentials: "same-origin" });
       if (!response.ok) throw new Error(await errorText(response));
       setJob((await response.json() as { job: SyncJob }).job);
+      window.setTimeout(() => void refresh(), 500);
     } catch (error) { setMessage(error instanceof Error ? error.message : "garmin_sync_failed"); }
     finally { setBusy(false); }
   }
@@ -185,7 +207,9 @@ export default function GarminAgentSettings() {
   const agent = agents[0] ?? null;
   const online = isOnline(agent);
   const active = job && ["queued", "running", "processing"].includes(job.status);
+  const interrupted = !!job && !online && ["running", "processing"].includes(job.status);
   const statusLabel = !agent ? "Ikke installeret" : online ? "Online" : "Offline";
+  const queueInfo = job ? queueDescription(job) : null;
 
   if (state === "loading") return <div className="garmin-agent-panel"><p className="settings-loading">Henter Garmin-indstillinger…</p></div>;
 
@@ -224,26 +248,28 @@ export default function GarminAgentSettings() {
     {agent && <>
       <div className="garmin-agent-grid">
         <div><span>Agent</span><strong>{statusLabel}</strong><small>{agent.lastSeenAt ? `Sidst set ${age(agent.lastSeenAt)}` : "Containeren har ikke checket ind endnu"}</small></div>
-        <div><span>Din seneste sync</span><strong>{job?.status === "complete" ? "Færdig" : job?.status === "failed" ? "Fejlet" : job ? "Kører" : "Ingen endnu"}</strong><small>{job?.completedAt ? age(job.completedAt) : job?.requestedAt ? `Startet ${age(job.requestedAt)}` : "—"}</small></div>
+        <div><span>Din seneste sync</span><strong>{job?.status === "complete" ? "Færdig" : job?.status === "failed" ? "Fejlet" : job?.status === "queued" ? "I kø" : interrupted ? "Venter" : job ? "Kører" : "Ingen endnu"}</strong><small>{job?.completedAt ? age(job.completedAt) : job?.requestedAt ? `Bestilt ${age(job.requestedAt)}` : "—"}</small></div>
       </div>
 
       {job && <div className={`garmin-sync-progress status-${job.status}`}>
         <div className="garmin-sync-progress-heading">
-          <div><span>Synkronisering</span><strong>{syncLabel(job)}</strong></div>
-          <span>{active ? elapsed(job.startedAt ?? job.requestedAt) : job.completedAt ? `Afsluttet ${age(job.completedAt)}` : ""}</span>
+          <div><span>Synkronisering</span><strong>{interrupted ? "Afbrudt · venter på Garmin-agent" : syncLabel(job)}</strong></div>
+          <span>{job.status === "queued" && job.queuePosition ? `Nr. ${job.queuePosition} i køen` : interrupted ? "Genoptages automatisk" : active ? elapsed(job.startedAt ?? job.requestedAt) : job.completedAt ? `Afsluttet ${age(job.completedAt)}` : ""}</span>
         </div>
         <div className="garmin-sync-track" role="progressbar" aria-label="Garmin synkronisering" aria-valuemin={0} aria-valuemax={100} aria-valuenow={syncPercent(job)}>
           <span style={{ width: `${syncPercent(job)}%` }} />
         </div>
-        {active && <small>Fasen opdateres automatisk cirka hvert 10. sekund. Procenten viser processen, ikke Garmins interne download-procent.</small>}
+        {queueInfo && <small>{queueInfo}</small>}
+        {interrupted && <small>Jobbet beholdes. Når Garmin-agenten kommer online igen, fortsætter Nexus automatisk fra den relevante fase.</small>}
+        {active && !queueInfo && !interrupted && <small>Fasen opdateres automatisk cirka hvert 10. sekund. Procenten viser processen, ikke Garmins interne download-procent.</small>}
       </div>}
 
       <div className="garmin-agent-actions">
-        <button className="primary-action" type="button" disabled={busy || !!active || !credentials.configured} onClick={() => void requestSync()}>{active ? "Garmin-synkronisering kører…" : "Opdatér fra Garmin"}</button>
+        <button className="primary-action" type="button" disabled={busy || !!active || !credentials.configured} onClick={() => void requestSync()}>{job?.status === "queued" ? "Garmin-synkronisering er i kø…" : active ? "Garmin-synkronisering kører…" : "Opdatér fra Garmin"}</button>
         {canManageAgent && <button className="secondary-action" type="button" onClick={() => setShowSetup((value) => !value)}>{showSetup ? "Skjul agent-setup" : "Vis agent-setup"}</button>}
         {canManageAgent && <button className="secondary-action" type="button" disabled={busy} onClick={() => void rotateToken()}>Generér nyt agent-token</button>}
         {!credentials.configured && <span>Gem først dit Garmin-login.</span>}
-        {credentials.configured && !online && <span>Sync kan sættes i kø; agenten tager jobbet næste gang containeren er online.</span>}
+        {credentials.configured && !online && !active && <span>Sync kan sættes i kø; agenten tager jobbet næste gang containeren er online.</span>}
       </div>
       {job?.status === "failed" && <p className="settings-feedback error">Seneste Garmin-sync fejlede{job.message ? `: ${job.message}` : "."}</p>}
     </>}
