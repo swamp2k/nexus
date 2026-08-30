@@ -1,0 +1,149 @@
+.garmin-agent-panel {
+  display: grid;
+  gap: 16px;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface-soft);
+}
+
+.garmin-agent-heading,
+.garmin-agent-empty,
+.garmin-agent-actions {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.garmin-agent-heading h3 {
+  margin: 0 0 6px;
+  font-size: 1.15rem;
+}
+
+.garmin-agent-heading p:last-child,
+.garmin-agent-empty span,
+.garmin-agent-actions span,
+.garmin-agent-token p:last-child {
+  margin: 0;
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
+.garmin-agent-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--muted) 12%, var(--surface));
+  color: var(--muted-strong);
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.garmin-agent-status i {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: currentColor;
+}
+
+.garmin-agent-status.online {
+  background: color-mix(in srgb, var(--success) 12%, var(--surface));
+  color: var(--success);
+}
+
+.garmin-agent-empty > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.garmin-agent-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.garmin-agent-grid > div {
+  display: grid;
+  gap: 4px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface);
+}
+
+.garmin-agent-grid span,
+.garmin-agent-grid small {
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+.garmin-agent-grid strong {
+  font-size: 1.02rem;
+}
+
+.garmin-agent-actions {
+  align-items: center;
+}
+
+.garmin-agent-token {
+  display: grid;
+  gap: 10px;
+  padding: 16px;
+  border: 1px solid color-mix(in srgb, #d97706 35%, var(--border));
+  border-radius: 12px;
+  background: color-mix(in srgb, #d97706 8%, var(--surface));
+}
+
+.garmin-agent-token > code,
+.garmin-agent-setup code {
+  display: block;
+  overflow-wrap: anywhere;
+  padding: 10px 12px;
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.78rem;
+}
+
+.garmin-agent-setup {
+  display: grid;
+  gap: 6px;
+}
+
+.garmin-manual-import {
+  margin-top: 2px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-soft);
+}
+
+.garmin-manual-import > summary {
+  cursor: pointer;
+  color: var(--muted-strong);
+  font-weight: 800;
+}
+
+.garmin-manual-import-body {
+  display: grid;
+  gap: 16px;
+  margin-top: 18px;
+}
+
+@media (max-width: 650px) {
+  .garmin-agent-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .garmin-agent-empty,
+  .garmin-agent-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}
