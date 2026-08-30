@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { FormEvent } from "react";
 import GarminPage from "./GarminPage";
 import MotionPage from "./MotionPage";
+import WellbeingPage from "./WellbeingPage";
 import WeatherPage from "./WeatherPage";
 import ElectricityPage from "./ElectricityPage";
 import SettingsPage from "./SettingsPage";
@@ -27,12 +28,13 @@ type Module = {
   icon: string;
 };
 
-type Page = "Hjem" | "Garmin" | "Motion" | "Vejr" | "Strøm" | "DBA" | "Unraid" | "PC Watch" | "Indstillinger";
+type Page = "Hjem" | "Garmin" | "Motion" | "Velbefindende" | "Vejr" | "Strøm" | "DBA" | "Unraid" | "PC Watch" | "Indstillinger";
 type PrimaryPage = Exclude<Page, "Indstillinger">;
 
 const modules: Module[] = [
   { name: "Garmin", status: "Active", detail: "Sundhed, søvn og historik", tone: "blue", icon: "⌖" },
   { name: "Motion", status: "Active", detail: "Aktiviteter og træningshistorik", tone: "teal", icon: "↗" },
+  { name: "Velbefindende", status: "Active", detail: "Dagligt check-in og journal", tone: "violet", icon: "♥" },
   { name: "Vejr", status: "Active", detail: "MET Norway prognose", tone: "sky", icon: "☁" },
   { name: "Strøm", status: "Active", detail: "Spotpriser og bedste tidspunkter", tone: "amber", icon: "ϟ" },
   { name: "DBA", status: "Later integration", detail: "Fund og monitorering", tone: "green", icon: "◇" },
@@ -40,13 +42,14 @@ const modules: Module[] = [
   { name: "PC Watch", status: "Later integration", detail: "Maskinstatus samlet ét sted", tone: "teal", icon: "▣" },
 ];
 
-const primaryNav: PrimaryPage[] = ["Hjem", "Garmin", "Motion", "Vejr", "Strøm", "DBA", "Unraid", "PC Watch"];
+const primaryNav: PrimaryPage[] = ["Hjem", "Garmin", "Motion", "Velbefindende", "Vejr", "Strøm", "DBA", "Unraid", "PC Watch"];
 const secondaryNav = ["Overblik", "Notifikationer", "Indstillinger"] as const;
-const navIcons = ["⌂", "⌖", "↗", "☁", "ϟ", "◇", "▤", "▣"];
+const navIcons = ["⌂", "⌖", "↗", "♥", "☁", "ϟ", "◇", "▤", "▣"];
 const mobileNav: Array<{ page: Page; icon: string; label: string }> = [
   { page: "Hjem", icon: "⌂", label: "Hjem" },
   { page: "Garmin", icon: "⌖", label: "Garmin" },
   { page: "Motion", icon: "↗", label: "Motion" },
+  { page: "Velbefindende", icon: "♥", label: "Velbefindende" },
   { page: "Vejr", icon: "☁", label: "Vejr" },
   { page: "Strøm", icon: "ϟ", label: "Strøm" },
   { page: "Indstillinger", icon: "⚙", label: "Indstillinger" },
@@ -65,7 +68,7 @@ function Dashboard({ onOpen }: { onOpen: (page: Page) => void }) {
         <div>
           <p className="section-label">I dag</p>
           <h2 id="today-heading">Nexus samler de første rigtige datakilder</h2>
-          <p>Garmin, motion, vejr og strøm bygges som selvstændige områder, mens Nexus står for præsentation, cache og historik.</p>
+          <p>Garmin, motion, velbefindende, vejr og strøm bygges som selvstændige områder, mens Nexus står for præsentation, cache og historik.</p>
         </div>
         <span className="status-pill">Building</span>
       </section>
@@ -177,11 +180,13 @@ function App() {
       ? "Din sundhedshistorik samlet, importeret og klar til analyse."
       : page === "Motion"
         ? "Aktiviteter, træningshistorik og på sigt dine egne rekorder og træningsdata."
-        : page === "Indstillinger"
-          ? "Dine personlige Nexus-indstillinger."
-          : page === "Strøm"
-            ? "Spotpriser og de bedste tidspunkter at bruge strøm på."
-            : "";
+        : page === "Velbefindende"
+          ? "Daglige målinger og journalnoter om hvordan du faktisk har det."
+          : page === "Indstillinger"
+            ? "Dine personlige Nexus-indstillinger."
+            : page === "Strøm"
+              ? "Spotpriser og de bedste tidspunkter at bruge strøm på."
+              : "";
 
   return (
     <div className="app-frame">
@@ -231,10 +236,11 @@ function App() {
           {page === "Hjem" && <Dashboard onOpen={setPage} />}
           {page === "Garmin" && <GarminPage />}
           {page === "Motion" && <MotionPage />}
+          {page === "Velbefindende" && <WellbeingPage />}
           {page === "Vejr" && <WeatherPage />}
           {page === "Strøm" && <ElectricityPage />}
           {page === "Indstillinger" && <SettingsPage />}
-          {!isHome && page !== "Garmin" && page !== "Motion" && page !== "Vejr" && page !== "Strøm" && page !== "Indstillinger" && <section className="placeholder-card"><p className="section-label">Planlagt</p><h2>{page}</h2><p>Modulet er på vej ind i Nexus.</p></section>}
+          {!isHome && page !== "Garmin" && page !== "Motion" && page !== "Velbefindende" && page !== "Vejr" && page !== "Strøm" && page !== "Indstillinger" && <section className="placeholder-card"><p className="section-label">Planlagt</p><h2>{page}</h2><p>Modulet er på vej ind i Nexus.</p></section>}
         </main>
 
         <footer><span>Nexus v0.1</span><span>Simple by design.</span></footer>
