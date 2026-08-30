@@ -5,6 +5,7 @@ import { handleGarminProcessRoute } from "./garmin/process-routes";
 import { handleGarminRoute } from "./garmin/routes";
 import { handleSettingsRoute } from "./settings/routes";
 import { handleSourceRoute } from "./sources/routes";
+import { handleWellbeingRoute } from "./wellbeing/routes";
 
 type HealthResponse = {
   ok: true;
@@ -45,6 +46,11 @@ export default {
         if (processResponse) return processResponse;
         const garminResponse = await handleGarminRoute(request, env);
         if (garminResponse) return garminResponse;
+      }
+
+      if (url.pathname.startsWith("/api/wellbeing/")) {
+        const wellbeingResponse = await handleWellbeingRoute(request, env);
+        if (wellbeingResponse) return wellbeingResponse;
       }
 
       if (url.pathname === "/api/settings") {
