@@ -122,7 +122,8 @@ async function requestSync(request: Request, env: AgentEnv): Promise<Response> {
   if (!agent) return json({ error: "garmin_agent_not_configured" }, { status: 409 });
 
   const existing = await env.DB.prepare(
-    `SELECT id, status, requested_at AS requestedAt, updated_at AS updatedAt
+    `SELECT id, status, message, requested_at AS requestedAt, started_at AS startedAt,
+            completed_at AS completedAt, updated_at AS updatedAt
      FROM garmin_sync_jobs
      WHERE user_id = ? AND status IN ('queued','running','processing')
      ORDER BY requested_at DESC LIMIT 1`,
@@ -131,11 +132,12 @@ async function requestSync(request: Request, env: AgentEnv): Promise<Response> {
 
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
+  const message = "Venter på Garmin-agent";
   await env.DB.prepare(
-    `INSERT INTO garmin_sync_jobs (id, user_id, agent_id, status, requested_at, updated_at)
-     VALUES (?, ?, ?, 'queued', ?, ?)`,
-  ).bind(id, user.id, agent.id, now, now).run();
-  return json({ job: { id, status: "queued", requestedAt: now, updatedAt: now }, existing: false }, { status: 201 });
+    `INSERT INTO garmin_sync_jobs (id, user_id, agent_id, status, message, requested_at, updated_at)
+     VALUES (?, ?, ?, 'queued', ?, ?, ?)`,
+  ).bind(id, user.id, agent.id, message, now, now).run();
+  return json({ job: { id, status: "queued", message, requestedAt: now, startedAt: null, completedAt: null, updatedAt: now }, existing: false }, { status: 201 });
 }
 
 async function syncStatus(request: Request, env: AgentEnv): Promise<Response> {
@@ -169,7 +171,8 @@ async function nextJob(request: Request, env: AgentEnv): Promise<Response> {
   const now = new Date().toISOString();
   const claimed = await env.DB.prepare(
     `UPDATE garmin_sync_jobs
-     SET status = 'running', agent_id = ?, started_at = COALESCE(started_at, ?), updated_at = ?
+     SET status = 'running', agent_id = ?, message = 'Forbereder Garmin-konto',
+         started_at = COALESCE(started_at, ?), updated_at = ?
      WHERE id = ? AND status = 'queued'`,
   ).bind(agent.id, now, now, job.id).run();
   if (!claimed.meta.changes) return new Response(null, { status: 204 });
@@ -220,6 +223,26 @@ async function ownedJob(env: AgentEnv, agentId: string, jobId: string, allowed: 
      WHERE id = ? AND agent_id = ? AND status IN (${placeholders})
      LIMIT 1`,
   ).bind(jobId, agentId, ...allowed).first<JobRow>();
+}
+
+async function progressJob(request: Request, env: AgentEnv, jobId: string): Promise<Response> {
+  if (request.method !== "POST") return json({ error: "method_not_allowed" }, { status: 405 });
+  const agent = await requireAgent(request, env);
+  if (!agent) return json({ error: "unauthorized" }, { status: 401 });
+  const job = await ownedJob(env, agent.id, jobId, ["running", "processing"]);
+  if (!job) return json({ error: "job_not_found" }, { status: 404 });
+
+  let body: { message?: unknown } = {};
+  try { body = await request.json(); } catch { /* required below */ }
+  if (typeof body.message !== "string" || !body.message.trim()) {
+    return json({ error: "invalid_progress_message" }, { status: 400 });
+  }
+  const message = body.message.trim().slice(0, 180);
+  const now = new Date().toISOString();
+  await env.DB.prepare(
+    `UPDATE garmin_sync_jobs SET message = ?, updated_at = ? WHERE id = ? AND agent_id = ?`,
+  ).bind(message, now, jobId, agent.id).run();
+  return json({ ok: true, message, updatedAt: now });
 }
 
 async function failJob(request: Request, env: AgentEnv, jobId: string): Promise<Response> {
@@ -285,7 +308,7 @@ async function uploadJob(request: Request, env: AgentEnv, jobId: string): Promis
 
     await env.DB.prepare(
       `UPDATE garmin_sync_jobs
-       SET status = 'processing', import_id = ?, message = NULL, updated_at = ?
+       SET status = 'processing', import_id = ?, message = 'Importerer data i Nexus', updated_at = ?
        WHERE id = ? AND agent_id = ?`,
     ).bind(importId, now, jobId, agent.id).run();
 
@@ -315,7 +338,7 @@ async function processJob(request: Request, env: AgentEnv, jobId: string): Promi
     const now = new Date().toISOString();
     await env.DB.prepare(
       `UPDATE garmin_sync_jobs
-       SET status = 'complete', message = NULL, completed_at = ?, updated_at = ?
+       SET status = 'complete', message = 'Synkronisering færdig', completed_at = ?, updated_at = ?
        WHERE id = ? AND agent_id = ?`,
     ).bind(now, now, jobId, agent.id).run();
   }
@@ -332,9 +355,10 @@ export async function handleGarminAgentRoute(request: Request, env: AgentEnv): P
   if (pathname === "/api/garmin/sync" && request.method === "GET") return syncStatus(request, env);
   if (pathname === "/api/garmin/agent/jobs/next") return nextJob(request, env);
 
-  const match = pathname.match(/^\/api\/garmin\/agent\/jobs\/([0-9a-f-]+)\/(credentials|upload|process|fail)$/i);
+  const match = pathname.match(/^\/api\/garmin\/agent\/jobs\/([0-9a-f-]+)\/(credentials|progress|upload|process|fail)$/i);
   if (!match || !UUID_RE.test(match[1])) return null;
   if (match[2] === "credentials") return credentialsForJob(request, env, match[1]);
+  if (match[2] === "progress") return progressJob(request, env, match[1]);
   if (match[2] === "upload") return uploadJob(request, env, match[1]);
   if (match[2] === "process") return processJob(request, env, match[1]);
   return failJob(request, env, match[1]);
