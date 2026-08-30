@@ -10,6 +10,8 @@ type SettingsResponse = {
     energyPriceArea: "DK1" | "DK2" | null;
     energyGridProvider: string | null;
     energySupplierMarkupOere: number | null;
+    energyLowPriceDkk: number | null;
+    energyHighPriceDkk: number | null;
     updatedAt: string | null;
   };
   options?: { gridProviders?: GridProviderOption[] };
@@ -25,6 +27,8 @@ export default function SettingsPage() {
   const [energyPriceArea, setEnergyPriceArea] = useState<"DK1" | "DK2">("DK1");
   const [energyGridProvider, setEnergyGridProvider] = useState("Konstant");
   const [energySupplierMarkupOere, setEnergySupplierMarkupOere] = useState("0");
+  const [energyLowPriceDkk, setEnergyLowPriceDkk] = useState("1");
+  const [energyHighPriceDkk, setEnergyHighPriceDkk] = useState("2");
   const [gridProviders, setGridProviders] = useState<GridProviderOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [saveState, setSaveState] = useState<SaveState>("idle");
@@ -43,6 +47,8 @@ export default function SettingsPage() {
         setEnergyPriceArea(settings.energyPriceArea === "DK2" ? "DK2" : "DK1");
         setEnergyGridProvider(settings.energyGridProvider || "Konstant");
         setEnergySupplierMarkupOere(String(settings.energySupplierMarkupOere ?? 0));
+        setEnergyLowPriceDkk(String(settings.energyLowPriceDkk ?? 1));
+        setEnergyHighPriceDkk(String(settings.energyHighPriceDkk ?? 2));
         setGridProviders(options?.gridProviders ?? []);
       })
       .catch(() => undefined)
@@ -67,6 +73,13 @@ export default function SettingsPage() {
   }
 
   async function save() {
+    const lowBand = Number(energyLowPriceDkk);
+    const highBand = Number(energyHighPriceDkk);
+    if (!Number.isFinite(lowBand) || !Number.isFinite(highBand) || lowBand < 0 || highBand <= lowBand) {
+      setSaveState("error");
+      return;
+    }
+
     setSaveState("saving");
     try {
       const response = await fetch("/api/settings", {
@@ -80,6 +93,8 @@ export default function SettingsPage() {
           energyPriceArea,
           energyGridProvider,
           energySupplierMarkupOere: Number(energySupplierMarkupOere),
+          energyLowPriceDkk: lowBand,
+          energyHighPriceDkk: highBand,
         }),
       });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -90,6 +105,8 @@ export default function SettingsPage() {
       setEnergyPriceArea(settings.energyPriceArea === "DK2" ? "DK2" : "DK1");
       setEnergyGridProvider(settings.energyGridProvider || "Konstant");
       setEnergySupplierMarkupOere(String(settings.energySupplierMarkupOere ?? 0));
+      setEnergyLowPriceDkk(String(settings.energyLowPriceDkk ?? 1));
+      setEnergyHighPriceDkk(String(settings.energyHighPriceDkk ?? 2));
       setSaveState("saved");
     } catch { setSaveState("error"); }
   }
@@ -121,14 +138,19 @@ export default function SettingsPage() {
             </div>
             <label><span>Netselskab</span><select value={energyGridProvider} onChange={(event) => { setEnergyGridProvider(event.target.value); changed(); }}>{(gridProviders.length ? gridProviders : [{ key: "Konstant", label: "Konstant" }]).map((provider) => <option key={provider.key} value={provider.key}>{provider.label}</option>)}</select></label>
             <label><span>Elselskabets tillæg · øre/kWh ekskl. moms</span><input inputMode="decimal" type="number" min="0" max="500" step="0.01" value={energySupplierMarkupOere} onChange={(event) => { setEnergySupplierMarkupOere(event.target.value); changed(); }} /></label>
-            <p className="settings-help">Faste abonnementer påvirker ikke, om det er billigt at bruge 1 kWh lige nu, og fordeles derfor ikke ind i timeprisen.</p>
+            <div className="settings-coordinate-grid">
+              <label><span>Lav pris · op til kr/kWh</span><input inputMode="decimal" type="number" min="0" max="20" step="0.05" value={energyLowPriceDkk} onChange={(event) => { setEnergyLowPriceDkk(event.target.value); changed(); }} /></label>
+              <label><span>Høj pris · fra kr/kWh</span><input inputMode="decimal" type="number" min="0" max="20" step="0.05" value={energyHighPriceDkk} onChange={(event) => { setEnergyHighPriceDkk(event.target.value); changed(); }} /></label>
+            </div>
+            <div className="energy-band-preview" aria-label="Farvegrænser for elpris"><span className="low">Lav ≤ {energyLowPriceDkk || "—"} kr</span><span className="medium">Middel</span><span className="high">Høj ≥ {energyHighPriceDkk || "—"} kr</span></div>
+            <p className="settings-help">Farvegrænserne bruges på elprissøjlerne på både Strøm-siden og køkkendisplayet. Faste abonnementer fordeles ikke ind i timeprisen.</p>
           </div>
         )}
       </article>
 
       <GarminImportSettings />
 
-      {!loading && <div className="settings-save-bar"><div>{saveState === "saved" && <p className="settings-feedback success">Indstillingerne er gemt.</p>}{saveState === "error" && <p className="settings-feedback error">Indstillingerne kunne ikke gemmes.</p>}</div><button className="primary-action" type="button" onClick={() => void save()} disabled={saveState === "saving" || !latitude || !longitude}>{saveState === "saving" ? "Gemmer…" : "Gem indstillinger"}</button></div>}
+      {!loading && <div className="settings-save-bar"><div>{saveState === "saved" && <p className="settings-feedback success">Indstillingerne er gemt.</p>}{saveState === "error" && <p className="settings-feedback error">Indstillingerne kunne ikke gemmes. Kontrollér bl.a. at grænsen for høj pris er større end grænsen for lav pris.</p>}</div><button className="primary-action" type="button" onClick={() => void save()} disabled={saveState === "saving" || !latitude || !longitude}>{saveState === "saving" ? "Gemmer…" : "Gem indstillinger"}</button></div>}
     </section>
   );
 }
