@@ -7,6 +7,7 @@ import "./garmin-health.css";
 import "./garmin-charts.css";
 import "./garmin-navigation.css";
 import "./garmin-agent.css";
+import "./motion.css";
 import "./weather.css";
 import "./electricity.css";
 import "./settings.css";
