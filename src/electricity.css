@@ -33,9 +33,9 @@
 .electricity-card { min-width: 0; padding: 24px; }
 .electricity-card-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
 .electricity-card-heading h3 { margin: 0; font-size: 1.28rem; letter-spacing: -0.025em; }
-.electricity-chart-wrap { min-width: 0; }
-.electricity-chart-scroll { overflow-x: auto; padding-bottom: 4px; scrollbar-width: thin; }
-.electricity-chart { display: block; width: 100%; min-width: 1120px; min-height: 260px; }
+.electricity-chart-wrap { min-width: 0; max-width: 100%; overflow: hidden; }
+.electricity-chart-scroll { overflow-x: hidden; padding-bottom: 4px; }
+.electricity-chart { display: block; width: 100%; max-width: 100%; min-width: 0; height: auto; min-height: 260px; }
 .electricity-gridline { stroke: var(--border); stroke-width: 1; }
 .electricity-axis-label { fill: var(--muted); font-size: 12px; font-weight: 700; }
 .electricity-axis-label--hour { font-size: 11px; }
@@ -76,4 +76,5 @@
   .electricity-hero-metrics, .electricity-day-card { grid-template-columns: 1fr; }
   .electricity-day-card .section-label { grid-column: auto; }
   .electricity-band-legend { margin-left: 0; }
+  .electricity-axis-label--hour { font-size: 10px; }
 }
