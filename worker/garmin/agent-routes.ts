@@ -158,6 +158,33 @@ async function nextJob(request: Request, env: AgentEnv): Promise<Response> {
   const agent = await requireAgent(request, env);
   if (!agent) return json({ error: "unauthorized" }, { status: 401 });
 
+  const interrupted = await env.DB.prepare(
+    `SELECT j.id, j.user_id AS userId, j.requested_at AS requestedAt
+     FROM garmin_sync_jobs j
+     JOIN garmin_credentials c ON c.user_id = j.user_id
+     WHERE j.agent_id = ? AND j.status = 'running' AND j.import_id IS NULL
+     ORDER BY j.started_at
+     LIMIT 1`,
+  ).bind(agent.id).first<JobRow>();
+
+  if (interrupted) {
+    const now = new Date().toISOString();
+    await env.DB.prepare(
+      `UPDATE garmin_sync_jobs
+       SET message = 'Genoptager efter agent-genstart', updated_at = ?
+       WHERE id = ? AND agent_id = ? AND status = 'running'`,
+    ).bind(now, interrupted.id, agent.id).run();
+    return json({
+      job: {
+        id: interrupted.id,
+        userId: interrupted.userId,
+        requestedAt: interrupted.requestedAt,
+        status: "running",
+        resumed: true,
+      },
+    });
+  }
+
   const job = await env.DB.prepare(
     `SELECT j.id, j.user_id AS userId, j.requested_at AS requestedAt
      FROM garmin_sync_jobs j
