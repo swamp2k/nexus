@@ -1,5 +1,6 @@
 import { handleAuthRoute } from "./auth/routes";
 import { handleGarminAgentRoute } from "./garmin/agent-routes";
+import { handleGarminCredentialRoute } from "./garmin/credential-routes";
 import { handleGarminProcessRoute } from "./garmin/process-routes";
 import { handleGarminRoute } from "./garmin/routes";
 import { handleSettingsRoute } from "./settings/routes";
@@ -36,6 +37,8 @@ export default {
       }
 
       if (url.pathname.startsWith("/api/garmin/")) {
+        const credentialResponse = await handleGarminCredentialRoute(request, env);
+        if (credentialResponse) return credentialResponse;
         const agentResponse = await handleGarminAgentRoute(request, env);
         if (agentResponse) return agentResponse;
         const processResponse = await handleGarminProcessRoute(request, env);
