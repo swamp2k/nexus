@@ -15,8 +15,39 @@ function age(value: string | null): string {
   return new Intl.DateTimeFormat("da-DK", { dateStyle: "medium", timeStyle: "short" }).format(new Date(value));
 }
 
+function elapsed(value: string | null): string {
+  if (!value) return "";
+  const seconds = Math.max(0, Math.floor((Date.now() - Date.parse(value)) / 1000));
+  if (seconds < 60) return `Kører i ${seconds} sek`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `Kører i ${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return `Kører i ${hours} t${rest ? ` ${rest} min` : ""}`;
+}
+
 function isOnline(agent: Agent | null): boolean {
   return !!agent?.lastSeenAt && Date.now() - Date.parse(agent.lastSeenAt) < 90_000;
+}
+
+function syncLabel(job: SyncJob): string {
+  if (job.status === "failed") return job.message ? `Fejlet: ${job.message}` : "Synkronisering fejlede";
+  if (job.message) return job.message;
+  if (job.status === "queued") return "Venter på Garmin-agent";
+  if (job.status === "running") return "Henter data fra Garmin";
+  if (job.status === "processing") return "Importerer data i Nexus";
+  return "Synkronisering færdig";
+}
+
+function syncPercent(job: SyncJob): number {
+  if (job.status === "complete" || job.status === "failed") return 100;
+  if (job.status === "queued") return 8;
+  if (job.status === "processing") return 85;
+  const message = (job.message ?? "").toLowerCase();
+  if (message.includes("forbereder")) return 15;
+  if (message.includes("pakker")) return 55;
+  if (message.includes("uploader")) return 70;
+  return 35;
 }
 
 async function errorText(response: Response): Promise<string> {
@@ -193,10 +224,22 @@ export default function GarminAgentSettings() {
     {agent && <>
       <div className="garmin-agent-grid">
         <div><span>Agent</span><strong>{statusLabel}</strong><small>{agent.lastSeenAt ? `Sidst set ${age(agent.lastSeenAt)}` : "Containeren har ikke checket ind endnu"}</small></div>
-        <div><span>Din seneste sync</span><strong>{job?.status === "complete" ? "Færdig" : job?.status === "failed" ? "Fejlet" : job ? job.status : "Ingen endnu"}</strong><small>{job?.completedAt ? age(job.completedAt) : job?.requestedAt ? `Startet ${age(job.requestedAt)}` : "—"}</small></div>
+        <div><span>Din seneste sync</span><strong>{job?.status === "complete" ? "Færdig" : job?.status === "failed" ? "Fejlet" : job ? "Kører" : "Ingen endnu"}</strong><small>{job?.completedAt ? age(job.completedAt) : job?.requestedAt ? `Startet ${age(job.requestedAt)}` : "—"}</small></div>
       </div>
+
+      {job && <div className={`garmin-sync-progress status-${job.status}`}>
+        <div className="garmin-sync-progress-heading">
+          <div><span>Synkronisering</span><strong>{syncLabel(job)}</strong></div>
+          <span>{active ? elapsed(job.startedAt ?? job.requestedAt) : job.completedAt ? `Afsluttet ${age(job.completedAt)}` : ""}</span>
+        </div>
+        <div className="garmin-sync-track" role="progressbar" aria-label="Garmin synkronisering" aria-valuemin={0} aria-valuemax={100} aria-valuenow={syncPercent(job)}>
+          <span style={{ width: `${syncPercent(job)}%` }} />
+        </div>
+        {active && <small>Fasen opdateres automatisk cirka hvert 10. sekund. Procenten viser processen, ikke Garmins interne download-procent.</small>}
+      </div>}
+
       <div className="garmin-agent-actions">
-        <button className="primary-action" type="button" disabled={busy || !!active || !credentials.configured} onClick={() => void requestSync()}>{active ? `Garmin sync: ${job?.status}` : "Opdatér fra Garmin"}</button>
+        <button className="primary-action" type="button" disabled={busy || !!active || !credentials.configured} onClick={() => void requestSync()}>{active ? "Garmin-synkronisering kører…" : "Opdatér fra Garmin"}</button>
         {canManageAgent && <button className="secondary-action" type="button" onClick={() => setShowSetup((value) => !value)}>{showSetup ? "Skjul agent-setup" : "Vis agent-setup"}</button>}
         {canManageAgent && <button className="secondary-action" type="button" disabled={busy} onClick={() => void rotateToken()}>Generér nyt agent-token</button>}
         {!credentials.configured && <span>Gem først dit Garmin-login.</span>}
