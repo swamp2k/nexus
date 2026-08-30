@@ -20,6 +20,15 @@ type SettingsResponse = {
 type SaveState = "idle" | "saving" | "saved" | "error";
 type LocateState = "idle" | "locating" | "error";
 
+async function responseError(response: Response): Promise<string> {
+  try {
+    const body = await response.json() as { error?: string; detail?: string };
+    return body.detail ?? body.error ?? `HTTP ${response.status}`;
+  } catch {
+    return `HTTP ${response.status}`;
+  }
+}
+
 export default function SettingsPage() {
   const [label, setLabel] = useState("Hjem");
   const [latitude, setLatitude] = useState("");
@@ -32,6 +41,7 @@ export default function SettingsPage() {
   const [gridProviders, setGridProviders] = useState<GridProviderOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [saveState, setSaveState] = useState<SaveState>("idle");
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [locateState, setLocateState] = useState<LocateState>("idle");
 
   useEffect(() => {
@@ -55,7 +65,7 @@ export default function SettingsPage() {
       .finally(() => setLoading(false));
   }, []);
 
-  function changed() { setSaveState("idle"); }
+  function changed() { setSaveState("idle"); setSaveError(null); }
 
   function useCurrentLocation() {
     if (!navigator.geolocation) { setLocateState("error"); return; }
@@ -76,10 +86,12 @@ export default function SettingsPage() {
     const lowBand = Number(energyLowPriceDkk);
     const highBand = Number(energyHighPriceDkk);
     if (!Number.isFinite(lowBand) || !Number.isFinite(highBand) || lowBand < 0 || highBand <= lowBand) {
+      setSaveError("Grænsen for høj pris skal være større end grænsen for lav pris.");
       setSaveState("error");
       return;
     }
 
+    setSaveError(null);
     setSaveState("saving");
     try {
       const response = await fetch("/api/settings", {
@@ -97,7 +109,7 @@ export default function SettingsPage() {
           energyHighPriceDkk: highBand,
         }),
       });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      if (!response.ok) throw new Error(await responseError(response));
       const { settings } = await response.json() as SettingsResponse;
       setLabel(settings.weatherLabel || "Hjem");
       setLatitude(String(settings.weatherLat));
@@ -108,7 +120,10 @@ export default function SettingsPage() {
       setEnergyLowPriceDkk(String(settings.energyLowPriceDkk ?? 1));
       setEnergyHighPriceDkk(String(settings.energyHighPriceDkk ?? 2));
       setSaveState("saved");
-    } catch { setSaveState("error"); }
+    } catch (error) {
+      setSaveError(error instanceof Error ? error.message : "Ukendt fejl");
+      setSaveState("error");
+    }
   }
 
   return (
@@ -150,7 +165,7 @@ export default function SettingsPage() {
 
       <GarminImportSettings />
 
-      {!loading && <div className="settings-save-bar"><div>{saveState === "saved" && <p className="settings-feedback success">Indstillingerne er gemt.</p>}{saveState === "error" && <p className="settings-feedback error">Indstillingerne kunne ikke gemmes. Kontrollér bl.a. at grænsen for høj pris er større end grænsen for lav pris.</p>}</div><button className="primary-action" type="button" onClick={() => void save()} disabled={saveState === "saving" || !latitude || !longitude}>{saveState === "saving" ? "Gemmer…" : "Gem indstillinger"}</button></div>}
+      {!loading && <div className="settings-save-bar"><div>{saveState === "saved" && <p className="settings-feedback success">Indstillingerne er gemt.</p>}{saveState === "error" && <p className="settings-feedback error">Indstillingerne kunne ikke gemmes: {saveError ?? "ukendt fejl"}.</p>}</div><button className="primary-action" type="button" onClick={() => void save()} disabled={saveState === "saving" || !latitude || !longitude}>{saveState === "saving" ? "Gemmer…" : "Gem indstillinger"}</button></div>}
     </section>
   );
 }
