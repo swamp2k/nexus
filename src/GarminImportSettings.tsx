@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import GarminAgentSettings from "./GarminAgentSettings";
 
 type GarminImport = {
   id: string;
@@ -169,45 +170,52 @@ export default function GarminImportSettings() {
   return (
     <article className="settings-card">
       <div className="settings-card-heading">
-        <div><p className="section-label">Datakilde</p><h2>Garmin</h2><p>Import og vedligeholdelse af GarminDB-data. Den almindelige Garmin-side viser kun de normaliserede sundhedsdata.</p></div>
+        <div><p className="section-label">Datakilde</p><h2>Garmin</h2><p>GarminDB-agenten er den normale synkronisering. Manuel ZIP-import bevares som fallback og fejlsøgning.</p></div>
         <span className="settings-icon" aria-hidden="true">⌖</span>
       </div>
 
       <div className="settings-form garmin-settings-form">
-        <input ref={inputRef} className="visually-hidden" type="file" accept=".zip,application/zip" disabled={uploadState === "uploading"} onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadFile(file); }} />
-        <div className="settings-location-actions">
-          <button className="primary-action" type="button" disabled={uploadState === "uploading"} onClick={() => inputRef.current?.click()}>{uploadState === "uploading" ? `Uploader ${progress}%` : "Upload GarminDB ZIP"}</button>
-          <span>Rå ZIP, JSON og FIT bevares i R2.</span>
-        </div>
-        {uploadState === "uploading" && <div className="upload-progress" aria-label={`Upload ${progress}%`}><span style={{ width: `${progress}%` }} /></div>}
-        {uploadState === "complete" && <p className="settings-feedback success">{uploadFilename} er uploadet og inventeret.</p>}
-        {uploadError && <p className="settings-feedback error">{uploadError}</p>}
+        <GarminAgentSettings />
 
-        <div className="garmin-settings-history">
-          <div className="imports-heading"><div><p className="section-label">Historik</p><h3>Garmin-imports</h3></div><button className="secondary-action" type="button" onClick={() => void refreshImports()}>Opdatér</button></div>
-          {importsState === "loading" && <p className="empty-state">Henter importhistorik…</p>}
-          {importsState === "error" && <p className="empty-state">Importhistorikken kunne ikke hentes.</p>}
-          {importsState === "ready" && imports.length === 0 && <p className="empty-state">Ingen Garmin-imports endnu.</p>}
-          {imports.length > 0 && <div className="imports-list">{imports.map((item) => (
-            <article className="import-row" key={item.id}>
-              <div className="import-file-icon">ZIP</div>
-              <div className="import-row-copy"><strong>{item.filename}</strong><span>{formatBytes(item.sizeBytes)} · {formatDate(item.createdAt)}{item.fileCount !== null ? ` · ${item.fileCount} filer` : ""}{item.detectedFrom && item.detectedTo ? ` · ${item.detectedFrom} → ${item.detectedTo}` : ""}</span>{processingId === item.id && <span>Parser batch… {processedFiles} filer behandlet</span>}{item.errorMessage && <span className="import-row-error">{item.errorMessage}</span>}</div>
-              <div className="import-row-actions">
-                {(item.status === "uploaded" || item.status === "failed") && <button className="secondary-action" type="button" disabled={inventoryingId === item.id} onClick={() => void inventoryImport(item.id)}>{inventoryingId === item.id ? "Analyserer…" : "Analysér"}</button>}
-                {(item.status === "ready" || item.status === "processing") && <button className="primary-action" type="button" disabled={processingId !== null} onClick={() => void processImport(item.id)}>{processingId === item.id ? `Importerer… ${processedFiles}` : "Importér data"}</button>}
-                {(item.status === "ready" || item.status === "complete") && <button className="secondary-action" type="button" onClick={() => void loadInventoryFiles(item.id)}>{selectedImportId === item.id ? "Skjul filer" : "Se filer"}</button>}
-                <span className={`import-status status-${item.status}`}>{item.status}</span>
-              </div>
-            </article>
-          ))}</div>}
+        <details className="garmin-manual-import">
+          <summary>Avanceret: manuel GarminDB-import</summary>
+          <div className="garmin-manual-import-body">
+            <input ref={inputRef} className="visually-hidden" type="file" accept=".zip,application/zip" disabled={uploadState === "uploading"} onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadFile(file); }} />
+            <div className="settings-location-actions">
+              <button className="primary-action" type="button" disabled={uploadState === "uploading"} onClick={() => inputRef.current?.click()}>{uploadState === "uploading" ? `Uploader ${progress}%` : "Upload GarminDB ZIP"}</button>
+              <span>Rå ZIP, JSON og FIT bevares i R2.</span>
+            </div>
+            {uploadState === "uploading" && <div className="upload-progress" aria-label={`Upload ${progress}%`}><span style={{ width: `${progress}%` }} /></div>}
+            {uploadState === "complete" && <p className="settings-feedback success">{uploadFilename} er uploadet og inventeret.</p>}
+            {uploadError && <p className="settings-feedback error">{uploadError}</p>}
 
-          {selectedImport && <section className="inventory-panel" aria-labelledby="settings-inventory-heading">
-            <div className="inventory-heading"><div><span className="summary-kicker">Inventory</span><h4 id="settings-inventory-heading">{selectedImport.filename}</h4></div><span className="inventory-total">{inventoryFiles.length || selectedImport.fileCount || 0} filer</span></div>
-            {filesState === "loading" && <p className="empty-state">Henter filoversigt…</p>}
-            {filesState === "error" && <p className="settings-feedback error">Filoversigten kunne ikke hentes: {filesError}</p>}
-            {filesState === "ready" && <><div className="inventory-type-grid">{fileTypeCounts.map(([type, count]) => <div className="inventory-type-card" key={type}><strong>{count}</strong><span>.{type === "uden filtype" ? "—" : type}</span></div>)}</div><div className="inventory-file-list">{inventoryFiles.map((file) => <div className="inventory-file-row" key={file.path}><span className="inventory-file-type">{file.fileType?.toUpperCase() || "FILE"}</span><code title={file.path}>{file.path}</code><span>{file.status}</span><span>{formatBytes(file.sizeBytes)}</span></div>)}</div></>}
-          </section>}
-        </div>
+            <div className="garmin-settings-history">
+              <div className="imports-heading"><div><p className="section-label">Historik</p><h3>Garmin-imports</h3></div><button className="secondary-action" type="button" onClick={() => void refreshImports()}>Opdatér</button></div>
+              {importsState === "loading" && <p className="empty-state">Henter importhistorik…</p>}
+              {importsState === "error" && <p className="empty-state">Importhistorikken kunne ikke hentes.</p>}
+              {importsState === "ready" && imports.length === 0 && <p className="empty-state">Ingen Garmin-imports endnu.</p>}
+              {imports.length > 0 && <div className="imports-list">{imports.map((item) => (
+                <article className="import-row" key={item.id}>
+                  <div className="import-file-icon">ZIP</div>
+                  <div className="import-row-copy"><strong>{item.filename}</strong><span>{formatBytes(item.sizeBytes)} · {formatDate(item.createdAt)}{item.fileCount !== null ? ` · ${item.fileCount} filer` : ""}{item.detectedFrom && item.detectedTo ? ` · ${item.detectedFrom} → ${item.detectedTo}` : ""}</span>{processingId === item.id && <span>Parser batch… {processedFiles} filer behandlet</span>}{item.errorMessage && <span className="import-row-error">{item.errorMessage}</span>}</div>
+                  <div className="import-row-actions">
+                    {(item.status === "uploaded" || item.status === "failed") && <button className="secondary-action" type="button" disabled={inventoryingId === item.id} onClick={() => void inventoryImport(item.id)}>{inventoryingId === item.id ? "Analyserer…" : "Analysér"}</button>}
+                    {(item.status === "ready" || item.status === "processing") && <button className="primary-action" type="button" disabled={processingId !== null} onClick={() => void processImport(item.id)}>{processingId === item.id ? `Importerer… ${processedFiles}` : "Importér data"}</button>}
+                    {(item.status === "ready" || item.status === "complete") && <button className="secondary-action" type="button" onClick={() => void loadInventoryFiles(item.id)}>{selectedImportId === item.id ? "Skjul filer" : "Se filer"}</button>}
+                    <span className={`import-status status-${item.status}`}>{item.status}</span>
+                  </div>
+                </article>
+              ))}</div>}
+
+              {selectedImport && <section className="inventory-panel" aria-labelledby="settings-inventory-heading">
+                <div className="inventory-heading"><div><span className="summary-kicker">Inventory</span><h4 id="settings-inventory-heading">{selectedImport.filename}</h4></div><span className="inventory-total">{inventoryFiles.length || selectedImport.fileCount || 0} filer</span></div>
+                {filesState === "loading" && <p className="empty-state">Henter filoversigt…</p>}
+                {filesState === "error" && <p className="settings-feedback error">Filoversigten kunne ikke hentes: {filesError}</p>}
+                {filesState === "ready" && <><div className="inventory-type-grid">{fileTypeCounts.map(([type, count]) => <div className="inventory-type-card" key={type}><strong>{count}</strong><span>.{type === "uden filtype" ? "—" : type}</span></div>)}</div><div className="inventory-file-list">{inventoryFiles.map((file) => <div className="inventory-file-row" key={file.path}><span className="inventory-file-type">{file.fileType?.toUpperCase() || "FILE"}</span><code title={file.path}>{file.path}</code><span>{file.status}</span><span>{formatBytes(file.sizeBytes)}</span></div>)}</div></>}
+              </section>}
+            </div>
+          </div>
+        </details>
       </div>
     </article>
   );
