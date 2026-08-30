@@ -34,10 +34,11 @@ STATE_ROOT = Path(os.path.expanduser(os.environ.get("NEXUS_GARMIN_STATE_ROOT", "
 DATA_ROOT = Path(os.path.expanduser(os.environ.get("NEXUS_GARMIN_DATA_ROOT", "/data/users")))
 GARMIN_CLI = os.environ.get("NEXUS_GARMIN_CLI", "garmindb_cli.py")
 POLL_SECONDS = max(5, int(os.environ.get("NEXUS_GARMIN_POLL_SECONDS", "15")))
+HEARTBEAT_SECONDS = 30
 
 
 def request(path: str, *, method: str = "GET", data: bytes | None = None, content_type: str | None = None):
-    headers = {"Authorization": f"Bearer {TOKEN}", "User-Agent": "Nexus-Garmin-Agent/0.4"}
+    headers = {"Authorization": f"Bearer {TOKEN}", "User-Agent": "Nexus-Garmin-Agent/0.5"}
     if content_type:
         headers["Content-Type"] = content_type
     req = urllib.request.Request(f"{NEXUS_URL}{path}", data=data, headers=headers, method=method)
@@ -154,15 +155,26 @@ def scrub_password(config_path: Path) -> None:
         print(f"[nexus] Warning: could not scrub local Garmin password: {error}", file=sys.stderr, flush=True)
 
 
-def run_garmindb(home: Path) -> None:
+def run_garmindb(home: Path, job_id: str) -> None:
     print("[nexus] Running GarminDB latest sync…", flush=True)
     environment = os.environ.copy()
     environment["HOME"] = str(home)
-    subprocess.run(
+    process = subprocess.Popen(
         [GARMIN_CLI, "--all", "--download", "--import", "--analyze", "--latest"],
-        check=True,
         env=environment,
     )
+
+    while True:
+        try:
+            return_code = process.wait(timeout=HEARTBEAT_SECONDS)
+            if return_code != 0:
+                raise subprocess.CalledProcessError(return_code, process.args)
+            return
+        except subprocess.TimeoutExpired:
+            # GarminDB can spend many minutes inside one blocking CLI call. Refreshing
+            # the existing progress endpoint also refreshes garmin_agents.last_seen_at,
+            # so Nexus knows the container is still alive while GarminDB is working.
+            report_progress(job_id, "Henter data fra Garmin")
 
 
 def build_zip(data_dir: Path, user_id: str) -> Path:
@@ -242,7 +254,7 @@ def process_job(job_id: str, user_id: str, job_status: str) -> None:
         print(f"[nexus] Syncing isolated Garmin profile {user_id[:8]}…", flush=True)
 
         report_progress(job_id, "Henter data fra Garmin")
-        run_garmindb(home)
+        run_garmindb(home, job_id)
         scrub_password(config_path)
 
         report_progress(job_id, "Pakker Garmin-data")
