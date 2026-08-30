@@ -3,7 +3,7 @@ import { processGarminDbBatch } from "./garmindb-import";
 import { inventoryZip } from "./zip-inventory";
 
 const MAX_AGENT_UPLOAD_BYTES = 100 * 1024 * 1024;
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{12}$/i;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 type AgentPrincipal = { id: string; userId: string; name: string };
 
@@ -57,13 +57,16 @@ async function createAgent(request: Request, env: Env): Promise<Response> {
   return json({ agent: { id, name, createdAt: now }, token }, { status: 201 });
 }
 
-async function rotateAgentToken(request: Request, env: Env, agentId: string): Promise<Response> {
+async function rotateAgentToken(request: Request, env: Env): Promise<Response> {
   if (request.method !== "POST") return json({ error: "method_not_allowed" }, { status: 405 });
   const user = await getAuthenticatedUser(request, env.DB);
   if (!user) return json({ error: "unauthorized" }, { status: 401 });
   const agent = await env.DB.prepare(
-    `SELECT id, name FROM garmin_agents WHERE id = ? AND user_id = ? AND revoked_at IS NULL`,
-  ).bind(agentId, user.id).first<{ id: string; name: string }>();
+    `SELECT id, name FROM garmin_agents
+     WHERE user_id = ? AND revoked_at IS NULL
+     ORDER BY last_seen_at DESC, created_at DESC
+     LIMIT 1`,
+  ).bind(user.id).first<{ id: string; name: string }>();
   if (!agent) return json({ error: "garmin_agent_not_found" }, { status: 404 });
 
   const token = createToken();
@@ -221,12 +224,10 @@ export async function handleGarminAgentRoute(request: Request, env: Env): Promis
   const pathname = new URL(request.url).pathname;
   if (pathname === "/api/garmin/agents" && request.method === "GET") return listAgents(request, env);
   if (pathname === "/api/garmin/agents" && request.method === "POST") return createAgent(request, env);
+  if (pathname === "/api/garmin/agents/token") return rotateAgentToken(request, env);
   if (pathname === "/api/garmin/sync" && request.method === "POST") return requestSync(request, env);
   if (pathname === "/api/garmin/sync" && request.method === "GET") return syncStatus(request, env);
   if (pathname === "/api/garmin/agent/jobs/next") return nextJob(request, env);
-
-  const rotateMatch = pathname.match(/^\/api\/garmin\/agents\/([0-9a-f-]+)\/token$/i);
-  if (rotateMatch && UUID_RE.test(rotateMatch[1])) return rotateAgentToken(request, env, rotateMatch[1]);
 
   const match = pathname.match(/^\/api\/garmin\/agent\/jobs\/([0-9a-f-]+)\/(upload|process|fail)$/i);
   if (!match || !UUID_RE.test(match[1])) return null;
