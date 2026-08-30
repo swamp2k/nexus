@@ -98,7 +98,7 @@ export default function WellbeingMetricSettings() {
       {metrics.length > 0 && <div className="wellbeing-settings-list">{metrics.map((metric) => <div key={metric.id} className={`wellbeing-setting-row ${metric.active ? "" : "inactive"}`}>
         <span className="wellbeing-setting-emoji">{metric.emoji}</span>
         <div><strong>{metric.name}</strong><small>{metric.direction === "high_good" ? "5 = godt" : "5 = meget / dårligt"}</small></div>
-        <button className="secondary-action" type="button" disabled={busy} onClick={() => void patchMetric(metric, { active: !metric.active })}>{metric.active ? "Skjul" : "Aktivér"}</button>
+        <button className="secondary-action" type="button" disabled={busy} onClick={() => void patchMetric(metric, { active: metric.active ? 0 : 1 })}>{metric.active ? "Skjul" : "Aktivér"}</button>
       </div>)}</div>}
 
       <div className="wellbeing-new-metric">
