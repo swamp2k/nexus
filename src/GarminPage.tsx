@@ -5,8 +5,7 @@ type GarminOverview = {
   daily: Record<string, unknown> | null;
   sleep: Record<string, unknown> | null;
   rhr: Record<string, unknown> | null;
-  activities: Array<Record<string, unknown>>;
-  counts: { dailyCount?: number; sleepCount?: number; activityCount?: number } | null;
+  counts: { dailyCount?: number; sleepCount?: number } | null;
 };
 
 function hours(seconds: unknown): string {
@@ -49,7 +48,7 @@ export default function GarminPage() {
     <section className="garmin-page" aria-labelledby="garmin-heading">
       <div className="module-page-hero">
         <div className="module-page-icon tone-blue">⌖</div>
-        <div><p className="section-label">Sundhed</p><h2 id="garmin-heading">Garmin</h2><p>Din sundheds- og aktivitetshistorik samlet og klar til analyse.</p></div>
+        <div><p className="section-label">Sundhed</p><h2 id="garmin-heading">Garmin</h2><p>Din sundhedshistorik samlet og klar til analyse.</p></div>
       </div>
 
       {!daily && <p className="empty-state">Der er endnu ingen normaliserede Garmin-data. Importen styres under Indstillinger → Garmin.</p>}
@@ -62,7 +61,7 @@ export default function GarminPage() {
           </div>
           <p>Overblikket er foldet sammen, mens du graver ned i {deepDive === "sleep" ? "søvndata" : "data"}.</p>
         </section> : <section className="garmin-health-overview">
-          <div className="garmin-health-heading"><div><p className="section-label">Seneste data</p><h3>{String(daily.date ?? "")}</h3></div><span>{overview?.counts?.dailyCount ?? 0} dage · {overview?.counts?.activityCount ?? 0} aktiviteter</span></div>
+          <div className="garmin-health-heading"><div><p className="section-label">Seneste data</p><h3>{String(daily.date ?? "")}</h3></div><span>{overview?.counts?.dailyCount ?? 0} dage</span></div>
           <div className="garmin-metric-grid">
             <article><span>Steps</span><strong>{numberValue(daily, "steps")?.toLocaleString("da-DK") ?? "—"}</strong><small>Mål {numberValue(daily, "step_goal")?.toLocaleString("da-DK") ?? "—"}</small></article>
             <article><span>Hvilepuls</span><strong>{latestRhr === null ? "—" : `${Math.round(latestRhr)} bpm`}</strong><small>{numberValue(daily, "min_hr") ?? "—"}–{numberValue(daily, "max_hr") ?? "—"} bpm</small></article>
@@ -73,18 +72,13 @@ export default function GarminPage() {
             </button>
             <article><span>Aktive kalorier</span><strong>{numberValue(daily, "active_calories") === null ? "—" : `${Math.round(numberValue(daily, "active_calories")!)} kcal`}</strong><small>Total {Math.round(numberValue(daily, "total_calories") ?? 0)} kcal</small></article>
           </div>
-
-          {overview && overview.activities.length > 0 && <div className="garmin-recent-activities"><p className="section-label">Seneste aktiviteter</p>{overview.activities.map((activity) => (
-            <div key={String(activity.activity_id)}><div><strong>{String(activity.name ?? activity.type ?? "Aktivitet")}</strong><span>{String(activity.start_time_local ?? activity.start_time_gmt ?? "")}</span></div><span>{numberValue(activity, "distance_m") === null ? "" : `${(numberValue(activity, "distance_m")! / 1000).toFixed(1)} km`}</span><span>{hours(activity.duration_seconds)}</span></div>
-          ))}</div>}
         </section>}
 
         {deepDive === "sleep" && sleep?.date && <GarminSleepDetail initialDate={String(sleep.date)} onClose={() => setDeepDive(null)} />}
 
         {!deepDive && <div className="garmin-summary-grid">
-          <article className="summary-card"><span className="summary-kicker">Historik</span><strong>{overview?.counts?.dailyCount ?? 0} dage</strong><p>Daglige sundhedsdata klar til trends og sammenligning.</p></article>
-          <button className="summary-card garmin-summary-action" type="button" onClick={() => setDeepDive("sleep")}><span className="summary-kicker">Søvn</span><strong>{overview?.counts?.sleepCount ?? 0} nætter</strong><p>Åbn søvnfordeling, natlige signaler og historik.</p></button>
-          <article className="summary-card"><span className="summary-kicker">Aktiviteter</span><strong>{overview?.counts?.activityCount ?? 0} aktiviteter</strong><p>Aktiviteter med distance, varighed, puls og øvrige Garmin-metadata.</p></article>
+          <article className="summary-card"><span className="summary-kicker">Historik</span><strong>{overview?.counts?.dailyCount ?? 0} dage</strong></article>
+          <button className="summary-card garmin-summary-action" type="button" onClick={() => setDeepDive("sleep")}><span className="summary-kicker">Søvn</span><strong>{overview?.counts?.sleepCount ?? 0} nætter</strong></button>
         </div>}
       </>}
     </section>
