@@ -17,6 +17,7 @@ Optional:
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import subprocess
@@ -38,7 +39,7 @@ HEARTBEAT_SECONDS = 30
 
 
 def request(path: str, *, method: str = "GET", data: bytes | None = None, content_type: str | None = None):
-    headers = {"Authorization": f"Bearer {TOKEN}", "User-Agent": "Nexus-Garmin-Agent/0.5"}
+    headers = {"Authorization": f"Bearer {TOKEN}", "User-Agent": "Nexus-Garmin-Agent/0.6"}
     if content_type:
         headers["Content-Type"] = content_type
     req = urllib.request.Request(f"{NEXUS_URL}{path}", data=data, headers=headers, method=method)
@@ -171,33 +172,94 @@ def run_garmindb(home: Path, job_id: str) -> None:
                 raise subprocess.CalledProcessError(return_code, process.args)
             return
         except subprocess.TimeoutExpired:
-            # GarminDB can spend many minutes inside one blocking CLI call. Refreshing
-            # the existing progress endpoint also refreshes garmin_agents.last_seen_at,
-            # so Nexus knows the container is still alive while GarminDB is working.
             report_progress(job_id, "Henter data fra Garmin")
 
 
-def build_zip(data_dir: Path, user_id: str) -> Path:
+def nexus_supported_file(data_dir: Path, file_path: Path) -> bool:
+    if not file_path.is_file() or file_path.suffix.lower() != ".json":
+        return False
+    relative = file_path.relative_to(data_dir).as_posix()
+    name = file_path.name
+    return (
+        name.startswith("daily_summary_20")
+        or relative.startswith("Sleep/sleep_20")
+        or relative.startswith("RHR/rhr_20")
+        or relative.startswith("Weight/weight_20")
+        or (name.startswith("activity_") and name[9:-5].isdigit())
+    )
+
+
+def sha256_file(file_path: Path) -> str:
+    digest = hashlib.sha256()
+    with file_path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def snapshot_supported_files(data_dir: Path) -> dict[str, str]:
+    snapshot: dict[str, str] = {}
+    for file_path in sorted(data_dir.rglob("*.json")):
+        if nexus_supported_file(data_dir, file_path):
+            snapshot[file_path.relative_to(data_dir).as_posix()] = sha256_file(file_path)
+    return snapshot
+
+
+def load_or_create_snapshot(snapshot_path: Path, data_dir: Path) -> dict[str, str]:
+    if snapshot_path.exists():
+        try:
+            value = json.loads(snapshot_path.read_text(encoding="utf-8"))
+            if isinstance(value, dict) and all(isinstance(k, str) and isinstance(v, str) for k, v in value.items()):
+                print(f"[nexus] Reusing pre-sync snapshot with {len(value)} files", flush=True)
+                return value
+        except Exception as error:
+            print(f"[nexus] Warning: invalid sync snapshot, rebuilding it: {error}", file=sys.stderr, flush=True)
+
+    snapshot = snapshot_supported_files(data_dir)
+    temporary = snapshot_path.with_suffix(".json.tmp")
+    temporary.write_text(json.dumps(snapshot, separators=(",", ":")), encoding="utf-8")
+    os.chmod(temporary, 0o600)
+    temporary.replace(snapshot_path)
+    print(f"[nexus] Captured pre-sync snapshot of {len(snapshot)} Nexus-relevant files", flush=True)
+    return snapshot
+
+
+def build_incremental_zip(data_dir: Path, user_id: str, before: dict[str, str]) -> Path:
     if not data_dir.is_dir():
         raise RuntimeError(f"Garmin data directory does not exist: {data_dir}")
+
+    changed: list[Path] = []
+    newest: Path | None = None
+    for file_path in sorted(data_dir.rglob("*.json")):
+        if not nexus_supported_file(data_dir, file_path):
+            continue
+        if newest is None or file_path.stat().st_mtime_ns > newest.stat().st_mtime_ns:
+            newest = file_path
+        relative = file_path.relative_to(data_dir).as_posix()
+        if before.get(relative) != sha256_file(file_path):
+            changed.append(file_path)
+
+    # A no-op Garmin run still needs to complete its Nexus job. Re-importing the
+    # newest supported file is cheap and keeps the protocol simple/non-empty.
+    if not changed and newest is not None:
+        changed.append(newest)
+        print("[nexus] No data changed; sending one current file as a no-op sync marker", flush=True)
+
+    if not changed:
+        raise RuntimeError(f"No Nexus-supported Garmin files found below {data_dir}")
+
     handle = tempfile.NamedTemporaryFile(prefix=f"nexus-garmindb-{user_id[:8]}-", suffix=".zip", delete=False)
     handle.close()
     zip_path = Path(handle.name)
-    count = 0
     with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=6) as archive:
-        for file_path in sorted(data_dir.rglob("*")):
-            if not file_path.is_file():
-                continue
-            if file_path.suffix.lower() in {".db", ".sqlite", ".sqlite3"}:
-                continue
-            if file_path.name.startswith("."):
-                continue
+        for file_path in changed:
             archive.write(file_path, file_path.relative_to(data_dir).as_posix())
-            count += 1
-    if count == 0:
-        zip_path.unlink(missing_ok=True)
-        raise RuntimeError(f"No Garmin files found below {data_dir}")
-    print(f"[nexus] Packed {count} files ({zip_path.stat().st_size / 1024 / 1024:.1f} MB)", flush=True)
+
+    print(
+        f"[nexus] Packed {len(changed)} changed Nexus files "
+        f"({zip_path.stat().st_size / 1024 / 1024:.2f} MB)",
+        flush=True,
+    )
     return zip_path
 
 
@@ -231,9 +293,12 @@ def process_import(job_id: str, user_id: str, *, resumed: bool = False) -> None:
 def process_job(job_id: str, user_id: str, job_status: str) -> None:
     zip_path: Path | None = None
     config_path: Path | None = None
+    snapshot_path: Path | None = None
+    completed = False
     try:
         if job_status == "processing":
             process_import(job_id, user_id, resumed=True)
+            completed = True
             return
 
         report_progress(job_id, "Forbereder Garmin-konto")
@@ -250,6 +315,8 @@ def process_job(job_id: str, user_id: str, job_status: str) -> None:
             raise RuntimeError("Garmin credentials are incomplete")
 
         home, config_dir, data_dir = user_paths(user_id)
+        snapshot_path = home / ".nexus-garmin-pre-sync.json"
+        before = load_or_create_snapshot(snapshot_path, data_dir)
         config_path = write_config(config_dir, data_dir, username, password)
         print(f"[nexus] Syncing isolated Garmin profile {user_id[:8]}…", flush=True)
 
@@ -257,8 +324,8 @@ def process_job(job_id: str, user_id: str, job_status: str) -> None:
         run_garmindb(home, job_id)
         scrub_password(config_path)
 
-        report_progress(job_id, "Pakker Garmin-data")
-        zip_path = build_zip(data_dir, user_id)
+        report_progress(job_id, "Pakker ændrede Garmin-data")
+        zip_path = build_incremental_zip(data_dir, user_id, before)
 
         report_progress(job_id, "Uploader Garmin-data til Nexus")
         status, body = upload_file(f"/api/garmin/agent/jobs/{job_id}/upload", zip_path)
@@ -267,7 +334,8 @@ def process_job(job_id: str, user_id: str, job_status: str) -> None:
         print(f"[nexus] Upload ready: {body}", flush=True)
 
         process_import(job_id, user_id)
-    except Exception as error:  # agent boundary: report all failures back to Nexus
+        completed = True
+    except Exception as error:
         message = str(error)
         print(f"[nexus] Sync failed: {message}", file=sys.stderr, flush=True)
         fail_job(job_id, message)
@@ -276,6 +344,11 @@ def process_job(job_id: str, user_id: str, job_status: str) -> None:
             scrub_password(config_path)
         if zip_path:
             zip_path.unlink(missing_ok=True)
+        # Preserve the pre-sync snapshot across an abrupt container stop so the
+        # resumed job still knows what changed. For a normal success or handled
+        # failure, clear it so a future job starts from a fresh baseline.
+        if snapshot_path and (completed or sys.exc_info()[0] is None):
+            snapshot_path.unlink(missing_ok=True)
 
 
 def main() -> int:
