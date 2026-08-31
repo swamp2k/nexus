@@ -8,6 +8,7 @@
 
 .miyagi-analysis-card {
   overflow: hidden;
+  padding-bottom: 2px;
 }
 
 .miyagi-analysis-meta {
@@ -15,7 +16,7 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 12px 14px;
+  padding: 12px 16px;
   border-bottom: 1px solid var(--border);
 }
 
@@ -32,49 +33,67 @@
 }
 
 .miyagi-analysis-text {
-  padding: 14px 16px 16px;
+  display: grid;
+  gap: 9px;
+  max-width: 78ch;
+  padding: 16px 18px 18px;
+  color: var(--text);
+  line-height: 1.62;
 }
 
 .miyagi-analysis-text h3 {
-  margin: 17px 0 7px;
+  margin: 18px 0 2px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
   font-size: 1rem;
+  line-height: 1.3;
 }
 
 .miyagi-analysis-text h3:first-child {
-  margin-top: 0;
+  margin-top: 2px;
+  padding-top: 0;
+  border-top: 0;
 }
 
 .miyagi-analysis-text h4 {
-  margin: 12px 0 5px;
+  margin: 10px 0 0;
   font-size: 0.92rem;
 }
 
 .miyagi-analysis-text p {
-  margin: 4px 0;
-  line-height: 1.55;
+  margin: 0;
+  color: color-mix(in srgb, var(--text) 92%, var(--muted));
 }
 
-.miyagi-analysis-gap {
-  height: 5px;
+.miyagi-analysis-text strong {
+  color: var(--text);
+  font-weight: 750;
 }
 
-.miyagi-analysis-bullet {
-  position: relative;
-  padding-left: 15px;
+.miyagi-analysis-text ul,
+.miyagi-analysis-text ol {
+  display: grid;
+  gap: 7px;
+  margin: 0;
+  padding-left: 22px;
 }
 
-.miyagi-analysis-bullet::before {
-  content: "•";
-  position: absolute;
-  left: 2px;
-  color: var(--accent);
+.miyagi-analysis-text li {
+  padding-left: 2px;
+}
+
+.miyagi-analysis-text hr {
+  width: 100%;
+  margin: 6px 0;
+  border: 0;
+  border-top: 1px solid var(--border);
 }
 
 .miyagi-coverage {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
-  padding: 0 14px 14px;
+  padding: 0 16px 14px;
 }
 
 .miyagi-coverage span {
@@ -151,17 +170,24 @@
   background: color-mix(in srgb, var(--accent) 7%, var(--surface));
 }
 
-.miyagi-message strong {
+.miyagi-message > strong {
   display: block;
   margin-bottom: 3px;
   color: var(--muted-strong);
   font-size: 0.72rem;
 }
 
-.miyagi-message p {
-  margin: 0;
-  white-space: pre-wrap;
-  line-height: 1.48;
+.miyagi-message .miyagi-analysis-text {
+  gap: 6px;
+  padding: 0;
+  line-height: 1.5;
+}
+
+.miyagi-message .miyagi-analysis-text h3,
+.miyagi-message .miyagi-analysis-text h4 {
+  margin-top: 8px;
+  padding-top: 0;
+  border: 0;
 }
 
 .miyagi-conversation .miyagi-chat-shell input:disabled {
@@ -173,6 +199,129 @@
   background: var(--accent);
   color: white;
   cursor: pointer;
+}
+
+.miyagi-analysis-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(0, 0, 0, 0.52);
+  backdrop-filter: blur(7px);
+}
+
+.miyagi-analysis-dialog {
+  width: min(620px, 100%);
+  max-height: min(88vh, 760px);
+  overflow: auto;
+  display: grid;
+  gap: 18px;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  background: var(--surface);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.28);
+}
+
+.miyagi-analysis-dialog > header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.miyagi-analysis-dialog h3 {
+  margin: 1px 0 0;
+}
+
+.miyagi-focus-field {
+  display: grid;
+  gap: 7px;
+}
+
+.miyagi-focus-field > span,
+.miyagi-option-group legend {
+  color: var(--muted-strong);
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.miyagi-focus-field > span small {
+  margin-left: 4px;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.miyagi-focus-field textarea {
+  width: 100%;
+  resize: vertical;
+  padding: 11px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  outline: none;
+  background: var(--surface-soft);
+  color: var(--text);
+  line-height: 1.45;
+}
+
+.miyagi-focus-field textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.miyagi-option-group {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+  border: 0;
+}
+
+.miyagi-option-group > div {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.miyagi-option-group button {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: 10px 11px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-soft);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.miyagi-option-group button strong {
+  font-size: 0.86rem;
+}
+
+.miyagi-option-group button small {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 0.73rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.miyagi-option-group button.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: inset 0 0 0 1px var(--accent);
+}
+
+.miyagi-analysis-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 2px;
 }
 
 @media (max-width: 560px) {
@@ -187,5 +336,28 @@
 
   .miyagi-message {
     width: 94%;
+  }
+
+  .miyagi-analysis-overlay {
+    align-items: end;
+    padding: 10px;
+  }
+
+  .miyagi-analysis-dialog {
+    max-height: 90vh;
+    border-radius: 15px;
+  }
+
+  .miyagi-option-group > div {
+    grid-template-columns: 1fr;
+  }
+
+  .miyagi-option-group button {
+    grid-template-columns: 1fr auto;
+    align-items: center;
+  }
+
+  .miyagi-analysis-dialog-actions > * {
+    flex: 1;
   }
 }
