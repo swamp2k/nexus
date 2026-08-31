@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import type { ReactNode } from "react";
 
 type Analysis = {
   id: string;
@@ -26,6 +27,8 @@ type Message = {
 };
 
 type LatestResponse = { analysis: Analysis | null; messages: Message[] };
+type AnalysisLength = "short" | "normal" | "deep";
+type AnalysisTone = "objective" | "empathetic" | "miyagi";
 
 async function errorText(response: Response): Promise<string> {
   try {
@@ -52,18 +55,69 @@ function formatTimestamp(value: string): string {
   return new Intl.DateTimeFormat("da-DK", { dateStyle: "medium", timeStyle: "short" }).format(parsed);
 }
 
+function inlineMarkdown(text: string): ReactNode[] {
+  const parts = text.split(/(\*\*[^*]+\*\*)/g);
+  return parts.filter(Boolean).map((part, index) => {
+    if (part.startsWith("**") && part.endsWith("**")) return <strong key={`${index}-${part}`}>{part.slice(2, -2)}</strong>;
+    return <span key={`${index}-${part.slice(0, 12)}`}>{part}</span>;
+  });
+}
+
 function AnalysisText({ text }: { text: string }) {
-  const blocks = useMemo(() => text.split("\n").map((line) => line.trimEnd()), [text]);
-  return <div className="miyagi-analysis-text">
-    {blocks.map((line, index) => {
-      const key = `${index}-${line.slice(0, 20)}`;
-      if (!line.trim()) return <div className="miyagi-analysis-gap" key={key} />;
-      if (line.startsWith("## ")) return <h3 key={key}>{line.slice(3)}</h3>;
-      if (line.startsWith("### ")) return <h4 key={key}>{line.slice(4)}</h4>;
-      if (/^[-*] /.test(line)) return <p className="miyagi-analysis-bullet" key={key}>{line.slice(2)}</p>;
-      return <p key={key}>{line}</p>;
-    })}
-  </div>;
+  const lines = useMemo(() => text.replace(/\\---/g, "---").split("\n").map((line) => line.trimEnd()), [text]);
+  const blocks: ReactNode[] = [];
+  let bullets: string[] = [];
+  let numbers: string[] = [];
+
+  function flushLists() {
+    if (bullets.length) {
+      blocks.push(<ul key={`ul-${blocks.length}`}>{bullets.map((item, index) => <li key={`${index}-${item.slice(0, 16)}`}>{inlineMarkdown(item)}</li>)}</ul>);
+      bullets = [];
+    }
+    if (numbers.length) {
+      blocks.push(<ol key={`ol-${blocks.length}`}>{numbers.map((item, index) => <li key={`${index}-${item.slice(0, 16)}`}>{inlineMarkdown(item)}</li>)}</ol>);
+      numbers = [];
+    }
+  }
+
+  for (const rawLine of lines) {
+    const line = rawLine.trim();
+    if (!line) {
+      flushLists();
+      continue;
+    }
+    if (line === "---") {
+      flushLists();
+      blocks.push(<hr key={`hr-${blocks.length}`} />);
+      continue;
+    }
+    if (line.startsWith("## ")) {
+      flushLists();
+      blocks.push(<h3 key={`h3-${blocks.length}`}>{inlineMarkdown(line.slice(3))}</h3>);
+      continue;
+    }
+    if (line.startsWith("### ")) {
+      flushLists();
+      blocks.push(<h4 key={`h4-${blocks.length}`}>{inlineMarkdown(line.slice(4))}</h4>);
+      continue;
+    }
+    if (/^[-*] /.test(line)) {
+      flushLists();
+      bullets.push(line.slice(2));
+      continue;
+    }
+    const numbered = line.match(/^\d+[.)]\s+(.+)$/);
+    if (numbered) {
+      if (bullets.length) flushLists();
+      numbers.push(numbered[1]);
+      continue;
+    }
+    flushLists();
+    blocks.push(<p key={`p-${blocks.length}`}>{inlineMarkdown(line)}</p>);
+  }
+  flushLists();
+
+  return <div className="miyagi-analysis-text">{blocks}</div>;
 }
 
 export default function MiyagiWorkspace() {
@@ -73,6 +127,10 @@ export default function MiyagiWorkspace() {
   const [chatText, setChatText] = useState("");
   const [chatBusy, setChatBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [analysisDialogOpen, setAnalysisDialogOpen] = useState(false);
+  const [focus, setFocus] = useState("");
+  const [analysisLength, setAnalysisLength] = useState<AnalysisLength>("normal");
+  const [analysisTone, setAnalysisTone] = useState<AnalysisTone>("empathetic");
 
   useEffect(() => {
     let cancelled = false;
@@ -95,7 +153,17 @@ export default function MiyagiWorkspace() {
     return () => { cancelled = true; };
   }, []);
 
+  useEffect(() => {
+    if (!analysisDialogOpen) return;
+    const close = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setAnalysisDialogOpen(false);
+    };
+    window.addEventListener("keydown", close);
+    return () => window.removeEventListener("keydown", close);
+  }, [analysisDialogOpen]);
+
   async function runAnalysis() {
+    setAnalysisDialogOpen(false);
     setState("analyzing");
     setError(null);
     try {
@@ -103,7 +171,12 @@ export default function MiyagiWorkspace() {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ days: 90 }),
+        body: JSON.stringify({
+          days: 90,
+          focus: focus.trim(),
+          length: analysisLength,
+          tone: analysisTone,
+        }),
       });
       if (!response.ok) throw new Error(await errorText(response));
       const body = await response.json() as LatestResponse;
@@ -145,9 +218,9 @@ export default function MiyagiWorkspace() {
       <div>
         <p className="section-label">Mr. Miyagi</p>
         <h2>Se efter mønstre, ikke mirakler.</h2>
-        <p>Miyagi krydsrefererer dine sidste 90 dages sundhed, motion, check-ins og journal. Han leder efter gentagne sammenfald og fortæller også, når datagrundlaget er for tyndt.</p>
+        <p>Miyagi krydsrefererer dine sidste 90 dages sundhed, motion, check-ins og journal. Fokus er på hvad der flytter sig sammen — og hvad han mangler at vide for at forstå hvorfor.</p>
       </div>
-      <button className="primary-action" type="button" disabled={state === "loading" || state === "analyzing"} onClick={() => void runAnalysis()}>
+      <button className="primary-action" type="button" disabled={state === "loading" || state === "analyzing"} onClick={() => setAnalysisDialogOpen(true)}>
         {state === "analyzing" ? "Miyagi tænker…" : analysis ? "Analysér igen" : "Start analyse"}
       </button>
     </div>
@@ -160,7 +233,7 @@ export default function MiyagiWorkspace() {
     </div>
 
     {state === "loading" && <div className="miyagi-empty-analysis"><strong>Finder den seneste analyse…</strong></div>}
-    {state === "analyzing" && <div className="miyagi-thinking"><span className="miyagi-thinking-dot" /><div><strong>Miyagi lægger dagene ved siden af hinanden…</strong><p>90 dages data bliver samlet og gennemgået. Det kan tage lidt tid.</p></div></div>}
+    {state === "analyzing" && <div className="miyagi-thinking"><span className="miyagi-thinking-dot" /><div><strong>Miyagi lægger dagene ved siden af hinanden…</strong><p>Han leder efter samtidige ændringer, før/efter-forløb og ting der er værd at spørge dig om.</p></div></div>}
 
     {analysis && state !== "analyzing" && <section className="miyagi-analysis-card">
       <header className="miyagi-analysis-meta">
@@ -179,22 +252,61 @@ export default function MiyagiWorkspace() {
 
     {!analysis && state === "ready" && <div className="miyagi-empty-analysis">
       <strong>Ingen analyse endnu</strong>
-      <p>Tryk på <em>Start analyse</em>. Miyagi bruger kun dine egne Nexus-data og gemmer analysen, så du kan spørge ind til præcis samme datagrundlag bagefter.</p>
+      <p>Start en analyse. Du kan vælge et særligt fokus eller lade feltet stå tomt og lade Miyagi finde de mest interessante mønstre selv.</p>
     </div>}
 
     {analysis && <section className="miyagi-conversation">
-      <div className="miyagi-conversation-heading"><strong>Tal med Miyagi</strong><span>Spørg ind til fundene eller bed ham uddybe et mønster.</span></div>
+      <div className="miyagi-conversation-heading"><strong>Tal med Miyagi</strong><span>Svar på hans spørgsmål, spørg ind til et fund eller giv ham kontekst han ikke kunne se i data.</span></div>
       {messages.length > 0 && <div className="miyagi-messages">{messages.map((message, index) => <article className={`miyagi-message ${message.role}`} key={message.id ?? `${message.createdAt}-${index}`}>
         <strong>{message.role === "assistant" ? "Miyagi" : "Dig"}</strong>
-        <p>{message.body}</p>
+        <AnalysisText text={message.body} />
       </article>)}</div>}
       <form className="miyagi-chat-shell" onSubmit={(event) => { event.preventDefault(); void sendMessage(); }}>
-        <input value={chatText} onChange={(event) => setChatText(event.target.value)} disabled={chatBusy} maxLength={4000} placeholder="Spørg Miyagi om analysen…" aria-label="Spørg Mr. Miyagi" />
+        <input value={chatText} onChange={(event) => setChatText(event.target.value)} disabled={chatBusy} maxLength={4000} placeholder="Fx: Ja, i juli var vi på ferie og jeg sov et andet sted…" aria-label="Spørg Mr. Miyagi" />
         <button type="submit" disabled={chatBusy || !chatText.trim()}>{chatBusy ? "…" : "Send"}</button>
       </form>
     </section>}
 
     {error && <p className="settings-feedback error">{error}</p>}
     <small className="miyagi-disclaimer">Miyagi er et analyseværktøj i et privat hobbyprojekt. Han kan hjælpe med mønstre og refleksion, men er ikke læge og erstatter ikke faglig vurdering.</small>
+
+    {analysisDialogOpen && <div className="miyagi-analysis-overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setAnalysisDialogOpen(false); }}>
+      <section className="miyagi-analysis-dialog" role="dialog" aria-modal="true" aria-labelledby="miyagi-analysis-title">
+        <header>
+          <div><p className="section-label">Ny analyse</p><h3 id="miyagi-analysis-title">Hvad skal Miyagi kigge efter?</h3></div>
+          <button className="icon-action" type="button" onClick={() => setAnalysisDialogOpen(false)} aria-label="Luk">×</button>
+        </header>
+
+        <label className="miyagi-focus-field">
+          <span>Fokus <small>valgfrit</small></span>
+          <textarea rows={3} maxLength={1200} value={focus} onChange={(event) => setFocus(event.target.value)} placeholder="Lad feltet stå tomt for en generel analyse — eller fx: Kig især på søvn, energi og perioder med høj hvilepuls." />
+        </label>
+
+        <fieldset className="miyagi-option-group">
+          <legend>Længde</legend>
+          <div>
+            {(["short", "normal", "deep"] as const).map((value) => <button type="button" className={analysisLength === value ? "active" : ""} key={value} onClick={() => setAnalysisLength(value)}>
+              <strong>{value === "short" ? "Kort" : value === "normal" ? "Normal" : "Grundig"}</strong>
+              <small>{value === "short" ? "Det vigtigste" : value === "normal" ? "Balanceret" : "Gå på opdagelse"}</small>
+            </button>)}
+          </div>
+        </fieldset>
+
+        <fieldset className="miyagi-option-group">
+          <legend>Tone</legend>
+          <div>
+            {(["objective", "empathetic", "miyagi"] as const).map((value) => <button type="button" className={analysisTone === value ? "active" : ""} key={value} onClick={() => setAnalysisTone(value)}>
+              <strong>{value === "objective" ? "Objektiv" : value === "empathetic" ? "Empatisk" : "Mr. Miyagi"}</strong>
+              <small>{value === "objective" ? "Nøgtern" : value === "empathetic" ? "Menneskelig" : "Wax on 😄"}</small>
+            </button>)}
+          </div>
+        </fieldset>
+
+        <div className="miyagi-analysis-dialog-actions">
+          <button className="secondary-action" type="button" onClick={() => setAnalysisDialogOpen(false)}>Annuller</button>
+          <button className="primary-action" type="button" onClick={() => void runAnalysis()}>Start analyse</button>
+        </div>
+      </section>
+    </div>}
   </section>;
 }
