@@ -1,0 +1,80 @@
+.health-bar-chart-wrap {
+  overflow-x: auto;
+}
+
+.health-bar-chart {
+  min-width: 620px;
+}
+
+.health-bar {
+  fill: var(--accent);
+  opacity: .92;
+}
+
+.health-bar-primary {
+  fill: var(--accent);
+}
+
+.health-bar-secondary {
+  fill: color-mix(in srgb, var(--muted) 62%, transparent);
+}
+
+.health-bar-goal {
+  fill: #74c947;
+}
+
+.health-bar-stress-rest {
+  fill: #4b95e6;
+  background: #4b95e6;
+}
+
+.health-bar-stress-low {
+  fill: #72b7ef;
+  background: #72b7ef;
+}
+
+.health-bar-stress-medium {
+  fill: #e0b43b;
+  background: #e0b43b;
+}
+
+.health-bar-stress-high {
+  fill: #db5b5b;
+  background: #db5b5b;
+}
+
+.health-stress-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  margin-top: 6px;
+  color: var(--muted);
+  font-size: .72rem;
+}
+
+.health-stress-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+}
+
+.health-stress-legend span::before {
+  content: "";
+  width: 9px;
+  height: 9px;
+  flex: 0 0 auto;
+  border-radius: 2px;
+  background: currentColor;
+}
+
+.health-stress-legend .health-bar-stress-rest { color: #4b95e6; }
+.health-stress-legend .health-bar-stress-low { color: #72b7ef; }
+.health-stress-legend .health-bar-stress-medium { color: #e0b43b; }
+.health-stress-legend .health-bar-stress-high { color: #db5b5b; }
+
+@media (max-width: 700px) {
+  .health-bar-chart {
+    min-width: 540px;
+  }
+}
