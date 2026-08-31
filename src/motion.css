@@ -69,7 +69,9 @@
 .motion-activity-stats small,
 .motion-detail-head p,
 .motion-detail-stat span,
-.motion-detail-panel p {
+.motion-detail-panel p,
+.motion-panel-heading span,
+.motion-track-chart-head span {
   margin-top: 4px;
   color: var(--muted);
   font-size: 0.75rem;
@@ -117,7 +119,8 @@
 
 .motion-detail-head,
 .motion-detail-stats,
-.motion-detail-panel {
+.motion-detail-panel,
+.motion-track-chart {
   border: 1px solid var(--border);
   background: var(--surface);
   box-shadow: var(--shadow-soft);
@@ -191,19 +194,97 @@
   line-height: 1.55;
 }
 
-.motion-map-placeholder {
-  position: relative;
+.motion-panel-heading,
+.motion-track-chart-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.motion-route-panel {
   overflow: hidden;
 }
 
-.motion-map-placeholder::after {
-  content: "";
-  position: absolute;
-  inset: auto -8% -58% 36%;
-  height: 180px;
+.motion-route-map {
+  width: 100%;
+  height: 360px;
+  margin-top: 14px;
   border: 1px solid var(--border);
-  border-radius: 50%;
-  opacity: 0.5;
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--surface-soft);
+}
+
+.motion-route-map .leaflet-control-attribution {
+  font-size: 9px;
+}
+
+.motion-track-charts {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+
+.motion-track-chart {
+  min-width: 0;
+  padding: 16px;
+  border-radius: 14px;
+  color: var(--accent);
+}
+
+.motion-track-chart-head {
+  color: var(--text);
+}
+
+.motion-track-chart-head strong {
+  display: block;
+}
+
+.motion-track-chart svg {
+  display: block;
+  width: 100%;
+  height: 145px;
+  margin-top: 12px;
+  overflow: visible;
+}
+
+.motion-laps {
+  min-height: 0;
+}
+
+.motion-lap-list {
+  display: grid;
+  margin-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.motion-lap-row {
+  display: grid;
+  grid-template-columns: 40px repeat(4, minmax(0, 1fr));
+  gap: 12px;
+  align-items: center;
+  min-height: 42px;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.82rem;
+}
+
+.motion-lap-row:last-child {
+  border-bottom: 0;
+}
+
+.motion-lap-row span {
+  color: var(--muted);
+}
+
+@media (max-width: 960px) {
+  .motion-track-charts {
+    grid-template-columns: 1fr;
+  }
+
+  .motion-track-chart svg {
+    height: 170px;
+  }
 }
 
 @media (max-width: 760px) {
@@ -250,6 +331,19 @@
 
   .motion-detail-grid {
     grid-template-columns: 1fr;
+  }
+
+  .motion-route-map {
+    height: 300px;
+  }
+
+  .motion-lap-row {
+    grid-template-columns: 32px repeat(2, minmax(0, 1fr));
+  }
+
+  .motion-lap-row span:nth-child(4),
+  .motion-lap-row span:nth-child(5) {
+    display: none;
   }
 }
 
