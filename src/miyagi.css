@@ -1,0 +1,191 @@
+.miyagi-analysis-card,
+.miyagi-conversation,
+.miyagi-thinking {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-soft);
+}
+
+.miyagi-analysis-card {
+  overflow: hidden;
+}
+
+.miyagi-analysis-meta {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.miyagi-analysis-meta > div {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+}
+
+.miyagi-analysis-meta span,
+.miyagi-analysis-meta small {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.miyagi-analysis-text {
+  padding: 14px 16px 16px;
+}
+
+.miyagi-analysis-text h3 {
+  margin: 17px 0 7px;
+  font-size: 1rem;
+}
+
+.miyagi-analysis-text h3:first-child {
+  margin-top: 0;
+}
+
+.miyagi-analysis-text h4 {
+  margin: 12px 0 5px;
+  font-size: 0.92rem;
+}
+
+.miyagi-analysis-text p {
+  margin: 4px 0;
+  line-height: 1.55;
+}
+
+.miyagi-analysis-gap {
+  height: 5px;
+}
+
+.miyagi-analysis-bullet {
+  position: relative;
+  padding-left: 15px;
+}
+
+.miyagi-analysis-bullet::before {
+  content: "•";
+  position: absolute;
+  left: 2px;
+  color: var(--accent);
+}
+
+.miyagi-coverage {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 0 14px 14px;
+}
+
+.miyagi-coverage span {
+  padding: 4px 7px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted-strong);
+  font-size: 0.72rem;
+}
+
+.miyagi-thinking {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px;
+}
+
+.miyagi-thinking p {
+  margin: 3px 0 0;
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.miyagi-thinking-dot {
+  width: 12px;
+  height: 12px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: miyagi-pulse 1.25s ease-in-out infinite;
+}
+
+@keyframes miyagi-pulse {
+  0%, 100% { opacity: 0.35; transform: scale(0.78); }
+  50% { opacity: 1; transform: scale(1); }
+}
+
+.miyagi-conversation {
+  display: grid;
+  gap: 10px;
+  padding: 13px;
+}
+
+.miyagi-conversation-heading {
+  display: grid;
+  gap: 2px;
+}
+
+.miyagi-conversation-heading span {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.miyagi-messages {
+  display: grid;
+  gap: 7px;
+  max-height: 420px;
+  overflow: auto;
+  padding-right: 3px;
+}
+
+.miyagi-message {
+  width: min(88%, 680px);
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.miyagi-message.user {
+  justify-self: end;
+  border-color: color-mix(in srgb, var(--accent) 28%, var(--border));
+  background: color-mix(in srgb, var(--accent) 7%, var(--surface));
+}
+
+.miyagi-message strong {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--muted-strong);
+  font-size: 0.72rem;
+}
+
+.miyagi-message p {
+  margin: 0;
+  white-space: pre-wrap;
+  line-height: 1.48;
+}
+
+.miyagi-conversation .miyagi-chat-shell input:disabled {
+  opacity: 0.7;
+}
+
+.miyagi-conversation .miyagi-chat-shell button:not(:disabled) {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: white;
+  cursor: pointer;
+}
+
+@media (max-width: 560px) {
+  .miyagi-analysis-meta {
+    align-items: flex-start;
+  }
+
+  .miyagi-analysis-meta > div {
+    display: grid;
+    gap: 2px;
+  }
+
+  .miyagi-message {
+    width: 94%;
+  }
+}
