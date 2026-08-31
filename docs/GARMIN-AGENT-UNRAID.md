@@ -25,6 +25,7 @@ The container image itself is disposable. For a Nexus user `<user-id>`, the agen
   GarminConnectConfig.json
   garmin_tokens.json
   ...
+/state/users/<user-id>/.nexus-garmin-capabilities.json
 
 /data/users/<user-id>/
   DBs/
@@ -44,6 +45,30 @@ Users enter their own Garmin Connect login under **Nexus -> Indstillinger -> Gar
 Nexus encrypts username and password with AES-GCM before writing them to D1. The encryption key is a Worker secret and must never be committed to Git. During a sync, the authenticated installation agent receives credentials only for the specific claimed job/user.
 
 The agent writes the credentials into that user's temporary GarminDB config before invoking GarminDB. After GarminDB returns, the plaintext password is scrubbed from the local config again. GarminDB's OAuth token store remains persistent under that user's `.GarminDb` directory.
+
+## Capability and availability detection
+
+Garmin users do not necessarily expose the same data. A watch may lack a feature, a user may disable a sensor to save battery, or a measurement may simply not have been used recently. Nexus therefore keeps per-user source state instead of assuming every enabled GarminDB statistic is always present.
+
+States are:
+
+- `supported`: Nexus has seen real data from the source.
+- `inactive`: the source has worked before, or is plausible, but currently has no recent data.
+- `unsupported`: reserved for strong evidence that Garmin does not expose the feature; HRV is the current example.
+- `unknown`: not enough evidence yet.
+
+The state is persisted in `/state/users/<user-id>/.nexus-garmin-capabilities.json`.
+
+Current behavior:
+
+- HRV is enabled only after a successful HRV capability check. Repeated valid empty HRV responses on dates with sleep data are treated as unsupported. Unsupported HRV is rechecked periodically rather than assumed permanent forever.
+- Sleep and resting heart rate get a 14-day grace period before becoming inactive.
+- Weight gets a 45-day grace period because weight measurements are naturally sparse.
+- Inactive standalone sources are skipped during normal GarminDB syncs and cheaply rechecked later.
+- Steps and wrist heart rate are tracked separately, but both share Garmin's monitoring source. Missing wrist HR is never interpreted as proof that steps or the whole watch are unsupported.
+- After the historical bootstrap, if wrist HR has been inactive long enough, Nexus fetches recent daily summaries directly and temporarily skips raw GarminDB monitoring. This keeps steps/stress/body-battery style daily data flowing without letting GarminDB's heart-rate cursor grow backwards indefinitely. Normal monitoring resumes automatically when heart-rate data returns.
+
+GarminDB also defines `--latest` using filesystem modification time. A historical bootstrap therefore makes thousands of old monitoring files appear "new" for 24 hours. Before each sync Nexus ages the existing monitoring tree to more than 24 hours old; files actually refreshed by the current Garmin download receive a fresh mtime and are the only monitoring files imported as latest.
 
 ## Cloudflare secret
 
@@ -115,9 +140,10 @@ shared Unraid agent claims oldest job
           |
           +-> fetches credentials for that job only
           +-> HOME=/state/users/<user-id>
+          +-> detects source capability/availability
           +-> GarminDB data=/data/users/<user-id>
           +-> garmindb_cli.py --all --download --import --analyze --latest
-          +-> uploads JSON/FIT ZIP to Nexus
+          +-> uploads changed Nexus-relevant JSON to Nexus
           +-> Nexus inventories and parses it into that same user's D1 records
 ```
 
@@ -142,13 +168,24 @@ The agent may be offline when the button is pressed; the job remains queued unti
 
 ## Updating
 
-Rebuild/recreate the container while keeping both appdata directories:
+A Docker image and a Docker container are separate things. Rebuilding the tag `nexus-garmin-agent:local` does **not** make an already-created container use the new image. The container must be recreated.
+
+From the Nexus clone:
 
 ```bash
+git pull
 docker stop nexus-garmin-agent
 docker rm nexus-garmin-agent
 docker build --pull -f docker/garmin-agent/Dockerfile -t nexus-garmin-agent:local .
 # recreate with the same /state and /data mounts + environment
 ```
 
-Because `/state` and `/data` are bind-mounted from Unraid, container replacement does not remove user profiles, OAuth token stores, GarminDB databases, JSON, or FIT files.
+With Docker Compose, the equivalent is normally:
+
+```bash
+git pull
+docker build -f docker/garmin-agent/Dockerfile -t nexus-garmin-agent:local .
+docker compose up -d --force-recreate nexus-garmin-agent
+```
+
+Because `/state` and `/data` are bind-mounted from Unraid, container replacement does not remove user profiles, OAuth token stores, capability state, GarminDB databases, JSON, or FIT files.
