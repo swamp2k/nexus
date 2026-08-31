@@ -177,7 +177,6 @@ def load_capabilities(home: Path) -> dict:
         value.setdefault("last_successful_sync_at", None)
         return value
 
-    # Migrate the original HRV-only cache.
     migrated = empty_capabilities()
     supported = value.get("hrv_supported")
     if isinstance(supported, bool):
@@ -204,14 +203,7 @@ def latest_meaningful_file(paths, predicate) -> tuple[datetime.date | None, int]
     return None, checked
 
 
-def apply_observed_source(
-    capabilities: dict,
-    name: str,
-    last_data_date: datetime.date | None,
-    *,
-    stale_days: int | None = None,
-    evidence_source: str = "existing-files",
-) -> None:
+def apply_observed_source(capabilities: dict, name: str, last_data_date: datetime.date | None, *, stale_days: int | None = None, evidence_source: str = "existing-files") -> None:
     if last_data_date is None:
         return
     entry = source_entry(capabilities, name)
@@ -227,11 +219,7 @@ def apply_observed_source(
 def scan_existing_capabilities(data_dir: Path, capabilities: dict) -> dict:
     sleep_dir = data_dir / "Sleep"
     if sleep_dir.is_dir():
-        sleep_date, _ = latest_meaningful_file(
-            sleep_dir.glob("sleep_????-??-??.json"),
-            lambda value: isinstance(value.get("dailySleepDTO"), dict)
-            and value["dailySleepDTO"].get("sleepTimeSeconds") is not None,
-        )
+        sleep_date, _ = latest_meaningful_file(sleep_dir.glob("sleep_????-??-??.json"), lambda value: isinstance(value.get("dailySleepDTO"), dict) and value["dailySleepDTO"].get("sleepTimeSeconds") is not None)
         apply_observed_source(capabilities, "sleep", sleep_date, stale_days=STALE_DAYS["sleep"])
 
     rhr_dir = data_dir / "RHR"
@@ -267,10 +255,7 @@ def scan_existing_capabilities(data_dir: Path, capabilities: dict) -> dict:
 
     weight_dir = data_dir / "Weight"
     if weight_dir.is_dir():
-        weight_date, _ = latest_meaningful_file(
-            weight_dir.glob("weight_????-??-??.json"),
-            lambda value: bool(value.get("dateWeightList")),
-        )
+        weight_date, _ = latest_meaningful_file(weight_dir.glob("weight_????-??-??.json"), lambda value: bool(value.get("dateWeightList")))
         apply_observed_source(capabilities, "weight", weight_date, stale_days=STALE_DAYS["weight"])
 
     monitoring_dir = data_dir / "FitFiles" / "Monitoring"
@@ -278,18 +263,10 @@ def scan_existing_capabilities(data_dir: Path, capabilities: dict) -> dict:
         summary_files = list(monitoring_dir.rglob("daily_summary_????-??-??.json"))
         monitoring_date, _ = latest_meaningful_file(summary_files, lambda value: value.get("calendarDate") is not None)
         apply_observed_source(capabilities, "monitoring", monitoring_date)
-
         steps_date, _ = latest_meaningful_file(summary_files, lambda value: value.get("totalSteps") is not None)
         apply_observed_source(capabilities, "steps", steps_date, stale_days=STALE_DAYS["steps"])
-
-        heart_date, _ = latest_meaningful_file(
-            summary_files,
-            lambda value: any(value.get(key) is not None for key in ("minHeartRate", "maxHeartRate", "restingHeartRate")),
-        )
+        heart_date, _ = latest_meaningful_file(summary_files, lambda value: any(value.get(key) is not None for key in ("minHeartRate", "maxHeartRate", "restingHeartRate")))
         apply_observed_source(capabilities, "heart_rate", heart_date, stale_days=STALE_DAYS["heart_rate"])
-
-        # Daily summaries prove the shared monitoring source works. Missing one
-        # individual signal is therefore inactivity, not lack of device support.
         if monitoring_date is not None:
             if steps_date is None and not source_entry(capabilities, "steps").get("ever_supported"):
                 source_entry(capabilities, "steps")["state"] = "inactive"
@@ -298,10 +275,7 @@ def scan_existing_capabilities(data_dir: Path, capabilities: dict) -> dict:
 
     activities_dir = data_dir / "FitFiles" / "Activities"
     if activities_dir.is_dir():
-        activity_files = [
-            path for path in activities_dir.glob("activity_*.json")
-            if path.stem.removeprefix("activity_").isdigit()
-        ]
+        activity_files = [path for path in activities_dir.glob("activity_*.json") if path.stem.removeprefix("activity_").isdigit()]
         if activity_files:
             entry = source_entry(capabilities, "activities")
             entry["state"] = "supported"
@@ -311,9 +285,8 @@ def scan_existing_capabilities(data_dir: Path, capabilities: dict) -> dict:
     for name, stale_days in STALE_DAYS.items():
         entry = source_entry(capabilities, name)
         last_date = parse_date(entry.get("last_data_date"))
-        if entry.get("ever_supported") and last_date is not None:
-            if (datetime.date.today() - last_date).days > stale_days:
-                entry["state"] = "inactive"
+        if entry.get("ever_supported") and last_date is not None and (datetime.date.today() - last_date).days > stale_days:
+            entry["state"] = "inactive"
     return capabilities
 
 
@@ -327,14 +300,7 @@ def capability_probe_due(entry: dict, *, hrv: bool = False) -> bool:
     return utc_now() - checked >= datetime.timedelta(days=interval)
 
 
-def mark_probe_result(
-    capabilities: dict,
-    name: str,
-    state: str,
-    *,
-    last_data_date: datetime.date | None = None,
-    source: str = "preflight",
-) -> None:
+def mark_probe_result(capabilities: dict, name: str, state: str, *, last_data_date: datetime.date | None = None, source: str = "preflight") -> None:
     entry = source_entry(capabilities, name)
     entry["state"] = state
     entry["checked_at"] = utc_now().isoformat()
@@ -348,7 +314,6 @@ def mark_probe_result(
 def garmin_login(config_dir: Path):
     from garmindb import GarminConnectConfigManager
     from garmindb.garmin_connect_auth_adapter import GarminConnectAuthAdapter
-
     config = GarminConnectConfigManager(str(config_dir))
     garmin = GarminConnectAuthAdapter(config)
     garmin.login()
@@ -374,16 +339,12 @@ def probe_capabilities(garmin, data_dir: Path, capabilities: dict) -> None:
 
     dates = recent_probe_dates()
     sleep_dates: list[datetime.date] = []
-
     if due_sleep or due_hrv:
         sleep_found = None
         valid_sleep_responses = 0
         for day in dates:
             try:
-                value = garmin.connectapi(
-                    f"/wellness-service/wellness/dailySleepData/{display_name}",
-                    params={"date": day.isoformat(), "nonSleepBufferMinutes": 60},
-                )
+                value = garmin.connectapi(f"/wellness-service/wellness/dailySleepData/{display_name}", params={"date": day.isoformat(), "nonSleepBufferMinutes": 60})
             except Exception:
                 continue
             if not isinstance(value, dict):
@@ -394,20 +355,14 @@ def probe_capabilities(garmin, data_dir: Path, capabilities: dict) -> None:
                 sleep_dates.append(day)
                 sleep_found = day if sleep_found is None else max(sleep_found, day)
         if due_sleep and valid_sleep_responses:
-            if sleep_found is not None:
-                mark_probe_result(capabilities, "sleep", "supported", last_data_date=sleep_found)
-            else:
-                mark_probe_result(capabilities, "sleep", "inactive")
+            mark_probe_result(capabilities, "sleep", "supported" if sleep_found else "inactive", last_data_date=sleep_found)
 
     if due_rhr:
         rhr_found = None
         valid_rhr_responses = 0
         for day in dates:
             try:
-                value = garmin.connectapi(
-                    f"/userstats-service/wellness/daily/{display_name}",
-                    params={"fromDate": day.isoformat(), "untilDate": day.isoformat(), "metricId": 60},
-                )
+                value = garmin.connectapi(f"/userstats-service/wellness/daily/{display_name}", params={"fromDate": day.isoformat(), "untilDate": day.isoformat(), "metricId": 60})
                 if not isinstance(value, dict):
                     continue
                 valid_rhr_responses += 1
@@ -417,30 +372,23 @@ def probe_capabilities(garmin, data_dir: Path, capabilities: dict) -> None:
             if rows and rows[0].get("value") is not None:
                 rhr_found = day if rhr_found is None else max(rhr_found, day)
         if valid_rhr_responses:
-            if rhr_found is not None:
-                mark_probe_result(capabilities, "rhr", "supported", last_data_date=rhr_found)
-            else:
-                mark_probe_result(capabilities, "rhr", "inactive")
+            mark_probe_result(capabilities, "rhr", "supported" if rhr_found else "inactive", last_data_date=rhr_found)
 
     if due_weight:
         end = datetime.date.today()
         start = end - datetime.timedelta(days=180)
         try:
-            value = garmin.connectapi(
-                "/weight-service/weight/dateRange",
-                params={"startDate": start.isoformat(), "endDate": end.isoformat()},
-            )
+            value = garmin.connectapi("/weight-service/weight/dateRange", params={"startDate": start.isoformat(), "endDate": end.isoformat()})
             rows = value.get("dateWeightList") if isinstance(value, dict) else None
         except Exception:
             rows = None
         if rows:
             latest = None
             for row in rows:
-                if not isinstance(row, dict):
-                    continue
-                row_date = parse_date(row.get("calendarDate") or row.get("date"))
-                if row_date is not None and (latest is None or row_date > latest):
-                    latest = row_date
+                if isinstance(row, dict):
+                    row_date = parse_date(row.get("calendarDate") or row.get("date"))
+                    if row_date is not None and (latest is None or row_date > latest):
+                        latest = row_date
             mark_probe_result(capabilities, "weight", "supported", last_data_date=latest)
         elif rows == []:
             mark_probe_result(capabilities, "weight", "inactive")
@@ -459,7 +407,6 @@ def probe_capabilities(garmin, data_dir: Path, capabilities: dict) -> None:
                             candidates.append(day)
                     if len(candidates) >= PROBE_DAYS:
                         break
-
         valid_responses = 0
         hrv_found = None
         for day in candidates[:PROBE_DAYS]:
@@ -487,36 +434,24 @@ def update_daily_summary_capabilities(capabilities: dict, value: dict, day: date
     if value.get("totalSteps") is not None:
         apply_observed_source(capabilities, "steps", day, stale_days=STALE_DAYS["steps"], evidence_source="direct-summary")
     if any(value.get(key) is not None for key in ("minHeartRate", "maxHeartRate", "restingHeartRate")):
-        apply_observed_source(
-            capabilities,
-            "heart_rate",
-            day,
-            stale_days=STALE_DAYS["heart_rate"],
-            evidence_source="direct-summary",
-        )
+        apply_observed_source(capabilities, "heart_rate", day, stale_days=STALE_DAYS["heart_rate"], evidence_source="direct-summary")
 
 
 def fetch_direct_daily_summaries(garmin, data_dir: Path, capabilities: dict) -> bool:
-    """Keep daily summary data flowing while wrist HR is temporarily inactive."""
     display_name = getattr(garmin, "display_name", None)
     if not display_name:
         raise RuntimeError("Garmin login did not provide a display name")
-
     saw_heart_rate = False
     today = datetime.date.today()
     for offset in range(DIRECT_MONITORING_DAYS):
         day = today - datetime.timedelta(days=offset)
         try:
-            value = garmin.connectapi(
-                f"/usersummary-service/usersummary/daily/{display_name}",
-                params={"calendarDate": day.isoformat()},
-            )
+            value = garmin.connectapi(f"/usersummary-service/usersummary/daily/{display_name}", params={"calendarDate": day.isoformat()})
         except Exception as error:
             print(f"[nexus] Direct daily summary failed for {day}: {error}", file=sys.stderr, flush=True)
             continue
         if not isinstance(value, dict):
             continue
-
         year_dir = data_dir / "FitFiles" / "Monitoring" / str(day.year)
         write_json_atomic(year_dir / f"daily_summary_{day.isoformat()}.json", value)
         update_daily_summary_capabilities(capabilities, value, day)
@@ -534,55 +469,18 @@ def source_enabled(capabilities: dict, name: str, *, default: bool = True) -> bo
     return default
 
 
-def write_config(
-    config_dir: Path,
-    data_dir: Path,
-    username: str,
-    password: str,
-    *,
-    capabilities: dict,
-    monitoring_enabled: bool,
-) -> Path:
+def write_config(config_dir: Path, data_dir: Path, username: str, password: str, *, capabilities: dict, monitoring_enabled: bool) -> Path:
     config = {
         "db": {"type": "sqlite"},
         "garmin": {"domain": "garmin.com"},
-        "credentials": {
-            "user": username,
-            "secure_password": False,
-            "password": password,
-            "password_file": None,
-        },
-        "data": {
-            "weight_start_date": "12/31/2019",
-            "sleep_start_date": "12/31/2019",
-            "rhr_start_date": "12/31/2019",
-            "hrv_start_date": "12/31/2019",
-            "monitoring_start_date": "12/31/2019",
-            "download_latest_activities": 25,
-            "download_all_activities": 1000,
-        },
-        "directories": {
-            "relative_to_home": False,
-            "base_dir": str(data_dir),
-            "mount_dir": "/nonexistent",
-        },
-        "enabled_stats": {
-            "monitoring": monitoring_enabled,
-            "steps": monitoring_enabled,
-            "itime": monitoring_enabled,
-            "sleep": source_enabled(capabilities, "sleep"),
-            "rhr": source_enabled(capabilities, "rhr"),
-            "hrv": source_enabled(capabilities, "hrv"),
-            "weight": source_enabled(capabilities, "weight"),
-            "activities": True,
-        },
+        "credentials": {"user": username, "secure_password": False, "password": password, "password_file": None},
+        "data": {"weight_start_date": "12/31/2019", "sleep_start_date": "12/31/2019", "rhr_start_date": "12/31/2019", "hrv_start_date": "12/31/2019", "monitoring_start_date": "12/31/2019", "download_latest_activities": 25, "download_all_activities": 1000},
+        "directories": {"relative_to_home": False, "base_dir": str(data_dir), "mount_dir": "/nonexistent"},
+        "enabled_stats": {"monitoring": monitoring_enabled, "steps": monitoring_enabled, "itime": monitoring_enabled, "sleep": source_enabled(capabilities, "sleep"), "rhr": source_enabled(capabilities, "rhr"), "hrv": source_enabled(capabilities, "hrv"), "weight": source_enabled(capabilities, "weight"), "activities": True},
         "course_views": {"steps": []},
         "modes": {},
         "activities": {"display": []},
-        "settings": {
-            "metric": True,
-            "default_display_activities": ["walking", "running", "cycling"],
-        },
+        "settings": {"metric": True, "default_display_activities": ["walking", "running", "cycling"]},
         "checkup": {"look_back_days": 90},
     }
     config_path = config_dir / "GarminConnectConfig.json"
@@ -600,7 +498,6 @@ def scrub_password(config_path: Path) -> None:
 
 
 def age_existing_monitoring_files(data_dir: Path) -> None:
-    """Make GarminDB --latest import only monitoring files refreshed by this sync."""
     root = data_dir / "FitFiles" / "Monitoring"
     if not root.is_dir():
         return
@@ -623,10 +520,7 @@ def run_garmindb(home: Path, job_id: str) -> None:
     print("[nexus] Running GarminDB latest sync…", flush=True)
     environment = os.environ.copy()
     environment["HOME"] = str(home)
-    process = subprocess.Popen(
-        [GARMIN_CLI, "--all", "--download", "--import", "--analyze", "--latest"],
-        env=environment,
-    )
+    process = subprocess.Popen([GARMIN_CLI, "--all", "--download", "--import", "--latest"], env=environment)
     while True:
         try:
             return_code = process.wait(timeout=HEARTBEAT_SECONDS)
@@ -642,13 +536,7 @@ def nexus_supported_file(data_dir: Path, file_path: Path) -> bool:
         return False
     relative = file_path.relative_to(data_dir).as_posix()
     name = file_path.name
-    return (
-        name.startswith("daily_summary_20")
-        or relative.startswith("Sleep/sleep_20")
-        or relative.startswith("RHR/rhr_20")
-        or relative.startswith("Weight/weight_20")
-        or (name.startswith("activity_") and name[9:-5].isdigit())
-    )
+    return name.startswith("daily_summary_20") or relative.startswith("Sleep/sleep_20") or relative.startswith("RHR/rhr_20") or relative.startswith("Weight/weight_20") or (name.startswith("activity_") and name[9:-5].isdigit())
 
 
 def sha256_file(file_path: Path) -> str:
@@ -660,11 +548,7 @@ def sha256_file(file_path: Path) -> str:
 
 
 def snapshot_supported_files(data_dir: Path) -> dict[str, str]:
-    snapshot: dict[str, str] = {}
-    for file_path in sorted(data_dir.rglob("*.json")):
-        if nexus_supported_file(data_dir, file_path):
-            snapshot[file_path.relative_to(data_dir).as_posix()] = sha256_file(file_path)
-    return snapshot
+    return {file_path.relative_to(data_dir).as_posix(): sha256_file(file_path) for file_path in sorted(data_dir.rglob("*.json")) if nexus_supported_file(data_dir, file_path)}
 
 
 def load_or_create_snapshot(snapshot_path: Path, data_dir: Path) -> dict[str, str]:
@@ -683,8 +567,6 @@ def load_or_create_snapshot(snapshot_path: Path, data_dir: Path) -> dict[str, st
 
 
 def build_incremental_zip(data_dir: Path, user_id: str, before: dict[str, str]) -> Path:
-    if not data_dir.is_dir():
-        raise RuntimeError(f"Garmin data directory does not exist: {data_dir}")
     changed: list[Path] = []
     newest: Path | None = None
     for file_path in sorted(data_dir.rglob("*.json")):
@@ -700,7 +582,6 @@ def build_incremental_zip(data_dir: Path, user_id: str, before: dict[str, str]) 
         print("[nexus] No data changed; sending one current file as a no-op sync marker", flush=True)
     if not changed:
         raise RuntimeError(f"No Nexus-supported Garmin files found below {data_dir}")
-
     handle = tempfile.NamedTemporaryFile(prefix=f"nexus-garmindb-{user_id[:8]}-", suffix=".zip", delete=False)
     handle.close()
     zip_path = Path(handle.name)
@@ -754,7 +635,6 @@ def process_job(job_id: str, user_id: str, job_status: str) -> None:
             process_import(job_id, user_id, resumed=True)
             completed = True
             return
-
         report_progress(job_id, "Forbereder Garmin-konto")
         status, body = request(f"/api/garmin/agent/jobs/{job_id}/credentials")
         if status >= 300:
@@ -772,39 +652,20 @@ def process_job(job_id: str, user_id: str, job_status: str) -> None:
         snapshot_path = home / ".nexus-garmin-pre-sync.json"
         before = load_or_create_snapshot(snapshot_path, data_dir)
         capabilities = scan_existing_capabilities(data_dir, load_capabilities(home))
-
-        config_path = write_config(
-            config_dir,
-            data_dir,
-            username,
-            password,
-            capabilities=capabilities,
-            monitoring_enabled=True,
-        )
-
-        due_probe = any((
-            capability_probe_due(source_entry(capabilities, "sleep")),
-            capability_probe_due(source_entry(capabilities, "rhr")),
-            capability_probe_due(source_entry(capabilities, "weight")),
-            capability_probe_due(source_entry(capabilities, "hrv"), hrv=True),
-        ))
+        config_path = write_config(config_dir, data_dir, username, password, capabilities=capabilities, monitoring_enabled=True)
+        due_probe = any((capability_probe_due(source_entry(capabilities, "sleep")), capability_probe_due(source_entry(capabilities, "rhr")), capability_probe_due(source_entry(capabilities, "weight")), capability_probe_due(source_entry(capabilities, "hrv"), hrv=True)))
         bootstrap_completed = bool(capabilities.get("bootstrap_completed"))
         heart_inactive = source_entry(capabilities, "heart_rate").get("state") == "inactive"
         direct_monitoring = bootstrap_completed and heart_inactive
-
         garmin = None
         if due_probe or direct_monitoring:
             try:
                 garmin = garmin_login(config_dir)
             except Exception as error:
                 print(f"[nexus] Garmin capability preflight failed: {error}", file=sys.stderr, flush=True)
-
         if garmin is not None and due_probe:
             probe_capabilities(garmin, data_dir, capabilities)
-
         if direct_monitoring and garmin is None:
-            # Never sacrifice ordinary monitoring just because the lightweight
-            # fallback could not authenticate on this run.
             direct_monitoring = False
         elif garmin is not None and direct_monitoring:
             saw_heart_rate = fetch_direct_daily_summaries(garmin, data_dir, capabilities)
@@ -813,31 +674,17 @@ def process_job(job_id: str, user_id: str, job_status: str) -> None:
                 print("[nexus] Wrist HR data returned; normal GarminDB monitoring re-enabled", flush=True)
             else:
                 print("[nexus] Wrist HR remains inactive; using direct daily summaries and skipping raw monitoring sync", flush=True)
-
-        config_path = write_config(
-            config_dir,
-            data_dir,
-            username,
-            password,
-            capabilities=capabilities,
-            monitoring_enabled=not direct_monitoring,
-        )
+        config_path = write_config(config_dir, data_dir, username, password, capabilities=capabilities, monitoring_enabled=not direct_monitoring)
         save_capabilities(home, capabilities)
         print(f"[nexus] Syncing isolated Garmin profile {user_id[:8]} · {capability_summary(capabilities)}", flush=True)
-
-        # GarminDB defines --latest by mtime. Age the old monitoring tree first;
-        # files refreshed by this run naturally become new again.
         age_existing_monitoring_files(data_dir)
-
         report_progress(job_id, "Henter data fra Garmin")
         run_garmindb(home, job_id)
         scrub_password(config_path)
-
         capabilities = scan_existing_capabilities(data_dir, capabilities)
         capabilities["bootstrap_completed"] = True
         capabilities["last_successful_sync_at"] = utc_now().isoformat()
         save_capabilities(home, capabilities)
-
         report_progress(job_id, "Pakker ændrede Garmin-data")
         zip_path = build_incremental_zip(data_dir, user_id, before)
         report_progress(job_id, "Uploader Garmin-data til Nexus")
@@ -874,7 +721,6 @@ def main() -> int:
     print(f"[nexus] Multi-user Garmin agent online; polling {NEXUS_URL} every {POLL_SECONDS}s", flush=True)
     print(f"[nexus] Persistent state root: {STATE_ROOT}", flush=True)
     print(f"[nexus] Persistent data root: {DATA_ROOT}", flush=True)
-
     while True:
         try:
             status, body = request("/api/garmin/agent/jobs/next")
