@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 type Metric = {
   id: string;
@@ -25,6 +25,10 @@ export default function WellbeingMetricSettings() {
   const [direction, setDirection] = useState<"high_good" | "high_bad">("high_good");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [showHidden, setShowHidden] = useState(false);
+
+  const activeMetrics = useMemo(() => metrics.filter((metric) => Boolean(metric.active)), [metrics]);
+  const hiddenMetrics = useMemo(() => metrics.filter((metric) => !metric.active), [metrics]);
 
   async function refresh() {
     const response = await fetch("/api/wellbeing/metrics", { credentials: "same-origin", cache: "no-store" });
@@ -97,11 +101,17 @@ export default function WellbeingMetricSettings() {
     <div className="wellbeing-settings">
       {metrics.length === 0 && <div className="wellbeing-starter"><span>Ingen målepunkter endnu.</span><button className="secondary-action" type="button" disabled={busy} onClick={() => void addStarterSet()}>Opret forslag</button></div>}
 
-      {metrics.length > 0 && <div className="wellbeing-settings-list">{metrics.map((metric) => <div key={metric.id} className={`wellbeing-setting-row ${metric.active ? "" : "inactive"}`}>
+      {activeMetrics.length > 0 && <div className="wellbeing-settings-list">{activeMetrics.map((metric) => <div key={metric.id} className="wellbeing-setting-row">
         <span className="wellbeing-setting-emoji">{metric.emoji}</span>
         <div><strong>{metric.name}</strong><small>{metric.direction === "high_good" ? "5 = godt" : "5 = meget / dårligt"}</small></div>
-        <button className="secondary-action" type="button" disabled={busy} onClick={() => void patchMetric(metric, { active: !Boolean(metric.active) })}>{metric.active ? "Skjul" : "Aktivér"}</button>
+        <button className="secondary-action" type="button" disabled={busy} onClick={() => void patchMetric(metric, { active: false })}>Skjul</button>
       </div>)}</div>}
+
+      {metrics.length > 0 && activeMetrics.length === 0 && <p className="settings-help">Alle målepunkter er skjult.</p>}
+
+      {hiddenMetrics.length > 0 && <div className="wellbeing-hidden-actions">
+        <button className="secondary-action" type="button" onClick={() => setShowHidden(true)}>Skjulte målepunkter ({hiddenMetrics.length})</button>
+      </div>}
 
       <div className="wellbeing-new-metric">
         <label><span>Emoji</span><input value={emoji} onChange={(event) => setEmoji(event.target.value)} maxLength={8} /></label>
@@ -111,5 +121,16 @@ export default function WellbeingMetricSettings() {
       </div>
       {message && <p className="settings-feedback error">{message}</p>}
     </div>
+
+    {showHidden && <div className="wellbeing-hidden-overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setShowHidden(false); }}>
+      <section className="wellbeing-hidden-dialog" role="dialog" aria-modal="true" aria-labelledby="wellbeing-hidden-title">
+        <div className="wellbeing-hidden-heading"><div><p className="section-label">Velbefindende</p><h3 id="wellbeing-hidden-title">Skjulte målepunkter</h3></div><button className="secondary-action" type="button" onClick={() => setShowHidden(false)}>Luk</button></div>
+        <div className="wellbeing-settings-list">{hiddenMetrics.map((metric) => <div key={metric.id} className="wellbeing-setting-row">
+          <span className="wellbeing-setting-emoji">{metric.emoji}</span>
+          <div><strong>{metric.name}</strong><small>{metric.direction === "high_good" ? "5 = godt" : "5 = meget / dårligt"}</small></div>
+          <button className="secondary-action" type="button" disabled={busy} onClick={() => void patchMetric(metric, { active: true })}>Aktivér</button>
+        </div>)}</div>
+      </section>
+    </div>}
   </details>;
 }
