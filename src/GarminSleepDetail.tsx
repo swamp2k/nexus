@@ -110,7 +110,7 @@ function StageTimeline({ stages, start, end }: { stages: StagePoint[]; start: nu
   </div>;
 }
 
-function SleepRing({ row }: { row: SleepRow }) {
+function SleepRing({ row, label = "Total søvn" }: { row: SleepRow; label?: string }) {
   const total = Math.max(1, (row.sleep_seconds ?? 0) + (row.awake_seconds ?? 0));
   let cursor = 0;
   const stops: string[] = [];
@@ -121,15 +121,22 @@ function SleepRing({ row }: { row: SleepRow }) {
     stops.push(`${colors[stage]} ${cursor}% ${cursor + pct}%`);
     cursor += pct;
   }
-  return <div className="sleep-ring" style={{ background: `conic-gradient(${stops.join(",")})` }}><div><strong>{duration(row.sleep_seconds)}</strong><span>Total søvn</span></div></div>;
+  return <div className="sleep-ring" style={{ background: `conic-gradient(${stops.join(",")})` }}><div><strong>{duration(row.sleep_seconds)}</strong><span>{label}</span></div></div>;
+}
+
+function SleepStageOverview({ row, average = false }: { row: SleepRow; average?: boolean }) {
+  const sleepTotal = row.sleep_seconds ?? 0;
+  const windowTotal = sleepTotal + (row.awake_seconds ?? 0);
+  return <div className="sleep-daily-top">
+    <SleepRing row={row} label={average ? "Gns. søvn" : "Total søvn"} />
+    <div className="sleep-stage-summary">{STAGES.map((stage) => <div key={stage}><span><i className={`sleep-stage-${stage}`} />{stageLabel(stage)}</span><strong>{duration(stageSeconds(row, stage))}</strong><small>{windowTotal ? `${Math.round((stageSeconds(row, stage) / windowTotal) * 100)} %` : ""}</small></div>)}</div>
+  </div>;
 }
 
 function DailyView({ row }: { row: SleepRow }) {
   const detail = row.detail;
-  const sleepTotal = row.sleep_seconds ?? 0;
-  const windowTotal = sleepTotal + (row.awake_seconds ?? 0);
   return <div className="sleep-daily-view">
-    <div className="sleep-daily-top"><SleepRing row={row} /><div className="sleep-stage-summary">{STAGES.map((stage) => <div key={stage}><span><i className={`sleep-stage-${stage}`} />{stageLabel(stage)}</span><strong>{duration(stageSeconds(row, stage))}</strong><small>{windowTotal ? `${Math.round((stageSeconds(row, stage) / windowTotal) * 100)} %` : ""}</small></div>)}</div></div>
+    <SleepStageOverview row={row} />
     {detail?.stages?.length ? <article className="sleep-garmin-section"><h4>Søvnstadier</h4><StageTimeline stages={detail.stages} start={detail.sleepStartMs ?? row.sleep_start_ms ?? detail.stages[0].start} end={detail.sleepEndMs ?? row.sleep_end_ms ?? detail.stages.at(-1)!.end} /></article> : null}
     <div className="sleep-signal-pills"><span>Bevægelse</span><span>Hvilepuls {detail?.restingHeartRate ? `${detail.restingHeartRate} bpm` : ""}</span><span>Body Battery {detail?.bodyBatteryChange === null || detail?.bodyBatteryChange === undefined ? "" : `${detail.bodyBatteryChange > 0 ? "+" : ""}${detail.bodyBatteryChange}`}</span></div>
     <article className="sleep-garmin-section"><h4>Søvnmålinger</h4><div className="sleep-metrics-grid"><div><strong>{detail?.restingHeartRate ? `${detail.restingHeartRate} bpm` : "—"}</strong><span>Hvilepuls</span></div><div><strong>{detail?.bodyBatteryChange === null || detail?.bodyBatteryChange === undefined ? "—" : `${detail.bodyBatteryChange > 0 ? "+" : ""}${detail.bodyBatteryChange}`}</strong><span>Body Battery ændring</span></div><div><strong>{row.avg_respiration === null ? "—" : `${row.avg_respiration.toFixed(0)} brpm`}</strong><span>Gns. respiration</span></div><div><strong>{row.low_respiration === null ? "—" : `${row.low_respiration.toFixed(0)} brpm`}</strong><span>Laveste respiration</span></div></div></article>
@@ -142,15 +149,38 @@ function DailyView({ row }: { row: SleepRow }) {
   </div>;
 }
 
+function averageSleepRow(rows: SleepRow[]): SleepRow | null {
+  const valid = rows.filter((row) => (row.sleep_seconds ?? 0) > 0);
+  if (!valid.length) return null;
+  const mean = (key: "sleep_seconds" | "deep_seconds" | "light_seconds" | "rem_seconds" | "awake_seconds") =>
+    valid.reduce((sum, row) => sum + (row[key] ?? 0), 0) / valid.length;
+  return {
+    date: valid.at(-1)?.date ?? "",
+    sleep_start_ms: null,
+    sleep_end_ms: null,
+    sleep_seconds: mean("sleep_seconds"),
+    nap_seconds: null,
+    deep_seconds: mean("deep_seconds"),
+    light_seconds: mean("light_seconds"),
+    rem_seconds: mean("rem_seconds"),
+    awake_seconds: mean("awake_seconds"),
+    avg_respiration: null,
+    low_respiration: null,
+    high_respiration: null,
+  };
+}
+
 function RangeView({ history, onSelect }: { history: SleepRow[]; onSelect: (date: string) => void }) {
   const valid = history.filter((row) => (row.sleep_seconds ?? 0) > 0);
   const avg = valid.length ? valid.reduce((sum, row) => sum + (row.sleep_seconds ?? 0), 0) / valid.length : 0;
+  const averageRow = averageSleepRow(history);
   const bedtimes = valid.map((row) => secondsOfDay(row.sleep_start_ms)).filter((value): value is number => value !== null);
   const wakeTimes = valid.map((row) => secondsOfDay(row.sleep_end_ms)).filter((value): value is number => value !== null);
   const avgBed = circularMean(bedtimes);
   const avgWake = circularMean(wakeTimes);
   const consistencyRows = history.map((row) => ({ date: row.date, bedSeconds: secondsOfDay(row.sleep_start_ms), wakeSeconds: secondsOfDay(row.sleep_end_ms) }));
   return <div className="sleep-range-view">
+    {averageRow && <SleepStageOverview row={averageRow} average />}
     <article className="sleep-garmin-section"><h4>Søvnvarighed</h4><SleepDurationBars rows={history.map((row) => ({ date: row.date, seconds: row.sleep_seconds }))} onSelect={onSelect} /><div className="sleep-range-stat"><strong>{duration(avg)}</strong><span>Gns. søvnvarighed</span></div></article>
     <article className="sleep-garmin-section"><h4>Søvnrytme</h4><SleepConsistencyChart rows={consistencyRows} avgBed={avgBed} avgWake={avgWake} onSelect={onSelect} /><div className="sleep-range-stat split"><div><strong>{formatSecondsOfDay(avgBed)}</strong><span>Gns. sengetid</span></div><div><strong>{formatSecondsOfDay(avgWake)}</strong><span>Gns. opvågning</span></div></div></article>
     <div className="sleep-night-list">{[...history].reverse().map((row) => <button key={row.date} type="button" onClick={() => onSelect(row.date)}><div><strong>{longDate(row.date)}</strong><span>{shortDate(row.date)}</span></div><strong>{duration(row.sleep_seconds)}</strong><i className="sleep-mini-ring" /></button>)}</div>
