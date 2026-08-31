@@ -4,7 +4,7 @@ import App from "./App";
 import "./styles.css";
 import "./garmin.css";
 import "./garmin-health.css";
-import "./garmin-health-detail.css";
+import "./garmin-health-bars.css";
 import "./garmin-charts.css";
 import "./garmin-navigation.css";
 import "./garmin-agent.css";
