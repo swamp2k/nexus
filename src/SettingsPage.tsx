@@ -131,7 +131,7 @@ export default function SettingsPage() {
     <section className="settings-page" aria-labelledby="settings-heading">
       <details className="settings-card settings-collapsible">
         <summary className="settings-card-heading">
-          <div><p className="section-label">Personligt</p><h2 id="settings-heading">Lokation</h2><p>Bruges til vejrudsigt og andre lokale Nexus-kilder. Indstillingen gemmes kun for din bruger.</p></div>
+          <div><p className="section-label">Personligt</p><h2 id="settings-heading">Lokation</h2></div>
           <span className="settings-icon" aria-hidden="true">⌖</span>
         </summary>
         {loading ? <p className="settings-loading">Henter indstillinger…</p> : (
@@ -145,7 +145,7 @@ export default function SettingsPage() {
       </details>
 
       <details className="settings-card settings-collapsible">
-        <summary className="settings-card-heading"><div><p className="section-label">Strøm</p><h2>Elpris</h2><p>Nexus kombinerer spotpris med dit netselskabs aktuelle tarif, Energinet, elafgift, moms og dit elselskabs kWh-tillæg.</p></div><span className="settings-icon" aria-hidden="true">ϟ</span></summary>
+        <summary className="settings-card-heading"><div><p className="section-label">Strøm</p><h2>Elpris</h2></div><span className="settings-icon" aria-hidden="true">ϟ</span></summary>
         {loading ? <p className="settings-loading">Henter indstillinger…</p> : (
           <div className="settings-form">
             <div className="settings-choice-grid" role="radiogroup" aria-label="Elprisområde">
@@ -167,7 +167,7 @@ export default function SettingsPage() {
       <WellbeingMetricSettings />
 
       <details className="settings-card settings-collapsible settings-component-wrapper">
-        <summary className="settings-card-heading"><div><p className="section-label">Datakilde</p><h2>Garmin</h2><p>Automatisk GarminDB-synkronisering, agent-status og manuel fallback-import.</p></div><span className="settings-icon" aria-hidden="true">⌖</span></summary>
+        <summary className="settings-card-heading"><div><p className="section-label">Datakilde</p><h2>Garmin</h2></div><span className="settings-icon" aria-hidden="true">⌖</span></summary>
         <GarminImportSettings />
       </details>
 
