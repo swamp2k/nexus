@@ -9,6 +9,8 @@ type Metric = {
   sortOrder: number;
 };
 
+type MetricPatch = Partial<Omit<Metric, "active">> & { active?: boolean };
+
 async function errorText(response: Response): Promise<string> {
   try {
     const body = await response.json() as { error?: string; detail?: string };
@@ -49,7 +51,7 @@ export default function WellbeingMetricSettings() {
     finally { setBusy(false); }
   }
 
-  async function patchMetric(metric: Metric, patch: Partial<Metric>) {
+  async function patchMetric(metric: Metric, patch: MetricPatch) {
     setBusy(true); setMessage(null);
     try {
       const response = await fetch(`/api/wellbeing/metrics/${metric.id}`, {
@@ -89,8 +91,8 @@ export default function WellbeingMetricSettings() {
     finally { setBusy(false); }
   }
 
-  return <article className="settings-card">
-    <div className="settings-card-heading"><div><p className="section-label">Velbefindende</p><h2>Daglige målepunkter</h2><p>Vælg selv hvad du vil score 1–5. Retningen fortæller Nexus om en høj score er positiv eller negativ.</p></div><span className="settings-icon" aria-hidden="true">♥</span></div>
+  return <details className="settings-card settings-collapsible">
+    <summary className="settings-card-heading"><div><p className="section-label">Velbefindende</p><h2>Daglige målepunkter</h2><p>Vælg selv hvad du vil score 1–5. Retningen fortæller Nexus om en høj score er positiv eller negativ.</p></div><span className="settings-icon" aria-hidden="true">♥</span></summary>
 
     <div className="wellbeing-settings">
       {metrics.length === 0 && <div className="wellbeing-starter"><span>Ingen målepunkter endnu.</span><button className="secondary-action" type="button" disabled={busy} onClick={() => void addStarterSet()}>Opret forslag</button></div>}
@@ -98,7 +100,7 @@ export default function WellbeingMetricSettings() {
       {metrics.length > 0 && <div className="wellbeing-settings-list">{metrics.map((metric) => <div key={metric.id} className={`wellbeing-setting-row ${metric.active ? "" : "inactive"}`}>
         <span className="wellbeing-setting-emoji">{metric.emoji}</span>
         <div><strong>{metric.name}</strong><small>{metric.direction === "high_good" ? "5 = godt" : "5 = meget / dårligt"}</small></div>
-        <button className="secondary-action" type="button" disabled={busy} onClick={() => void patchMetric(metric, { active: metric.active ? 0 : 1 })}>{metric.active ? "Skjul" : "Aktivér"}</button>
+        <button className="secondary-action" type="button" disabled={busy} onClick={() => void patchMetric(metric, { active: !Boolean(metric.active) })}>{metric.active ? "Skjul" : "Aktivér"}</button>
       </div>)}</div>}
 
       <div className="wellbeing-new-metric">
@@ -109,5 +111,5 @@ export default function WellbeingMetricSettings() {
       </div>
       {message && <p className="settings-feedback error">{message}</p>}
     </div>
-  </article>;
+  </details>;
 }
