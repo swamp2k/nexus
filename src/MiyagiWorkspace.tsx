@@ -1,5 +1,6 @@
-import { useEffect, useMemo, useState } from "react";
-import type { ReactNode } from "react";
+import { useEffect, useState } from "react";
+import MiyagiHistory from "./MiyagiHistory";
+import MiyagiMarkdown from "./MiyagiMarkdown";
 
 type Analysis = {
   id: string;
@@ -10,6 +11,9 @@ type Analysis = {
   contextHash: string;
   analysis: string;
   createdAt: string;
+  focus?: string | null;
+  responseLength?: "short" | "normal" | "deep" | null;
+  tone?: "objective" | "empathetic" | "miyagi" | null;
   coverage?: {
     healthDays: number;
     sleepDays: number;
@@ -55,71 +59,6 @@ function formatTimestamp(value: string): string {
   return new Intl.DateTimeFormat("da-DK", { dateStyle: "medium", timeStyle: "short" }).format(parsed);
 }
 
-function inlineMarkdown(text: string): ReactNode[] {
-  const parts = text.split(/(\*\*[^*]+\*\*)/g);
-  return parts.filter(Boolean).map((part, index) => {
-    if (part.startsWith("**") && part.endsWith("**")) return <strong key={`${index}-${part}`}>{part.slice(2, -2)}</strong>;
-    return <span key={`${index}-${part.slice(0, 12)}`}>{part}</span>;
-  });
-}
-
-function AnalysisText({ text }: { text: string }) {
-  const lines = useMemo(() => text.replace(/\\---/g, "---").split("\n").map((line) => line.trimEnd()), [text]);
-  const blocks: ReactNode[] = [];
-  let bullets: string[] = [];
-  let numbers: string[] = [];
-
-  function flushLists() {
-    if (bullets.length) {
-      blocks.push(<ul key={`ul-${blocks.length}`}>{bullets.map((item, index) => <li key={`${index}-${item.slice(0, 16)}`}>{inlineMarkdown(item)}</li>)}</ul>);
-      bullets = [];
-    }
-    if (numbers.length) {
-      blocks.push(<ol key={`ol-${blocks.length}`}>{numbers.map((item, index) => <li key={`${index}-${item.slice(0, 16)}`}>{inlineMarkdown(item)}</li>)}</ol>);
-      numbers = [];
-    }
-  }
-
-  for (const rawLine of lines) {
-    const line = rawLine.trim();
-    if (!line) {
-      flushLists();
-      continue;
-    }
-    if (line === "---") {
-      flushLists();
-      blocks.push(<hr key={`hr-${blocks.length}`} />);
-      continue;
-    }
-    if (line.startsWith("## ")) {
-      flushLists();
-      blocks.push(<h3 key={`h3-${blocks.length}`}>{inlineMarkdown(line.slice(3))}</h3>);
-      continue;
-    }
-    if (line.startsWith("### ")) {
-      flushLists();
-      blocks.push(<h4 key={`h4-${blocks.length}`}>{inlineMarkdown(line.slice(4))}</h4>);
-      continue;
-    }
-    if (/^[-*] /.test(line)) {
-      flushLists();
-      bullets.push(line.slice(2));
-      continue;
-    }
-    const numbered = line.match(/^\d+[.)]\s+(.+)$/);
-    if (numbered) {
-      if (bullets.length) flushLists();
-      numbers.push(numbered[1]);
-      continue;
-    }
-    flushLists();
-    blocks.push(<p key={`p-${blocks.length}`}>{inlineMarkdown(line)}</p>);
-  }
-  flushLists();
-
-  return <div className="miyagi-analysis-text">{blocks}</div>;
-}
-
 export default function MiyagiWorkspace() {
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -128,8 +67,9 @@ export default function MiyagiWorkspace() {
   const [chatBusy, setChatBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [analysisDialogOpen, setAnalysisDialogOpen] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
   const [focus, setFocus] = useState("");
-  const [analysisLength, setAnalysisLength] = useState<AnalysisLength>("normal");
+  const [analysisLength, setAnalysisLength] = useState<AnalysisLength>("short");
   const [analysisTone, setAnalysisTone] = useState<AnalysisTone>("empathetic");
 
   useEffect(() => {
@@ -155,12 +95,17 @@ export default function MiyagiWorkspace() {
 
   useEffect(() => {
     if (!analysisDialogOpen) return;
-    const close = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setAnalysisDialogOpen(false);
-    };
+    const close = (event: KeyboardEvent) => { if (event.key === "Escape") setAnalysisDialogOpen(false); };
     window.addEventListener("keydown", close);
     return () => window.removeEventListener("keydown", close);
   }, [analysisDialogOpen]);
+
+  function openAnalysisDialog() {
+    setFocus("");
+    setAnalysisLength("short");
+    setAnalysisTone("empathetic");
+    setAnalysisDialogOpen(true);
+  }
 
   async function runAnalysis() {
     setAnalysisDialogOpen(false);
@@ -214,22 +159,11 @@ export default function MiyagiWorkspace() {
   }
 
   return <section className="miyagi-workspace" aria-label="Mr. Miyagi analyse">
-    <div className="miyagi-intro">
-      <div>
-        <p className="section-label">Mr. Miyagi</p>
-        <h2>Se efter mønstre, ikke mirakler.</h2>
-        <p>Miyagi krydsrefererer dine sidste 90 dages sundhed, motion, check-ins og journal. Fokus er på hvad der flytter sig sammen — og hvad han mangler at vide for at forstå hvorfor.</p>
-      </div>
-      <button className="primary-action" type="button" disabled={state === "loading" || state === "analyzing"} onClick={() => setAnalysisDialogOpen(true)}>
+    <div className="miyagi-workspace-actions">
+      <button className="secondary-action" type="button" onClick={() => setHistoryOpen(true)}>Historik</button>
+      <button className="primary-action" type="button" disabled={state === "loading" || state === "analyzing"} onClick={openAnalysisDialog}>
         {state === "analyzing" ? "Miyagi tænker…" : analysis ? "Analysér igen" : "Start analyse"}
       </button>
-    </div>
-
-    <div className="miyagi-source-grid" aria-label="Datakilder til analysen">
-      <div><span>♥</span><strong>Sundhed</strong><small>Søvn, puls, stress, Body Battery, skridt</small></div>
-      <div><span>↗</span><strong>Motion</strong><small>Aktiviteter, varighed, intensitet og historik</small></div>
-      <div><span>☀</span><strong>Check-ins</strong><small>Dine egne daglige målepunkter</small></div>
-      <div><span>✎</span><strong>Journal</strong><small>Det du selv skrev om dagen</small></div>
     </div>
 
     {state === "loading" && <div className="miyagi-empty-analysis"><strong>Finder den seneste analyse…</strong></div>}
@@ -240,7 +174,7 @@ export default function MiyagiWorkspace() {
         <div><strong>Analyse</strong><span>{formatDate(analysis.periodStart)} – {formatDate(analysis.periodEnd)}</span></div>
         <small>{formatTimestamp(analysis.createdAt)}</small>
       </header>
-      <AnalysisText text={analysis.analysis} />
+      <MiyagiMarkdown text={analysis.analysis} />
       {analysis.coverage && <div className="miyagi-coverage">
         <span>{analysis.coverage.healthDays} sundhedsdage</span>
         <span>{analysis.coverage.sleepDays} nætter</span>
@@ -252,14 +186,14 @@ export default function MiyagiWorkspace() {
 
     {!analysis && state === "ready" && <div className="miyagi-empty-analysis">
       <strong>Ingen analyse endnu</strong>
-      <p>Start en analyse. Du kan vælge et særligt fokus eller lade feltet stå tomt og lade Miyagi finde de mest interessante mønstre selv.</p>
+      <p>Start en analyse. Standard er kort og empatisk; du kan vælge fokus eller en anden svarstil i dialogen.</p>
     </div>}
 
     {analysis && <section className="miyagi-conversation">
       <div className="miyagi-conversation-heading"><strong>Tal med Miyagi</strong><span>Svar på hans spørgsmål, spørg ind til et fund eller giv ham kontekst han ikke kunne se i data.</span></div>
       {messages.length > 0 && <div className="miyagi-messages">{messages.map((message, index) => <article className={`miyagi-message ${message.role}`} key={message.id ?? `${message.createdAt}-${index}`}>
         <strong>{message.role === "assistant" ? "Miyagi" : "Dig"}</strong>
-        <AnalysisText text={message.body} />
+        <MiyagiMarkdown text={message.body} />
       </article>)}</div>}
       <form className="miyagi-chat-shell" onSubmit={(event) => { event.preventDefault(); void sendMessage(); }}>
         <input value={chatText} onChange={(event) => setChatText(event.target.value)} disabled={chatBusy} maxLength={4000} placeholder="Fx: Ja, i juli var vi på ferie og jeg sov et andet sted…" aria-label="Spørg Mr. Miyagi" />
@@ -279,7 +213,7 @@ export default function MiyagiWorkspace() {
 
         <label className="miyagi-focus-field">
           <span>Fokus <small>valgfrit</small></span>
-          <textarea rows={3} maxLength={1200} value={focus} onChange={(event) => setFocus(event.target.value)} placeholder="Lad feltet stå tomt for en generel analyse — eller fx: Kig især på søvn, energi og perioder med høj hvilepuls." />
+          <textarea rows={3} maxLength={1200} value={focus} onChange={(event) => setFocus(event.target.value)} placeholder="Tomt felt = generel analyse. Eller fx: Kig især på søvn, energi og perioder med høj hvilepuls." />
         </label>
 
         <fieldset className="miyagi-option-group">
@@ -303,10 +237,12 @@ export default function MiyagiWorkspace() {
         </fieldset>
 
         <div className="miyagi-analysis-dialog-actions">
-          <button className="secondary-action" type="button" onClick={() => setAnalysisDialogOpen(false)}>Annuller</button>
+          <span>Standard: <strong>Kort · Empatisk</strong></span>
           <button className="primary-action" type="button" onClick={() => void runAnalysis()}>Start analyse</button>
         </div>
       </section>
     </div>}
+
+    {historyOpen && <MiyagiHistory onClose={() => setHistoryOpen(false)} />}
   </section>;
 }
