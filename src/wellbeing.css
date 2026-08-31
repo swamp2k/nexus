@@ -228,12 +228,47 @@
   color: var(--muted);
 }
 
-.wellbeing-setting-row.inactive {
-  opacity: 0.58;
-}
-
 .wellbeing-setting-emoji {
   font-size: 1.35rem;
+}
+
+.wellbeing-hidden-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+.wellbeing-hidden-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.48);
+  backdrop-filter: blur(6px);
+}
+
+.wellbeing-hidden-dialog {
+  width: min(620px, 100%);
+  max-height: min(75vh, 720px);
+  overflow: auto;
+  padding: 20px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-soft);
+}
+
+.wellbeing-hidden-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.wellbeing-hidden-heading h3 {
+  margin: 2px 0 0;
 }
 
 .wellbeing-new-metric {
@@ -313,5 +348,15 @@
   .wellbeing-save,
   .wellbeing-journal-actions .secondary-action {
     width: 100%;
+  }
+
+  .wellbeing-hidden-overlay {
+    align-items: end;
+    padding: 12px;
+  }
+
+  .wellbeing-hidden-dialog {
+    max-height: 82vh;
+    border-radius: 16px;
   }
 }
