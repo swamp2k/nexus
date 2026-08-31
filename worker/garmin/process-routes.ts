@@ -48,7 +48,7 @@ export async function handleGarminProcessRoute(request: Request, env: Env): Prom
     if (request.method !== "GET") return json({ error: "method_not_allowed" }, { status: 405 });
     const activityId = url.searchParams.get("id") ?? "";
     if (!ACTIVITY_ID_RE.test(activityId)) return json({ error: "invalid_activity_id" }, { status: 400 });
-    const detail = await getActivityDetail(env.DB, user.id, activityId);
+    const detail = await getActivityDetail(env, user.id, activityId);
     if (!detail) return json({ error: "activity_not_found" }, { status: 404 });
     return json(detail);
   }
