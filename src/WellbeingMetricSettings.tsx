@@ -92,7 +92,7 @@ export default function WellbeingMetricSettings() {
   }
 
   return <details className="settings-card settings-collapsible">
-    <summary className="settings-card-heading"><div><p className="section-label">Velbefindende</p><h2>Daglige målepunkter</h2><p>Vælg selv hvad du vil score 1–5. Retningen fortæller Nexus om en høj score er positiv eller negativ.</p></div><span className="settings-icon" aria-hidden="true">♥</span></summary>
+    <summary className="settings-card-heading"><div><p className="section-label">Velbefindende</p><h2>Daglige målepunkter</h2></div><span className="settings-icon" aria-hidden="true">♥</span></summary>
 
     <div className="wellbeing-settings">
       {metrics.length === 0 && <div className="wellbeing-starter"><span>Ingen målepunkter endnu.</span><button className="secondary-action" type="button" disabled={busy} onClick={() => void addStarterSet()}>Opret forslag</button></div>}
