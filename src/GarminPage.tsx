@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import GarminHealthDetail from "./GarminHealthDetail";
+import type { GarminHealthMetric } from "./GarminHealthDetail";
 import GarminSleepDetail from "./GarminSleepDetail";
 
 type GarminOverview = {
@@ -7,6 +9,8 @@ type GarminOverview = {
   rhr: Record<string, unknown> | null;
   counts: { dailyCount?: number; sleepCount?: number } | null;
 };
+
+type DeepDive = "sleep" | GarminHealthMetric | null;
 
 function hours(seconds: unknown): string {
   const value = typeof seconds === "number" ? seconds : Number(seconds);
@@ -25,7 +29,7 @@ function numberValue(row: Record<string, unknown> | null, key: string): number |
 export default function GarminPage() {
   const [overview, setOverview] = useState<GarminOverview | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
-  const [deepDive, setDeepDive] = useState<"sleep" | null>(null);
+  const [deepDive, setDeepDive] = useState<DeepDive>(null);
 
   useEffect(() => {
     void fetch("/api/garmin/overview", { credentials: "same-origin", cache: "no-store" })
@@ -40,6 +44,7 @@ export default function GarminPage() {
   const daily = overview?.daily ?? null;
   const sleep = overview?.sleep ?? null;
   const latestRhr = numberValue(overview?.rhr ?? null, "resting_hr") ?? numberValue(daily, "resting_hr");
+  const dailyDate = String(daily?.date ?? "");
 
   if (state === "loading") return <section className="garmin-page"><p className="empty-state">Henter Garmin-data…</p></section>;
   if (state === "error") return <section className="garmin-page"><p className="empty-state">Garmin-data kunne ikke hentes.</p></section>;
@@ -51,25 +56,23 @@ export default function GarminPage() {
       {daily && <>
         {deepDive ? <section className="garmin-health-overview garmin-health-collapsed">
           <div className="garmin-health-heading">
-            <div><p className="section-label">Seneste data</p><h3>{String(daily.date ?? "")}</h3></div>
+            <div><p className="section-label">Seneste data</p><h3>{dailyDate}</h3></div>
             <button className="secondary-action" type="button" onClick={() => setDeepDive(null)}>Vis overblik</button>
           </div>
-          <p>Overblikket er foldet sammen, mens du graver ned i {deepDive === "sleep" ? "søvndata" : "data"}.</p>
         </section> : <section className="garmin-health-overview">
-          <div className="garmin-health-heading"><div><p className="section-label">Seneste data</p><h3>{String(daily.date ?? "")}</h3></div><span>{overview?.counts?.dailyCount ?? 0} dage</span></div>
+          <div className="garmin-health-heading"><div><p className="section-label">Seneste data</p><h3>{dailyDate}</h3></div><span>{overview?.counts?.dailyCount ?? 0} dage</span></div>
           <div className="garmin-metric-grid">
-            <article><span>Steps</span><strong>{numberValue(daily, "steps")?.toLocaleString("da-DK") ?? "—"}</strong><small>Mål {numberValue(daily, "step_goal")?.toLocaleString("da-DK") ?? "—"}</small></article>
-            <article><span>Hvilepuls</span><strong>{latestRhr === null ? "—" : `${Math.round(latestRhr)} bpm`}</strong><small>{numberValue(daily, "min_hr") ?? "—"}–{numberValue(daily, "max_hr") ?? "—"} bpm</small></article>
-            <article><span>Body Battery</span><strong>{numberValue(daily, "body_battery_latest") ?? "—"}</strong><small>{numberValue(daily, "body_battery_low") ?? "—"} → {numberValue(daily, "body_battery_high") ?? "—"}</small></article>
-            <article><span>Stress</span><strong>{numberValue(daily, "avg_stress") ?? "—"}</strong><small>Maks {numberValue(daily, "max_stress") ?? "—"}</small></article>
-            <button className="garmin-metric-card garmin-metric-action" type="button" onClick={() => setDeepDive("sleep")}>
-              <span>Søvn</span><strong>{hours(sleep?.sleep_seconds)}</strong><small>Dyb {hours(sleep?.deep_seconds)} · REM {hours(sleep?.rem_seconds)}</small><em>Se detaljer ↓</em>
-            </button>
-            <article><span>Aktive kalorier</span><strong>{numberValue(daily, "active_calories") === null ? "—" : `${Math.round(numberValue(daily, "active_calories")!)} kcal`}</strong><small>Total {Math.round(numberValue(daily, "total_calories") ?? 0)} kcal</small></article>
+            <button className="garmin-metric-card garmin-metric-action" type="button" onClick={() => setDeepDive("steps")}><span>Skridt</span><strong>{numberValue(daily, "steps")?.toLocaleString("da-DK") ?? "—"}</strong><small>Mål {numberValue(daily, "step_goal")?.toLocaleString("da-DK") ?? "—"}</small><em>Se detaljer ↓</em></button>
+            <button className="garmin-metric-card garmin-metric-action" type="button" onClick={() => setDeepDive("heart")}><span>Hvilepuls</span><strong>{latestRhr === null ? "—" : `${Math.round(latestRhr)} bpm`}</strong><small>{numberValue(daily, "min_hr") ?? "—"}–{numberValue(daily, "max_hr") ?? "—"} bpm</small><em>Se detaljer ↓</em></button>
+            <button className="garmin-metric-card garmin-metric-action" type="button" onClick={() => setDeepDive("bodyBattery")}><span>Body Battery</span><strong>{numberValue(daily, "body_battery_latest") ?? "—"}</strong><small>{numberValue(daily, "body_battery_low") ?? "—"} → {numberValue(daily, "body_battery_high") ?? "—"}</small><em>Se detaljer ↓</em></button>
+            <button className="garmin-metric-card garmin-metric-action" type="button" onClick={() => setDeepDive("stress")}><span>Stress</span><strong>{numberValue(daily, "avg_stress") ?? "—"}</strong><small>Maks {numberValue(daily, "max_stress") ?? "—"}</small><em>Se detaljer ↓</em></button>
+            <button className="garmin-metric-card garmin-metric-action" type="button" onClick={() => setDeepDive("sleep")}><span>Søvn</span><strong>{hours(sleep?.sleep_seconds)}</strong><small>Dyb {hours(sleep?.deep_seconds)} · REM {hours(sleep?.rem_seconds)}</small><em>Se detaljer ↓</em></button>
+            <button className="garmin-metric-card garmin-metric-action" type="button" onClick={() => setDeepDive("respiration")}><span>Respiration</span><strong>{numberValue(daily, "waking_respiration") === null ? "—" : `${Math.round(numberValue(daily, "waking_respiration")!)} brpm`}</strong><small>Vågen gennemsnit</small><em>Se detaljer ↓</em></button>
           </div>
         </section>}
 
         {deepDive === "sleep" && sleep?.date && <GarminSleepDetail initialDate={String(sleep.date)} onClose={() => setDeepDive(null)} />}
+        {deepDive && deepDive !== "sleep" && <GarminHealthDetail metric={deepDive} initialDate={dailyDate} onClose={() => setDeepDive(null)} />}
 
         {!deepDive && <div className="garmin-summary-grid">
           <article className="summary-card"><span className="summary-kicker">Historik</span><strong>{overview?.counts?.dailyCount ?? 0} dage</strong></article>
