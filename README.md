@@ -1,72 +1,185 @@
 # Nexus
 
-Nexus is a personal and family-facing PWA that brings together data and status from otherwise separate tools and projects into one simple place.
+Nexus is a personal and family-facing PWA that brings data, status, and small everyday tools from otherwise separate systems into one simple place.
 
-The goal is not to replace those systems. Nexus is the presentation, integration, and analysis layer above them.
+Nexus is deliberately an **aggregation, presentation, and analysis layer**. It should not absorb every existing service or project into one monolith.
 
-## Core principles
+## Principles
 
-- **Keep existing projects independent.** DBA Gold, Unraid Watch, PC Watch, Home Assistant, and future tools remain separate systems.
-- **Keep Nexus core small.** Authentication, users, permissions, navigation, PWA behaviour, notifications, module registration, and shared UI belong in core.
-- **Modules own their domain.** Garmin, weather, electricity, DBA, Unraid, PC monitoring, etc. are modules or integrations with clear boundaries.
-- **Simple enough for non-technical family members.** The UI and login flow must be understandable without technical knowledge.
-- **KISS over architecture theatre.** Prefer a modular monolith and boring infrastructure over unnecessary microservices.
-- **Data stays useful outside the source system.** Imported data should be normalized where practical so Nexus can analyse and combine it across modules.
+- **Keep existing projects independent.** DBA Gold, Unraid Watch, PC Watch, Home Assistant, and future tools remain separate unless there is a concrete reason to migrate responsibility.
+- **KISS.** Prefer a modular monolith, explicit contracts, and boring infrastructure over architecture theatre.
+- **Multi-user by default.** Personal data and settings belong to the authenticated user unless explicitly shared.
+- **Simple for ordinary family members.** Technical complexity belongs behind the UI, not in it.
+- **Normalize useful data.** Source data should become queryable Nexus data where that enables charts, history, and cross-module insights.
+- **Retain source data when valuable.** Raw imports belong in R2 when reprocessing later is useful.
+- **Modules own their domain.** Garmin, Motion, wellbeing, weather, electricity, and future integrations should stay cleanly separated.
 
-## Platform
+## Stack
 
-Phase 0 stack is intentionally conservative:
-
-- React + TypeScript
+- React 19 + TypeScript
 - Vite
 - Cloudflare Vite plugin
 - Cloudflare Worker API
-- Cloudflare static assets / SPA routing
-- D1 for structured application and normalized module data when storage is introduced
-- R2 for large/raw imports such as Garmin exports, FIT, TCX, GPX, JSON, and other blobs
-- Cron / Queues only where they solve a concrete requirement
+- Cloudflare D1 for structured/normalized data
+- Cloudflare R2 for import/source blobs
+- Cloudflare Workers Builds from GitHub
+- Leaflet + OpenStreetMap for Motion route maps
+- PWA application shell
 
-Authentication is deliberately not selected yet. It will be chosen as its own decision because the login flow must be both secure and simple enough for non-technical family members.
+Cron and Queues are added only when a concrete requirement justifies them.
 
-## MVP
+## Authentication
 
-1. PWA application shell
-2. Multi-user authentication
-3. Simple roles and module permissions
-4. Dashboard with module widgets
-5. Garmin import pipeline
-6. Garmin history and charts
-7. Weather widget/module
-8. Electricity-price widget/module
-9. Stable integration contract for existing external projects
+Nexus uses passwordless magic-link authentication.
 
-DBA Gold, Unraid Watch, PC Watch, and Home Assistant integrations come after the integration contract is proven.
+- No open signup
+- Multi-user from day one
+- Roles: `admin`, `member`, `viewer`
+- Long-lived secure session cookie
+- Mail delivery through the configured mail provider
 
-## First module: Garmin
+Authentication and authorization live in the Worker; module data is scoped to the authenticated user.
 
-Garmin is the first real data module because it exercises the important platform concerns:
+## Current modules
 
-- per-user data ownership
-- historical imports
-- raw-file retention
-- normalization
-- charts and long-term trends
-- future automated synchronization
-- cross-module analysis
+### Garmin
 
-Initial data domains may include:
+Garmin is the primary health-data source.
 
-- daily health summaries
+Nexus currently normalizes and displays data including:
+
+- daily summaries
+- sleep
+- resting heart rate
+- steps
+- stress
+- Body Battery
+- respiration
+- weight/body metrics where available
 - activities
-- heart-rate samples
-- sleep sessions
-- body metrics
-- source/import metadata
 
-Raw Garmin exports should be retained separately from normalized data so imports can be reprocessed later without requiring another export.
+Garmin synchronization is handled by the shared `nexus-garmin-agent` container. One agent can serve multiple Nexus users while keeping GarminDB state and downloaded data isolated per user.
 
-## Current status
+The agent includes capability detection so missing/disabled watch features do not cause expensive historical re-fetches. HRV, for example, can be marked unsupported, while temporarily missing signals such as wrist heart rate can become inactive and be detected again later.
 
-Phase 0 bootstrap is in progress. The repository contains the React/TypeScript shell, Cloudflare Worker entry point, SPA routing configuration, initial PWA metadata, and a minimal `/api/health` endpoint.
+### Motion
 
-See `docs/ARCHITECTURE.md` and `docs/MVP.md` for the wider plan.
+Motion is the activity/training domain. It intentionally sits beside Garmin rather than inside it so other activity sources can be added later.
+
+Current activity views include:
+
+- activity history
+- clickable activity details
+- distance, duration, moving time, calories, heart rate, elevation, steps, and related summary data
+- route maps when GPS track data exists
+- track charts
+- laps/splits where available
+
+Garmin FIT activity records contain richer time-series data such as GPS position, heart rate, distance, cadence, altitude, speed, respiration, and temperature. Nexus should consume normalized activity detail rather than make the browser depend directly on FIT files.
+
+### Wellbeing
+
+Daily subjective check-in and journal module.
+
+- user-configurable 1–5 metrics
+- sensible starter metrics
+- metrics can be hidden/reactivated
+- journal entries
+- historical entries/backfill
+
+The original user-entered journal/check-in data is ground truth. Future AI interpretation must remain separate from that source data.
+
+### Weather
+
+Weather data from MET Norway with per-user location settings, caching, and stale-data fallback.
+
+### Electricity
+
+Electricity-price module using Danish day-ahead prices plus configurable grid/provider components to estimate the actual variable household price.
+
+### Planned integrations
+
+- DBA Gold
+- Unraid Watch
+- PC Watch
+- waste calendar
+- Mitsubishi/MELCloud
+- additional cross-module insights and notifications
+
+Existing services remain authoritative for their own domains.
+
+## Kitchen display
+
+`/display/kitchen` is a separate kiosk-style view intended for a shared kitchen tablet. It has no normal app chrome and is designed for glanceable, touch-friendly, automatically refreshed household information.
+
+## Data strategy
+
+### D1
+
+Use D1 for structured data that Nexus needs to query, compare, chart, or correlate.
+
+Examples:
+
+- users and sessions
+- settings
+- normalized Garmin health data
+- activities
+- wellbeing entries
+- cached source data
+- electricity configuration/data
+- import/job metadata
+
+### R2
+
+Use R2 for larger source artifacts that are useful to retain or reprocess.
+
+Examples include Garmin import archives and other source blobs.
+
+Do not couple Nexus directly to internal databases belonging to external projects when a small API/integration contract will do.
+
+## Development
+
+```bash
+npm install
+npm run dev
+```
+
+Useful commands:
+
+```bash
+npm run check
+npm run build
+npm run types
+npm run db:migrations:list
+npm run db:migrate
+```
+
+`npm run build` runs Worker type generation, TypeScript checks, and the Vite production build.
+
+## Deployment
+
+Production is deployed as a Cloudflare Worker/PWA from the GitHub repository.
+
+Workers Builds performs the application build/deploy, but **D1 migrations are not automatically applied by deploys**. Apply new migrations explicitly:
+
+```bash
+npm run db:migrate
+```
+
+Never put credentials, API keys, Garmin passwords, encryption keys, or tokens in the repository. Use Cloudflare secrets/environment bindings.
+
+## Repository guidance for coding agents
+
+`AGENTS.md` is the canonical repository guidance for Codex and all other coding agents.
+
+`CLAUDE.md` and `GEMINI.md` intentionally contain only redirects to `AGENTS.md` so project instructions do not drift between tools.
+
+## Documentation
+
+- `AGENTS.md` — canonical coding-agent/project guidance
+- `docs/ARCHITECTURE.md` — architecture and boundaries
+- `docs/MVP.md` — product scope/direction
+- `docs/AUTH.md` — authentication design
+- `docs/GARMIN-AGENT-UNRAID.md` — Garmin agent deployment/operations
+
+Documentation should describe the system that actually exists. When implementation changes invalidate a documented fact, update the relevant documentation in the same workstream.
