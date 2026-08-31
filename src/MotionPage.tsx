@@ -46,12 +46,7 @@ export default function MotionPage() {
   const activities = overview?.activities ?? [];
 
   return (
-    <section className="motion-page" aria-labelledby="motion-heading">
-      <div className="module-page-hero motion-page-hero">
-        <div className="module-page-icon tone-teal">↗</div>
-        <div><p className="section-label">Træning</p><h2 id="motion-heading">Motion</h2><p>Aktiviteter og træningshistorik samlet ét sted.</p></div>
-      </div>
-
+    <section className="motion-page" aria-label="Motion">
       <section className="motion-overview">
         <div className="motion-heading">
           <div><p className="section-label">Aktiviteter</p><h3>{overview?.counts?.activityCount ?? activities.length} registreret</h3></div>
