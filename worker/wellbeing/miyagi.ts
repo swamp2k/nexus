@@ -272,12 +272,7 @@ async function anthropicMessage(
       "x-api-key": config.key,
       "anthropic-version": "2023-06-01",
     },
-    body: JSON.stringify({
-      model: config.model,
-      max_tokens: maxTokens,
-      system,
-      messages,
-    }),
+    body: JSON.stringify({ model: config.model, max_tokens: maxTokens, system, messages }),
   });
 
   if (!response.ok) {
@@ -327,7 +322,7 @@ En kort syntese af hvad datasættet samlet set ser ud til at fortælle.
 Krydsreferér signalerne. Fremhæv særligt før/efter-forløb og perioder hvor flere signaler flytter sig sammen.
 
 ## Det mangler jeg at vide
-Kun når det er nyttigt: 1-3 konkrete spørgsmål til brugeren, der kan forklare eller afkræfte interessante perioder. Spørg fx om ændret rutine, rejse, sygdom, belastning, ferie eller om uret ikke blev båret — men kun hvis datasættet giver en konkret grund til spørgsmålet.
+Kun når det er nyttigt: 1-3 konkrete spørgsmål til brugeren, der kan forklare eller afkræfte interessante perioder.
 
 ## Datagrundlag
 Meget kort. Kun dækning og væsentlige huller; ingen lang datarapport.`;
@@ -374,13 +369,14 @@ async function latestAnalysis(request: Request, env: MiyagiEnv): Promise<Respons
 
   const analysis = await env.DB.prepare(
     `SELECT id, period_days AS periodDays, period_start AS periodStart, period_end AS periodEnd,
-            model, context_hash AS contextHash, analysis, created_at AS createdAt
+            model, context_hash AS contextHash, analysis, created_at AS createdAt,
+            focus, response_length AS responseLength, tone
      FROM miyagi_analyses WHERE user_id = ? ORDER BY created_at DESC LIMIT 1`,
   ).bind(user.id).first<DataRow>();
   if (!analysis) return json({ analysis: null, messages: [] });
 
   const messages = await env.DB.prepare(
-    `SELECT role, body, created_at AS createdAt
+    `SELECT id, role, body, created_at AS createdAt
      FROM miyagi_messages WHERE analysis_id = ? AND user_id = ?
      ORDER BY created_at LIMIT 50`,
   ).bind(String(analysis.id), user.id).all<ChatMessage>();
@@ -400,7 +396,7 @@ async function createAnalysis(request: Request, env: MiyagiEnv): Promise<Respons
   const requested = Number(body.days ?? 90);
   const days = Math.max(30, Math.min(180, Number.isFinite(requested) ? Math.floor(requested) : 90));
   const focus = typeof body.focus === "string" ? body.focus.trim().slice(0, 1200) : "";
-  const length: AnalysisLength = body.length === "short" || body.length === "deep" ? body.length : "normal";
+  const length: AnalysisLength = body.length === "normal" || body.length === "deep" ? body.length : "short";
   const tone: AnalysisTone = body.tone === "objective" || body.tone === "miyagi" ? body.tone : "empathetic";
 
   const context = await buildContext(env.DB, user.id, days);
@@ -423,11 +419,13 @@ async function createAnalysis(request: Request, env: MiyagiEnv): Promise<Respons
   const now = new Date().toISOString();
   await env.DB.prepare(
     `INSERT INTO miyagi_analyses
-       (id, user_id, period_days, period_start, period_end, model, context_json, context_hash, analysis, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       (id, user_id, period_days, period_start, period_end, model, context_json,
+        context_hash, analysis, created_at, focus, response_length, tone)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).bind(
     id, user.id, days, context.period.start, context.period.end,
     config.model, contextJson, contextHash, analysisText, now,
+    focus || null, length, tone,
   ).run();
 
   return json({
@@ -440,6 +438,9 @@ async function createAnalysis(request: Request, env: MiyagiEnv): Promise<Respons
       contextHash,
       analysis: analysisText,
       createdAt: now,
+      focus: focus || null,
+      responseLength: length,
+      tone,
       coverage: context.coverage,
     },
     messages: [],
