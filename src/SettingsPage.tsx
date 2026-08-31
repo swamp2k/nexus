@@ -129,11 +129,11 @@ export default function SettingsPage() {
 
   return (
     <section className="settings-page" aria-labelledby="settings-heading">
-      <article className="settings-card">
-        <div className="settings-card-heading">
+      <details className="settings-card settings-collapsible">
+        <summary className="settings-card-heading">
           <div><p className="section-label">Personligt</p><h2 id="settings-heading">Lokation</h2><p>Bruges til vejrudsigt og andre lokale Nexus-kilder. Indstillingen gemmes kun for din bruger.</p></div>
           <span className="settings-icon" aria-hidden="true">⌖</span>
-        </div>
+        </summary>
         {loading ? <p className="settings-loading">Henter indstillinger…</p> : (
           <div className="settings-form">
             <label><span>Navn på stedet</span><input value={label} onChange={(event) => { setLabel(event.target.value); changed(); }} placeholder="Hjem" maxLength={80} /></label>
@@ -142,10 +142,10 @@ export default function SettingsPage() {
             {locateState === "error" && <p className="settings-feedback error">Placeringen kunne ikke læses fra browseren.</p>}
           </div>
         )}
-      </article>
+      </details>
 
-      <article className="settings-card">
-        <div className="settings-card-heading"><div><p className="section-label">Strøm</p><h2>Elpris</h2><p>Nexus kombinerer spotpris med dit netselskabs aktuelle tarif, Energinet, elafgift, moms og dit elselskabs kWh-tillæg.</p></div><span className="settings-icon" aria-hidden="true">ϟ</span></div>
+      <details className="settings-card settings-collapsible">
+        <summary className="settings-card-heading"><div><p className="section-label">Strøm</p><h2>Elpris</h2><p>Nexus kombinerer spotpris med dit netselskabs aktuelle tarif, Energinet, elafgift, moms og dit elselskabs kWh-tillæg.</p></div><span className="settings-icon" aria-hidden="true">ϟ</span></summary>
         {loading ? <p className="settings-loading">Henter indstillinger…</p> : (
           <div className="settings-form">
             <div className="settings-choice-grid" role="radiogroup" aria-label="Elprisområde">
@@ -162,10 +162,14 @@ export default function SettingsPage() {
             <p className="settings-help">Farvegrænserne bruges på elprissøjlerne på både Strøm-siden og køkkendisplayet. Faste abonnementer fordeles ikke ind i timeprisen.</p>
           </div>
         )}
-      </article>
+      </details>
 
       <WellbeingMetricSettings />
-      <GarminImportSettings />
+
+      <details className="settings-card settings-collapsible settings-component-wrapper">
+        <summary className="settings-card-heading"><div><p className="section-label">Datakilde</p><h2>Garmin</h2><p>Automatisk GarminDB-synkronisering, agent-status og manuel fallback-import.</p></div><span className="settings-icon" aria-hidden="true">⌖</span></summary>
+        <GarminImportSettings />
+      </details>
 
       {!loading && <div className="settings-save-bar"><div>{saveState === "saved" && <p className="settings-feedback success">Indstillingerne er gemt.</p>}{saveState === "error" && <p className="settings-feedback error">Indstillingerne kunne ikke gemmes: {saveError ?? "ukendt fejl"}.</p>}</div><button className="primary-action" type="button" onClick={() => void save()} disabled={saveState === "saving" || !latitude || !longitude}>{saveState === "saving" ? "Gemmer…" : "Gem indstillinger"}</button></div>}
     </section>
