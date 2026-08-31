@@ -17,6 +17,7 @@ Optional:
 
 from __future__ import annotations
 
+import datetime
 import hashlib
 import json
 import os
@@ -36,10 +37,11 @@ DATA_ROOT = Path(os.path.expanduser(os.environ.get("NEXUS_GARMIN_DATA_ROOT", "/d
 GARMIN_CLI = os.environ.get("NEXUS_GARMIN_CLI", "garmindb_cli.py")
 POLL_SECONDS = max(5, int(os.environ.get("NEXUS_GARMIN_POLL_SECONDS", "15")))
 HEARTBEAT_SECONDS = 30
+HRV_CAPABILITY_FILE = ".nexus-garmin-capabilities.json"
 
 
 def request(path: str, *, method: str = "GET", data: bytes | None = None, content_type: str | None = None):
-    headers = {"Authorization": f"Bearer {TOKEN}", "User-Agent": "Nexus-Garmin-Agent/0.6"}
+    headers = {"Authorization": f"Bearer {TOKEN}", "User-Agent": "Nexus-Garmin-Agent/0.7"}
     if content_type:
         headers["Content-Type"] = content_type
     req = urllib.request.Request(f"{NEXUS_URL}{path}", data=data, headers=headers, method=method)
@@ -92,7 +94,128 @@ def user_paths(user_id: str) -> tuple[Path, Path, Path]:
     return home, config_dir, data_dir
 
 
-def write_config(config_dir: Path, data_dir: Path, username: str, password: str) -> Path:
+def write_json_atomic(path: Path, value: object) -> None:
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    temporary.write_text(json.dumps(value, indent=2), encoding="utf-8")
+    os.chmod(temporary, 0o600)
+    temporary.replace(path)
+
+
+def existing_hrv_capability(data_dir: Path) -> bool | None:
+    """Infer HRV support from already-downloaded HRV JSON without any network calls."""
+    files = sorted((data_dir / "RHR").glob("hrv_*.json")) if (data_dir / "RHR").is_dir() else []
+    if not files:
+        return None
+
+    checked = 0
+    for file_path in files:
+        try:
+            value = json.loads(file_path.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        checked += 1
+        if isinstance(value, dict) and value.get("hrvSummary"):
+            return True
+
+    # Do not classify a device from a single possibly-empty day. Three or more
+    # valid empty responses are enough evidence that Garmin is not exposing HRV
+    # Status for this account/device combination.
+    if checked >= 3:
+        return False
+    return None
+
+
+def load_hrv_capability(home: Path, data_dir: Path) -> bool | None:
+    capability_path = home / HRV_CAPABILITY_FILE
+    if capability_path.exists():
+        try:
+            value = json.loads(capability_path.read_text(encoding="utf-8"))
+            supported = value.get("hrv_supported")
+            if isinstance(supported, bool):
+                print(f"[nexus] HRV capability cached: {'supported' if supported else 'not supported'}", flush=True)
+                return supported
+        except Exception as error:
+            print(f"[nexus] Warning: invalid HRV capability cache: {error}", file=sys.stderr, flush=True)
+
+    supported = existing_hrv_capability(data_dir)
+    if supported is not None:
+        write_json_atomic(capability_path, {
+            "hrv_supported": supported,
+            "detected_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            "source": "existing-files",
+        })
+        print(
+            f"[nexus] HRV capability detected from existing files: {'supported' if supported else 'not supported'}",
+            flush=True,
+        )
+    return supported
+
+
+def recent_sleep_dates(data_dir: Path, limit: int = 7) -> list[str]:
+    sleep_dir = data_dir / "Sleep"
+    if not sleep_dir.is_dir():
+        return []
+    dates: list[str] = []
+    for path in sorted(sleep_dir.glob("sleep_????-??-??.json"), reverse=True):
+        date = path.stem.removeprefix("sleep_")
+        try:
+            value = json.loads(path.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        if isinstance(value, dict) and value.get("dailySleepDTO"):
+            dates.append(date)
+        if len(dates) >= limit:
+            break
+    return dates
+
+
+def probe_hrv_capability(home: Path, config_dir: Path, data_dir: Path) -> bool | None:
+    """Probe a few known sleep dates after a normal sync and persist the result."""
+    dates = recent_sleep_dates(data_dir)
+    if not dates:
+        print("[nexus] HRV preflight deferred: no recent sleep dates available", flush=True)
+        return None
+
+    try:
+        from garmindb import GarminConnectConfigManager
+        from garmindb.garmin_connect_auth_adapter import GarminConnectAuthAdapter
+
+        config = GarminConnectConfigManager(str(config_dir))
+        garmin = GarminConnectAuthAdapter(config)
+        garmin.login()
+
+        saw_response = False
+        for date in dates:
+            value = garmin.connectapi(f"/hrv-service/hrv/{date}")
+            if not isinstance(value, dict):
+                continue
+            saw_response = True
+            if value.get("hrvSummary"):
+                supported = True
+                break
+        else:
+            supported = False if saw_response else None
+
+        if supported is not None:
+            write_json_atomic(home / HRV_CAPABILITY_FILE, {
+                "hrv_supported": supported,
+                "detected_at": datetime.datetime.now(datetime.timezone.utc).isoformat(),
+                "source": "preflight",
+                "sample_dates": dates,
+            })
+            print(
+                f"[nexus] HRV preflight: {'supported' if supported else 'not supported'} "
+                f"({len(dates)} recent sleep dates checked)",
+                flush=True,
+            )
+        return supported
+    except Exception as error:
+        # Capability detection must never make an otherwise healthy Garmin sync fail.
+        print(f"[nexus] HRV preflight failed; leaving HRV disabled for now: {error}", file=sys.stderr, flush=True)
+        return None
+
+
+def write_config(config_dir: Path, data_dir: Path, username: str, password: str, *, hrv_enabled: bool) -> Path:
     config = {
         "db": {"type": "sqlite"},
         "garmin": {"domain": "garmin.com"},
@@ -122,7 +245,7 @@ def write_config(config_dir: Path, data_dir: Path, username: str, password: str)
             "itime": True,
             "sleep": True,
             "rhr": True,
-            "hrv": True,
+            "hrv": hrv_enabled,
             "weight": True,
             "activities": True,
         },
@@ -136,10 +259,7 @@ def write_config(config_dir: Path, data_dir: Path, username: str, password: str)
         "checkup": {"look_back_days": 90},
     }
     config_path = config_dir / "GarminConnectConfig.json"
-    temporary = config_path.with_suffix(".json.tmp")
-    temporary.write_text(json.dumps(config, indent=2), encoding="utf-8")
-    os.chmod(temporary, 0o600)
-    temporary.replace(config_path)
+    write_json_atomic(config_path, config)
     return config_path
 
 
@@ -148,10 +268,7 @@ def scrub_password(config_path: Path) -> None:
         config = json.loads(config_path.read_text(encoding="utf-8"))
         credentials = config.setdefault("credentials", {})
         credentials["password"] = ""
-        temporary = config_path.with_suffix(".json.tmp")
-        temporary.write_text(json.dumps(config, indent=2), encoding="utf-8")
-        os.chmod(temporary, 0o600)
-        temporary.replace(config_path)
+        write_json_atomic(config_path, config)
     except Exception as error:
         print(f"[nexus] Warning: could not scrub local Garmin password: {error}", file=sys.stderr, flush=True)
 
@@ -216,10 +333,7 @@ def load_or_create_snapshot(snapshot_path: Path, data_dir: Path) -> dict[str, st
             print(f"[nexus] Warning: invalid sync snapshot, rebuilding it: {error}", file=sys.stderr, flush=True)
 
     snapshot = snapshot_supported_files(data_dir)
-    temporary = snapshot_path.with_suffix(".json.tmp")
-    temporary.write_text(json.dumps(snapshot, separators=(",", ":")), encoding="utf-8")
-    os.chmod(temporary, 0o600)
-    temporary.replace(snapshot_path)
+    write_json_atomic(snapshot_path, snapshot)
     print(f"[nexus] Captured pre-sync snapshot of {len(snapshot)} Nexus-relevant files", flush=True)
     return snapshot
 
@@ -317,11 +431,31 @@ def process_job(job_id: str, user_id: str, job_status: str) -> None:
         home, config_dir, data_dir = user_paths(user_id)
         snapshot_path = home / ".nexus-garmin-pre-sync.json"
         before = load_or_create_snapshot(snapshot_path, data_dir)
-        config_path = write_config(config_dir, data_dir, username, password)
-        print(f"[nexus] Syncing isolated Garmin profile {user_id[:8]}…", flush=True)
+
+        hrv_supported = load_hrv_capability(home, data_dir)
+        config_path = write_config(
+            config_dir,
+            data_dir,
+            username,
+            password,
+            hrv_enabled=hrv_supported is True,
+        )
+        print(
+            f"[nexus] Syncing isolated Garmin profile {user_id[:8]} · "
+            f"HRV {'enabled' if hrv_supported is True else 'disabled'}",
+            flush=True,
+        )
 
         report_progress(job_id, "Henter data fra Garmin")
         run_garmindb(home, job_id)
+
+        # Unknown capability is deliberately treated as disabled for this run.
+        # Probe only after a successful ordinary sync, using dates where sleep
+        # data proves the watch was actually worn. If HRV is supported it will
+        # be enabled automatically on the next sync.
+        if hrv_supported is None:
+            probe_hrv_capability(home, config_dir, data_dir)
+
         scrub_password(config_path)
 
         report_progress(job_id, "Pakker ændrede Garmin-data")
