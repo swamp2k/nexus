@@ -58,39 +58,59 @@ function fmt(value: number | null, unit = "", digits = 0): string {
   return value === null ? "—" : `${value.toLocaleString("da-DK", { maximumFractionDigits: digits, minimumFractionDigits: digits })}${unit}`;
 }
 
-function SparkChart({ rows, primary, secondary, min = 0, max }: {
+function stressClass(value: number): string {
+  if (value <= 25) return "health-bar-stress-rest";
+  if (value <= 50) return "health-bar-stress-low";
+  if (value <= 75) return "health-bar-stress-medium";
+  return "health-bar-stress-high";
+}
+
+function BarChart({ rows, primary, secondary, min = 0, max, stress = false, goalReached }: {
   rows: HealthRow[];
   primary: (row: HealthRow) => number | null;
   secondary?: (row: HealthRow) => number | null;
   min?: number;
   max?: number;
+  stress?: boolean;
+  goalReached?: (row: HealthRow) => boolean;
 }) {
   const width = 900;
   const height = 260;
-  const pad = 24;
-  const p = rows.map(primary);
-  const s = secondary ? rows.map(secondary) : [];
-  const values = [...p, ...s].filter((value): value is number => value !== null && Number.isFinite(value));
+  const padX = 28;
+  const padY = 24;
+  const primaryValues = rows.map(primary);
+  const secondaryValues = secondary ? rows.map(secondary) : [];
+  const values = [...primaryValues, ...secondaryValues].filter((value): value is number => value !== null && Number.isFinite(value));
   const top = max ?? Math.max(min + 1, ...values, 1);
-  const y = (value: number) => height - pad - ((value - min) / Math.max(1, top - min)) * (height - pad * 2);
-  const x = (index: number) => pad + (index / Math.max(1, rows.length - 1)) * (width - pad * 2);
-  const path = (series: Array<number | null>) => series.map((value, index) => value === null ? null : `${index === 0 || series.slice(0, index).every((v) => v === null) ? "M" : "L"}${x(index)},${y(value)}`).filter(Boolean).join(" ");
+  const plotHeight = height - padY * 2;
+  const plotWidth = width - padX * 2;
+  const slot = plotWidth / Math.max(1, rows.length);
+  const grouped = Boolean(secondary);
+  const barWidth = Math.max(2, Math.min(grouped ? 12 : 20, slot * (grouped ? 0.32 : 0.62)));
+  const y = (value: number) => padY + (1 - (value - min) / Math.max(1, top - min)) * plotHeight;
+  const baseline = y(min);
+  const x = (index: number) => padX + index * slot + slot / 2;
 
-  return <div className="health-chart-wrap">
-    <svg className="health-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Historikgraf">
-      {[0, .25, .5, .75, 1].map((step) => <line key={step} x1={pad} x2={width - pad} y1={pad + step * (height - pad * 2)} y2={pad + step * (height - pad * 2)} className="health-grid-line" />)}
-      <path d={path(p)} className="health-line health-line-primary" />
-      {secondary && <path d={path(s)} className="health-line health-line-secondary" />}
+  return <div className="health-chart-wrap health-bar-chart-wrap">
+    <svg className="health-chart health-bar-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Historik som søjlediagram">
+      {[0, .25, .5, .75, 1].map((step) => <line key={step} x1={padX} x2={width - padX} y1={padY + step * plotHeight} y2={padY + step * plotHeight} className="health-grid-line" />)}
       {rows.map((row, index) => {
-        const value = p[index];
-        return value === null ? null : <circle key={`${row.date}-p`} cx={x(index)} cy={y(value)} r="4" className="health-dot health-dot-primary" />;
+        const value = primaryValues[index];
+        if (value === null) return null;
+        const cx = x(index) - (grouped ? barWidth * 0.58 : barWidth / 2);
+        const topY = y(value);
+        const cls = stress ? stressClass(value) : goalReached?.(row) ? "health-bar-goal" : "health-bar-primary";
+        return <rect key={`${row.date}-p`} x={cx} y={topY} width={barWidth} height={Math.max(2, baseline - topY)} rx="3" className={`health-bar ${cls}`}><title>{`${shortDate(row.date)}: ${Math.round(value)}`}</title></rect>;
       })}
       {secondary && rows.map((row, index) => {
-        const value = s[index];
-        return value === null ? null : <circle key={`${row.date}-s`} cx={x(index)} cy={y(value)} r="4" className="health-dot health-dot-secondary" />;
+        const value = secondaryValues[index];
+        if (value === null) return null;
+        const cx = x(index) + barWidth * 0.08;
+        const topY = y(value);
+        return <rect key={`${row.date}-s`} x={cx} y={topY} width={barWidth} height={Math.max(2, baseline - topY)} rx="3" className="health-bar health-bar-secondary"><title>{`${shortDate(row.date)}: ${Math.round(value)}`}</title></rect>;
       })}
     </svg>
-    <div className="health-chart-labels">{rows.map((row, index) => <span key={row.date} style={{ left: `${(index / Math.max(1, rows.length - 1)) * 100}%` }}>{rows.length > 40 ? (index % Math.ceil(rows.length / 10) === 0 ? shortDate(row.date) : "") : shortDate(row.date)}</span>)}</div>
+    <div className="health-chart-labels">{rows.map((row, index) => <span key={row.date} style={{ left: `${((index + .5) / Math.max(1, rows.length)) * 100}%` }}>{rows.length > 40 ? (index % Math.ceil(rows.length / 10) === 0 ? shortDate(row.date) : "") : shortDate(row.date)}</span>)}</div>
   </div>;
 }
 
@@ -113,7 +133,7 @@ function MetricContent({ metric, selected, history, range }: { metric: MetricKey
         <Stat value={range === "1d" ? fmt((selected.distance_m ?? 0) / 1000, " km", 2) : fmt(distance, " km", 1)} label={range === "1d" ? "Distance" : "Total distance"} />
         {range !== "1d" && <Stat value={fmt(totalSteps)} label="Skridt i perioden" />}
       </div>
-      {range !== "1d" && <SparkChart rows={history} primary={(row) => row.steps} secondary={(row) => row.step_goal} />}
+      {range !== "1d" && <BarChart rows={history} primary={(row) => row.steps} secondary={(row) => row.step_goal} goalReached={(row) => row.steps !== null && row.step_goal !== null && row.steps >= row.step_goal} />}
     </>;
   }
 
@@ -124,7 +144,7 @@ function MetricContent({ metric, selected, history, range }: { metric: MetricKey
         <Stat value={fmt(range === "1d" ? selected.max_hr : mean(ranged, "max_hr"), " bpm")} label={range === "1d" ? "Højeste" : "Gns. dagshøj"} />
         {range === "1d" && <Stat value={fmt(selected.min_hr, " bpm")} label="Laveste" />}
       </div>
-      {range !== "1d" && <SparkChart rows={history} primary={(row) => row.resting_hr} secondary={(row) => row.max_hr} />}
+      {range !== "1d" && <BarChart rows={history} primary={(row) => row.resting_hr} secondary={(row) => row.max_hr} />}
     </>;
   }
 
@@ -136,7 +156,7 @@ function MetricContent({ metric, selected, history, range }: { metric: MetricKey
         <Stat value={fmt(avg)} label={range === "1d" ? "Stressniveau" : "Gns. stress"} />
         <Stat value={fmt(maxStress)} label={range === "1d" ? "Maks" : "Gns. daglig maks"} />
       </div>
-      {range !== "1d" && <SparkChart rows={history} primary={(row) => row.avg_stress} max={100} />}
+      {range !== "1d" && <><BarChart rows={history} primary={(row) => row.avg_stress} max={100} stress /><div className="health-stress-legend"><span className="health-bar-stress-rest">0–25 Hvile</span><span className="health-bar-stress-low">26–50 Lav</span><span className="health-bar-stress-medium">51–75 Medium</span><span className="health-bar-stress-high">76–100 Høj</span></div></>}
     </>;
   }
 
@@ -151,7 +171,7 @@ function MetricContent({ metric, selected, history, range }: { metric: MetricKey
         <Stat value={fmt(span)} label={range === "1d" ? "Spænd" : "Gns. spænd"} />
         {range === "1d" && <Stat value={fmt(selected.body_battery_latest)} label="Seneste" />}
       </div>
-      {range !== "1d" && <SparkChart rows={history} primary={(row) => row.body_battery_high} secondary={(row) => row.body_battery_low} max={100} />}
+      {range !== "1d" && <BarChart rows={history} primary={(row) => row.body_battery_high} secondary={(row) => row.body_battery_low} max={100} />}
     </>;
   }
 
@@ -160,7 +180,7 @@ function MetricContent({ metric, selected, history, range }: { metric: MetricKey
       <Stat value={fmt(range === "1d" ? selected.waking_respiration : mean(ranged, "waking_respiration"), " brpm")} label={range === "1d" ? "Vågen" : "Gns. vågen"} />
       <Stat value={fmt(range === "1d" ? selected.sleeping_respiration : mean(ranged, "sleeping_respiration"), " brpm")} label={range === "1d" ? "Søvn" : "Gns. søvn"} />
     </div>
-    {range !== "1d" && <SparkChart rows={history} primary={(row) => row.sleeping_respiration} secondary={(row) => row.waking_respiration} min={6} max={24} />}
+    {range !== "1d" && <BarChart rows={history} primary={(row) => row.sleeping_respiration} secondary={(row) => row.waking_respiration} min={6} max={24} />}
   </>;
 }
 
