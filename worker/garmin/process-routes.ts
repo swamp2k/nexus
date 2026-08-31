@@ -1,10 +1,12 @@
 import { getAuthenticatedUser } from "../auth/session";
+import { getActivityDetail } from "./activity-detail";
 import { getGarminOverview, processGarminDbBatch } from "./garmindb-import";
 import { getHealthDetail } from "./health-detail";
 import { getSleepDetail } from "./sleep-detail";
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{12}$/i;
 const DATE_RE = /^20\d{2}-\d{2}-\d{2}$/;
+const ACTIVITY_ID_RE = /^[A-Za-z0-9_-]{1,80}$/;
 
 function json(body: unknown, init: ResponseInit = {}): Response {
   const headers = new Headers(init.headers);
@@ -15,7 +17,11 @@ function json(body: unknown, init: ResponseInit = {}): Response {
 export async function handleGarminProcessRoute(request: Request, env: Env): Promise<Response | null> {
   const url = new URL(request.url);
   const pathname = url.pathname;
-  if (pathname !== "/api/garmin/imports/process" && pathname !== "/api/garmin/overview" && pathname !== "/api/garmin/sleep" && pathname !== "/api/garmin/health") return null;
+  if (pathname !== "/api/garmin/imports/process"
+    && pathname !== "/api/garmin/overview"
+    && pathname !== "/api/garmin/activity"
+    && pathname !== "/api/garmin/sleep"
+    && pathname !== "/api/garmin/health") return null;
 
   const user = await getAuthenticatedUser(request, env.DB);
   if (!user) return json({ error: "unauthorized" }, { status: 401 });
@@ -29,6 +35,15 @@ export async function handleGarminProcessRoute(request: Request, env: Env): Prom
       if (message.includes("no such table")) return json({ daily: null, sleep: null, rhr: null, activities: [], counts: null });
       throw error;
     }
+  }
+
+  if (pathname === "/api/garmin/activity") {
+    if (request.method !== "GET") return json({ error: "method_not_allowed" }, { status: 405 });
+    const activityId = url.searchParams.get("id") ?? "";
+    if (!ACTIVITY_ID_RE.test(activityId)) return json({ error: "invalid_activity_id" }, { status: 400 });
+    const detail = await getActivityDetail(env.DB, user.id, activityId);
+    if (!detail) return json({ error: "activity_not_found" }, { status: 404 });
+    return json(detail);
   }
 
   if (pathname === "/api/garmin/sleep") {
