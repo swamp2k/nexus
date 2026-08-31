@@ -1,11 +1,16 @@
 import { useEffect, useMemo, useState } from "react";
+import MotionRouteMap from "./MotionRouteMap";
+import MotionTrackChart from "./MotionTrackChart";
 
 type Activity = Record<string, unknown>;
+type TrackPoint = Record<string, unknown>;
+type Lap = Record<string, unknown>;
 type ActivityDetailResponse = {
   activity: Activity;
   previous: Activity[];
-  track: unknown;
-  laps: unknown[];
+  track: TrackPoint[];
+  laps: Lap[];
+  sourceRecords?: number;
   trackAvailable: boolean;
 };
 
@@ -40,6 +45,14 @@ function pace(distanceM: unknown, seconds: unknown): string | null {
   return `${minutes}:${String(secs).padStart(2, "0")}/km`;
 }
 
+function garminTimeToSeconds(value: unknown): number | null {
+  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  if (typeof value !== "string") return null;
+  const match = value.match(/^(?:(\d+) day[s]?, )?(\d+):(\d+):(\d+(?:\.\d+)?)$/);
+  if (!match) return null;
+  return Number(match[1] ?? 0) * 86400 + Number(match[2]) * 3600 + Number(match[3]) * 60 + Number(match[4]);
+}
+
 function Stat({ value, label }: { value: string; label: string }) {
   return <div className="motion-detail-stat"><strong>{value}</strong><span>{label}</span></div>;
 }
@@ -64,13 +77,14 @@ export default function MotionActivityDetail({ activityId, onBack }: { activityI
   const totalPace = pace(activity?.distance_m, activity?.duration_seconds);
   const movingPace = pace(activity?.distance_m, activity?.moving_seconds);
   const previous = data?.previous ?? [];
+  const track = data?.track ?? [];
+  const laps = data?.laps ?? [];
 
   const comparison = useMemo(() => {
     if (!activity || previous.length === 0) return null;
-    const currentPace = pace(activity.distance_m, activity.moving_seconds ?? activity.duration_seconds);
     const currentDistance = num(activity.distance_m);
     const currentSeconds = num(activity.moving_seconds ?? activity.duration_seconds);
-    if (!currentPace || currentDistance === null || currentSeconds === null || currentDistance <= 0) return null;
+    if (currentDistance === null || currentSeconds === null || currentDistance <= 0) return null;
     const previousPaces = previous.map((row) => {
       const d = num(row.distance_m);
       const s = num(row.moving_seconds ?? row.duration_seconds);
@@ -117,11 +131,9 @@ export default function MotionActivityDetail({ activityId, onBack }: { activityI
       </section>
 
       <section className="motion-detail-grid">
-        <article className="motion-detail-panel motion-map-placeholder">
-          <div><p className="section-label">Rute</p><h3>GPS-spor</h3></div>
-          {data?.trackAvailable
-            ? <p>GPS-sporet er klar til kortvisning.</p>
-            : <p>Vi har bekræftet GPS-koordinater i Garmin FIT-data. Nexus-agenten skal bare normalisere sporet, før kortet kan tegnes her.</p>}
+        <article className="motion-detail-panel motion-route-panel">
+          <div className="motion-panel-heading"><div><p className="section-label">Rute</p><h3>GPS-spor</h3></div>{data?.sourceRecords ? <span>{data.sourceRecords.toLocaleString("da-DK")} datapunkter</span> : null}</div>
+          {data?.trackAvailable ? <MotionRouteMap track={track} /> : <p className="empty-state">Denne aktivitet har endnu ikke et GPS-spor i Nexus. Kør en ny Garmin-sync for at importere activity detail-data.</p>}
         </article>
 
         <article className="motion-detail-panel">
@@ -130,6 +142,30 @@ export default function MotionActivityDetail({ activityId, onBack }: { activityI
           <p>{comparison ?? "Når der er nok sammenlignelige ture, viser Nexus tempo- og performanceforskelle her."}</p>
         </article>
       </section>
+
+      {track.length > 1 && <section className="motion-track-charts" aria-label="Grafer for aktiviteten">
+        <MotionTrackChart track={track} metric="hr" />
+        <MotionTrackChart track={track} metric="speed" />
+        <MotionTrackChart track={track} metric="altitude" />
+      </section>}
+
+      {laps.length > 0 && <section className="motion-detail-panel motion-laps">
+        <div className="motion-panel-heading"><div><p className="section-label">Laps</p><h3>Segmenter</h3></div><span>{laps.length}</span></div>
+        <div className="motion-lap-list">
+          {laps.map((lap, index) => {
+            const lapDistance = num(lap.distance);
+            const movingSeconds = garminTimeToSeconds(lap.moving_time) ?? garminTimeToSeconds(lap.elapsed_time);
+            const lapPace = pace(lapDistance === null ? null : lapDistance * 1000, movingSeconds);
+            return <div className="motion-lap-row" key={String(lap.lap ?? index)}>
+              <strong>{index + 1}</strong>
+              <span>{lapDistance !== null ? `${lapDistance.toFixed(2)} km` : "—"}</span>
+              <span>{movingSeconds !== null ? formatDuration(movingSeconds) : "—"}</span>
+              <span>{lapPace ?? "—"}</span>
+              <span>{num(lap.avg_hr) !== null ? `${Math.round(num(lap.avg_hr)!)} bpm` : "—"}</span>
+            </div>;
+          })}
+        </div>
+      </section>}
     </section>
   );
 }
