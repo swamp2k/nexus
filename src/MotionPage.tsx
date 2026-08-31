@@ -33,7 +33,7 @@ export default function MotionPage() {
   const [selectedActivityId, setSelectedActivityId] = useState<string | null>(null);
 
   useEffect(() => {
-    void fetch("/api/garmin/overview", { credentials: "same-origin", cache: "no-store" })
+    void fetch("/api/garmin/activities?limit=100", { credentials: "same-origin", cache: "no-store" })
       .then(async (response) => {
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         return response.json() as Promise<MotionOverview>;
