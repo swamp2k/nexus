@@ -5,7 +5,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     TZ=Europe/Copenhagen \
     NEXUS_GARMIN_STATE_ROOT=/state/users \
     NEXUS_GARMIN_DATA_ROOT=/data/users \
-    NEXUS_GARMIN_CLI=/usr/local/bin/garmindb_cli.py \
+    NEXUS_GARMIN_CLI=/usr/local/bin/nexus-garmindb \
     NEXUS_GARMIN_POLL_SECONDS=15
 
 RUN apt-get update \
@@ -17,8 +17,10 @@ RUN apt-get update \
 RUN mkdir -p /state/users /data/users /opt/nexus
 
 COPY tools/nexus-garmin-agent.py /opt/nexus/nexus-garmin-agent.py
+COPY tools/export-activity-details.py /opt/nexus/export-activity-details.py
+COPY docker/garmin-agent/garmindb-wrapper.sh /usr/local/bin/nexus-garmindb
 COPY docker/garmin-agent/entrypoint.sh /usr/local/bin/nexus-garmin-entrypoint
-RUN chmod +x /usr/local/bin/nexus-garmin-entrypoint /opt/nexus/nexus-garmin-agent.py
+RUN chmod +x /usr/local/bin/nexus-garmin-entrypoint /usr/local/bin/nexus-garmindb /opt/nexus/nexus-garmin-agent.py /opt/nexus/export-activity-details.py
 
 VOLUME ["/state", "/data"]
 
