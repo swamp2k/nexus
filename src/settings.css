@@ -19,6 +19,46 @@
   margin-bottom: 24px;
 }
 
+.settings-collapsible > summary.settings-card-heading {
+  margin-bottom: 0;
+  cursor: pointer;
+  list-style: none;
+}
+
+.settings-collapsible > summary.settings-card-heading::-webkit-details-marker {
+  display: none;
+}
+
+.settings-collapsible > summary.settings-card-heading::after {
+  content: "⌄";
+  align-self: center;
+  margin-left: -12px;
+  color: var(--muted);
+  font-size: 1.15rem;
+  font-weight: 800;
+  transition: transform 160ms ease;
+}
+
+.settings-collapsible[open] > summary.settings-card-heading {
+  margin-bottom: 24px;
+}
+
+.settings-collapsible[open] > summary.settings-card-heading::after {
+  transform: rotate(180deg);
+}
+
+.settings-component-wrapper > .settings-card {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.settings-component-wrapper > .settings-card > .settings-card-heading {
+  display: none;
+}
+
 .settings-card-heading h2 { margin: 0 0 8px; font-size: 1.45rem; letter-spacing: -0.025em; }
 .settings-card-heading p:last-child { max-width: 680px; margin: 0; color: var(--muted); line-height: 1.55; }
 .settings-icon { display: grid; width: 52px; height: 52px; flex: 0 0 auto; place-items: center; border-radius: 16px; background: var(--accent-soft); color: var(--accent); font-size: 1.4rem; font-weight: 900; }
@@ -55,4 +95,5 @@
   .settings-card { padding: 20px; }
   .settings-coordinate-grid, .settings-choice-grid, .energy-band-preview { grid-template-columns: 1fr; }
   .settings-location-actions, .settings-save-bar { align-items: stretch; flex-direction: column; }
+  .settings-collapsible > summary.settings-card-heading::after { margin-left: -16px; }
 }
