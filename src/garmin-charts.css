@@ -48,20 +48,24 @@
 
 .sleep-chart-tooltip,
 .sleep-bar-tooltip,
-.sleep-consistency-tooltip {
+.sleep-consistency-tooltip,
+.health-chart-tooltip {
   position: absolute;
-  z-index: 8;
-  top: 8px;
-  left: 50%;
-  transform: translateX(-50%);
+  z-index: 12;
   min-width: 92px;
   padding: 8px 10px;
   border: 1px solid var(--border-strong);
   border-radius: 9px;
-  background: color-mix(in srgb, var(--surface) 94%, transparent);
+  background: color-mix(in srgb, var(--surface) 96%, transparent);
   box-shadow: var(--shadow-soft);
   pointer-events: none;
   text-align: center;
+}
+
+.cursor-tooltip {
+  transform: translate(-50%, -100%);
+  transition: none;
+  will-change: left, top;
 }
 
 .sleep-chart-tooltip strong,
@@ -69,16 +73,23 @@
 .sleep-bar-tooltip strong,
 .sleep-bar-tooltip span,
 .sleep-consistency-tooltip strong,
-.sleep-consistency-tooltip span {
+.sleep-consistency-tooltip span,
+.health-chart-tooltip strong,
+.health-chart-tooltip span {
   display: block;
 }
 
 .sleep-chart-tooltip span,
 .sleep-bar-tooltip span,
-.sleep-consistency-tooltip span {
+.sleep-consistency-tooltip span,
+.health-chart-tooltip span {
   margin-top: 2px;
   color: var(--muted);
   font-size: 0.7rem;
+}
+
+.health-chart-tooltip strong {
+  margin-bottom: 3px;
 }
 
 .sleep-bars-chart {
@@ -218,10 +229,6 @@
   white-space: nowrap;
 }
 
-.sleep-consistency-tooltip {
-  top: 10px;
-}
-
 .sleep-consistency-legend {
   grid-column: 2;
   display: flex;
@@ -254,23 +261,23 @@
   border-top-color: var(--muted-strong);
 }
 
+.health-bar.active {
+  filter: brightness(1.12);
+}
+
 @media (max-width: 600px) {
   .sleep-axis-chart svg {
     height: 165px;
   }
-
   .sleep-axis-text {
     font-size: 10px;
   }
-
   .sleep-bars-chart {
     grid-template-columns: 30px minmax(0, 1fr);
   }
-
   .sleep-consistency-axis-chart {
     grid-template-columns: 34px minmax(0, 1fr);
   }
-
   .sleep-consistency-y,
   .sleep-consistency-plot,
   .sleep-consistency-columns button {
