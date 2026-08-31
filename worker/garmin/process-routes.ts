@@ -1,10 +1,10 @@
 import { getAuthenticatedUser } from "../auth/session";
-import { getActivityDetail } from "./activity-detail";
+import { getActivityDetail, listActivities } from "./activity-detail";
 import { getGarminOverview, processGarminDbBatch } from "./garmindb-import";
 import { getHealthDetail } from "./health-detail";
 import { getSleepDetail } from "./sleep-detail";
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{12}$/i;
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 const DATE_RE = /^20\d{2}-\d{2}-\d{2}$/;
 const ACTIVITY_ID_RE = /^[A-Za-z0-9_-]{1,80}$/;
 
@@ -19,6 +19,7 @@ export async function handleGarminProcessRoute(request: Request, env: Env): Prom
   const pathname = url.pathname;
   if (pathname !== "/api/garmin/imports/process"
     && pathname !== "/api/garmin/overview"
+    && pathname !== "/api/garmin/activities"
     && pathname !== "/api/garmin/activity"
     && pathname !== "/api/garmin/sleep"
     && pathname !== "/api/garmin/health") return null;
@@ -35,6 +36,12 @@ export async function handleGarminProcessRoute(request: Request, env: Env): Prom
       if (message.includes("no such table")) return json({ daily: null, sleep: null, rhr: null, activities: [], counts: null });
       throw error;
     }
+  }
+
+  if (pathname === "/api/garmin/activities") {
+    if (request.method !== "GET") return json({ error: "method_not_allowed" }, { status: 405 });
+    const limit = Number(url.searchParams.get("limit") ?? "100");
+    return json(await listActivities(env.DB, user.id, Number.isFinite(limit) ? limit : 100));
   }
 
   if (pathname === "/api/garmin/activity") {
