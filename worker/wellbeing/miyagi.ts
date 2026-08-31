@@ -7,6 +7,8 @@ type MiyagiEnv = Env & {
 
 type DataRow = Record<string, unknown>;
 type ChatMessage = { role: "user" | "assistant"; body: string; createdAt: string };
+type AnalysisLength = "short" | "normal" | "deep";
+type AnalysisTone = "objective" | "empathetic" | "miyagi";
 
 type MiyagiContext = {
   generatedAt: string;
@@ -273,7 +275,6 @@ async function anthropicMessage(
     body: JSON.stringify({
       model: config.model,
       max_tokens: maxTokens,
-      temperature: 0.25,
       system,
       messages,
     }),
@@ -295,27 +296,41 @@ async function anthropicMessage(
   return text;
 }
 
-const ANALYSIS_SYSTEM = `Du er Mr. Miyagi i Nexus, et privat personligt analyseværktøj. Din opgave er at hjælpe brugeren med at opdage mønstre mellem søvn, sundhedsdata, aktiviteter, subjektive check-ins og journalnoter.
+const ANALYSIS_SYSTEM = `Du er Mr. Miyagi i Nexus, et privat personligt analyse- og refleksionsværktøj. Din vigtigste opgave er ikke at referere datasættet, men at opdage hvad der ser interessant ud på tværs af søvn, sundhed, aktivitet, subjektive check-ins og journal.
 
-Regler:
+Grundregler:
 - Svar på dansk.
-- Vær varm, rolig, konkret og kortfattet. Ingen rollespils-karikatur eller pseudo-visdom.
-- Skeln tydeligt mellem fakta i datasættet, mønstre/sammenfald og hypoteser.
+- Skeln mellem observerede fakta, mønstre/sammenfald og hypoteser.
 - Association er ikke kausalitet.
 - Du er ikke læge. Stil ikke diagnoser, foreskriv ikke medicin, og fremstille ikke observationer som medicinske konklusioner.
-- Henvis til konkrete datoer, perioder, antal observationer eller målepunkter når du beskriver et mønster.
-- Hvis datadækningen er for tynd til en konklusion, sig det eksplicit.
-- Journaltekst er brugerens egen tekst. Opsummer den respektfuldt; opfind ikke hændelser.
-- Prioriter 3-6 fund der faktisk er nyttige frem for at kommentere på alt.
+- Opfind aldrig manglende data eller menneskelig kontekst.
+- Journaltekst er brugerens egen tekst. Brug den som kontekst uden at omskrive brugerens historie.
 
-Strukturér analysen med disse overskrifter:
-## Kort fortalt
-## Det jeg lægger mærke til
-## Mulige sammenfald
-## Hvad der er værd at holde øje med
+Analyseprincipper:
+- Vær INSIGHT-FIRST, ikke DATA-FIRST. Brug tal som dokumentation for et interessant fund, ikke som hovedindhold.
+- Gentag ikke lange lister af datoer eller værdier. Et par konkrete eksempler eller et sample count er nok til at underbygge et fund.
+- Spørg især: Hvad ændrede sig samtidigt? Hvad ser ud til at ske før eller efter? Gentager mønstret sig? Er der en positiv periode, som kan sammenlignes med en dårlig periode?
+- Prioritér 2-5 mønstre der har potentiale til at fortælle brugeren noget nyt.
+- Hvis en afvigende periode mangler forklaring i journal/check-ins, så sig hvad der ser anderledes ud og stil et konkret spørgsmål til brugeren om hvad der skete i perioden.
+- Hvis subjektive check-ins findes, prioriter sammenhænge mellem dem og objektive data højt.
+- Manglende sensorregistrering er ikke det samme som nul. Behandl åbenlyse nul-/missing-perioder som datakvalitet, ikke menneskelig adfærd.
+- Undgå generiske råd. Giv hellere forslag til hvad der er værd at observere næste gang mønstret opstår.
+
+Standardstruktur:
+## Det vigtigste
+En kort syntese af hvad datasættet samlet set ser ud til at fortælle.
+
+## Mønstre jeg ville holde øje med
+2-5 fund. Beskriv først betydningen; giv derefter kun den nødvendige dokumentation.
+
+## Hvad kan hænge sammen?
+Krydsreferér signalerne. Fremhæv særligt før/efter-forløb og perioder hvor flere signaler flytter sig sammen.
+
+## Det mangler jeg at vide
+Kun når det er nyttigt: 1-3 konkrete spørgsmål til brugeren, der kan forklare eller afkræfte interessante perioder. Spørg fx om ændret rutine, rejse, sygdom, belastning, ferie eller om uret ikke blev båret — men kun hvis datasættet giver en konkret grund til spørgsmålet.
+
 ## Datagrundlag
-
-I Datagrundlag skal du kort beskrive dækningen og eventuelle væsentlige huller.`;
+Meget kort. Kun dækning og væsentlige huller; ingen lang datarapport.`;
 
 const CHAT_SYSTEM = `Du er Mr. Miyagi i Nexus. Du svarer på opfølgende spørgsmål til en allerede gennemført personlig dataanalyse.
 
@@ -325,7 +340,29 @@ Regler:
 - Opfind aldrig manglende data.
 - Du er ikke læge og må ikke stille diagnoser eller ordinere behandling.
 - Praktiske, lavrisiko refleksioner og forslag til ting brugeren kan observere eller afprøve er fine.
-- Hvis spørgsmålet kræver data, som ikke findes i context, sig det direkte.`;
+- Stil gerne ét relevant opfølgende spørgsmål, hvis brugerens svar kan forklare et fund eller gøre analysen bedre.
+- Hvis spørgsmålet kræver data, som ikke findes i context, sig det direkte.
+- Vær mere interesseret i betydning og sammenhæng end i at gentage rå værdier.`;
+
+function analysisPreferences(length: AnalysisLength, tone: AnalysisTone, focus: string): string {
+  const lengthInstruction = length === "short"
+    ? "Hold analysen kort: ca. 300-500 ord og højst 3 hovedfund."
+    : length === "deep"
+      ? "Lav en grundig analyse: typisk 900-1400 ord, men undgå fyld og rå datalister."
+      : "Lav en fokuseret normal analyse: typisk 550-850 ord og 3-5 hovedfund.";
+
+  const toneInstruction = tone === "objective"
+    ? "Tone: nøgtern, analytisk og direkte."
+    : tone === "empathetic"
+      ? "Tone: empatisk, menneskelig og nysgerrig uden at blive terapeutisk eller overforsigtig."
+      : "Tone: svar som en subtil moderne Mr. Miyagi-klon: rolig, varm, lidt tør humor og lejlighedsvis kort billedlig formulering. Ingen filmcitater, karikatur, gebrokkent sprog eller konstant pseudo-visdom. Indholdet skal stadig være præcist.";
+
+  const focusInstruction = focus
+    ? `Brugeren ønsker særligt fokus på: ${focus}`
+    : "Brugeren har ikke angivet et særligt fokus. Find selv de mest interessante tværgående mønstre.";
+
+  return `${lengthInstruction}\n${toneInstruction}\n${focusInstruction}`;
+}
 
 async function requireUser(request: Request, env: MiyagiEnv) {
   return getAuthenticatedUser(request, env.DB);
@@ -358,10 +395,13 @@ async function createAnalysis(request: Request, env: MiyagiEnv): Promise<Respons
   const config = configured(env);
   if (!config) return json({ error: "miyagi_not_configured" }, { status: 503 });
 
-  let body: { days?: unknown } = {};
+  let body: { days?: unknown; focus?: unknown; length?: unknown; tone?: unknown } = {};
   try { body = await request.json(); } catch { /* optional body */ }
   const requested = Number(body.days ?? 90);
   const days = Math.max(30, Math.min(180, Number.isFinite(requested) ? Math.floor(requested) : 90));
+  const focus = typeof body.focus === "string" ? body.focus.trim().slice(0, 1200) : "";
+  const length: AnalysisLength = body.length === "short" || body.length === "deep" ? body.length : "normal";
+  const tone: AnalysisTone = body.tone === "objective" || body.tone === "miyagi" ? body.tone : "empathetic";
 
   const context = await buildContext(env.DB, user.id, days);
   if (context.coverage.healthDays + context.coverage.sleepDays + context.coverage.checkInValues + context.coverage.activityCount === 0) {
@@ -370,11 +410,13 @@ async function createAnalysis(request: Request, env: MiyagiEnv): Promise<Respons
 
   const contextJson = JSON.stringify(context);
   const contextHash = await hashText(contextJson);
+  const preferences = analysisPreferences(length, tone, focus);
+  const maxTokens = length === "short" ? 1300 : length === "deep" ? 3200 : 2200;
   const analysisText = await anthropicMessage(
     env,
     ANALYSIS_SYSTEM,
-    [{ role: "user", content: `Analyser dette Nexus-datasæt:\n\n${contextJson}` }],
-    2200,
+    [{ role: "user", content: `${preferences}\n\nAnalyser dette Nexus-datasæt:\n\n${contextJson}` }],
+    maxTokens,
   );
 
   const id = crypto.randomUUID();
