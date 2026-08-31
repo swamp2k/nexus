@@ -5,7 +5,10 @@ import { handleGarminProcessRoute } from "./garmin/process-routes";
 import { handleGarminRoute } from "./garmin/routes";
 import { handleSettingsRoute } from "./settings/routes";
 import { handleSourceRoute } from "./sources/routes";
+import { handleJournalAiRoute } from "./wellbeing/journal-ai";
+import { handleMiyagiHistoryRoute } from "./wellbeing/miyagi-history";
 import { handleMiyagiRoute } from "./wellbeing/miyagi";
+import { handleWellbeingHistoryRoute } from "./wellbeing/history";
 import { handleWellbeingRoute } from "./wellbeing/routes";
 
 type HealthResponse = {
@@ -49,9 +52,24 @@ export default {
         if (garminResponse) return garminResponse;
       }
 
+      if (url.pathname.startsWith("/api/wellbeing/miyagi/history")) {
+        const historyResponse = await handleMiyagiHistoryRoute(request, env);
+        if (historyResponse) return historyResponse;
+      }
+
       if (url.pathname.startsWith("/api/wellbeing/miyagi/")) {
         const miyagiResponse = await handleMiyagiRoute(request, env);
         if (miyagiResponse) return miyagiResponse;
+      }
+
+      if (url.pathname.startsWith("/api/wellbeing/journal-ai/")) {
+        const journalAiResponse = await handleJournalAiRoute(request, env);
+        if (journalAiResponse) return journalAiResponse;
+      }
+
+      if (url.pathname === "/api/wellbeing/history") {
+        const historyResponse = await handleWellbeingHistoryRoute(request, env);
+        if (historyResponse) return historyResponse;
       }
 
       if (url.pathname.startsWith("/api/wellbeing/")) {
