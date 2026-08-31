@@ -14,12 +14,14 @@
     "db:migrate": "wrangler d1 migrations apply nexus --remote"
   },
   "dependencies": {
+    "leaflet": "^1.9.4",
     "react": "^19.2.8",
     "react-dom": "^19.2.8"
   },
   "devDependencies": {
     "@cloudflare/vite-plugin": "^1.54.1",
     "@cloudflare/workers-types": "^5.20260827.1",
+    "@types/leaflet": "^1.9.21",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.5",
     "@vitejs/plugin-react": "^6.1.0",
