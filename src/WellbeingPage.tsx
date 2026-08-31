@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import MiyagiWorkspace from "./MiyagiWorkspace";
 
 type Metric = {
   id: string;
@@ -154,34 +155,7 @@ export default function WellbeingPage() {
       </article>
     </div>
 
-    {miyagiOpen && <section className="miyagi-workspace" aria-label="Mr. Miyagi analyse">
-      <div className="miyagi-intro">
-        <div>
-          <p className="section-label">Mr. Miyagi</p>
-          <h2>Se efter mønstre, ikke mirakler.</h2>
-          <p>Miyagi skal samle de samme dage på tværs af dine Nexus-data og lede efter tilbagevendende sammenfald. Fund skal beskrives som observationer og hypoteser — ikke diagnoser eller medicinske konklusioner.</p>
-        </div>
-        <button className="primary-action" type="button" disabled title="Analyse-motoren kobles på som næste trin">Start analyse</button>
-      </div>
-
-      <div className="miyagi-source-grid" aria-label="Datakilder til analysen">
-        <div><span>♥</span><strong>Sundhed</strong><small>Søvn, puls, stress, Body Battery, skridt</small></div>
-        <div><span>↗</span><strong>Motion</strong><small>Aktiviteter, varighed, intensitet og historik</small></div>
-        <div><span>☀</span><strong>Check-ins</strong><small>Dine egne daglige målepunkter</small></div>
-        <div><span>✎</span><strong>Journal</strong><small>Det du selv skrev om dagen</small></div>
-      </div>
-
-      <div className="miyagi-empty-analysis">
-        <strong>Analyse-motoren er næste trin</strong>
-        <p>UI og dataflow er gjort klar. Næste backend-del samler et tidsvindue i ét normaliseret Miyagi-context, hvorefter vi kobler en LLM på analyse og opfølgende samtale.</p>
-      </div>
-
-      <div className="miyagi-chat-shell" aria-disabled="true">
-        <input disabled placeholder="Spørg Miyagi om analysen…" aria-label="Spørg Mr. Miyagi" />
-        <button type="button" disabled>Send</button>
-      </div>
-      <small className="miyagi-disclaimer">Miyagi er et analyseværktøj i et privat hobbyprojekt. Han kan hjælpe med mønstre og refleksion, men er ikke læge og erstatter ikke faglig vurdering.</small>
-    </section>}
+    {miyagiOpen && <MiyagiWorkspace />}
 
     {checkInOpen && <div className="wellbeing-checkin-overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setCheckInOpen(false); }}>
       <section className="wellbeing-checkin-dialog" role="dialog" aria-modal="true" aria-labelledby="wellbeing-checkin-title">
