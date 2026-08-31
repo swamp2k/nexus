@@ -1,0 +1,378 @@
+.wellbeing-command-actions,
+.miyagi-workspace-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
+.miyagi-workspace-actions {
+  padding-bottom: 2px;
+}
+
+.wellbeing-history-overlay,
+.miyagi-history-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 95;
+  display: grid;
+  place-items: center;
+  padding: 18px;
+  background: rgba(0, 0, 0, 0.52);
+  backdrop-filter: blur(7px);
+}
+
+.wellbeing-history-dialog,
+.miyagi-history-dialog {
+  width: min(920px, 100%);
+  max-height: min(90vh, 980px);
+  overflow: hidden;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.28);
+}
+
+.miyagi-history-dialog {
+  width: min(1120px, 100%);
+}
+
+.wellbeing-history-heading,
+.miyagi-history-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--border);
+}
+
+.wellbeing-history-heading h2,
+.miyagi-history-heading h2 {
+  margin: 0 0 3px;
+}
+
+.wellbeing-history-heading p:last-child,
+.miyagi-history-heading p:last-child {
+  margin: 0;
+  color: var(--muted);
+}
+
+.wellbeing-history-list {
+  overflow: auto;
+  display: grid;
+  align-content: start;
+  gap: 7px;
+  padding-top: 12px;
+}
+
+.wellbeing-history-day {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  background: var(--surface-soft);
+}
+
+.wellbeing-history-day-toggle {
+  width: 100%;
+  display: grid;
+  grid-template-columns: 18px minmax(180px, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 13px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.wellbeing-history-day-toggle > span:not(.wellbeing-history-chevron) {
+  color: var(--muted);
+  font-size: 0.78rem;
+  white-space: nowrap;
+}
+
+.wellbeing-history-chevron {
+  color: var(--muted);
+  font-size: 1.25rem;
+  line-height: 1;
+  transition: transform 120ms ease;
+}
+
+.wellbeing-history-day.open .wellbeing-history-chevron {
+  transform: rotate(90deg);
+}
+
+.wellbeing-history-day-body {
+  display: grid;
+  gap: 12px;
+  padding: 0 13px 13px 41px;
+  border-top: 1px solid var(--border);
+}
+
+.wellbeing-history-metrics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px 12px;
+  padding-top: 10px;
+}
+
+.wellbeing-history-metrics > div {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 7px;
+  font-size: 0.84rem;
+}
+
+.wellbeing-history-metrics > div > span:last-child {
+  color: var(--muted-strong);
+}
+
+.wellbeing-history-journal {
+  padding: 11px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.wellbeing-history-journal > p,
+.wellbeing-history-ai p,
+.wellbeing-history-user p {
+  margin: 0;
+  white-space: pre-wrap;
+  line-height: 1.5;
+}
+
+.wellbeing-history-followups {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.wellbeing-history-ai,
+.wellbeing-history-user {
+  padding: 8px 10px;
+  border-radius: 9px;
+  background: var(--surface-soft);
+}
+
+.wellbeing-history-user {
+  margin-top: 5px;
+  margin-left: 22px;
+  background: color-mix(in srgb, var(--accent) 7%, var(--surface));
+}
+
+.wellbeing-history-ai strong,
+.wellbeing-history-user strong {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--muted-strong);
+  font-size: 0.72rem;
+}
+
+.miyagi-history-layout {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 12px;
+  padding-top: 12px;
+}
+
+.miyagi-history-list,
+.miyagi-history-detail {
+  min-height: 0;
+  overflow: auto;
+}
+
+.miyagi-history-list {
+  display: grid;
+  align-content: start;
+  gap: 6px;
+}
+
+.miyagi-history-list button {
+  display: grid;
+  gap: 3px;
+  padding: 10px 11px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-soft);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.miyagi-history-list button.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.miyagi-history-list button span,
+.miyagi-history-list button small,
+.miyagi-history-list button em {
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-style: normal;
+}
+
+.miyagi-history-list button em {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.miyagi-history-detail {
+  padding: 0 4px 0 12px;
+  border-left: 1px solid var(--border);
+}
+
+.miyagi-history-detail-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+  margin-bottom: 6px;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.miyagi-history-chat {
+  display: grid;
+  gap: 7px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.miyagi-history-chat h3 {
+  margin: 0 0 2px;
+}
+
+.journal-ai-thinking {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding-top: 9px;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+}
+
+.journal-ai-thinking .miyagi-thinking-dot {
+  width: 9px;
+  height: 9px;
+}
+
+.journal-ai-followup {
+  display: grid;
+  gap: 7px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
+}
+
+.journal-ai-reply,
+.journal-ai-answer {
+  padding: 9px 10px;
+  border-radius: 9px;
+  background: var(--surface-soft);
+}
+
+.journal-ai-answer {
+  margin-left: 20px;
+  background: color-mix(in srgb, var(--accent) 7%, var(--surface));
+}
+
+.journal-ai-reply strong,
+.journal-ai-answer strong {
+  display: block;
+  margin-bottom: 3px;
+  color: var(--muted-strong);
+  font-size: 0.72rem;
+}
+
+.journal-ai-reply p,
+.journal-ai-answer p {
+  margin: 0;
+  white-space: pre-wrap;
+  line-height: 1.48;
+}
+
+.journal-ai-followup form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 8px;
+}
+
+.journal-ai-followup textarea {
+  min-width: 0;
+  width: 100%;
+  resize: vertical;
+  padding: 9px 10px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--surface-soft);
+  color: var(--text);
+}
+
+@media (max-width: 760px) {
+  .wellbeing-command-actions {
+    grid-column: 2 / -1;
+  }
+
+  .wellbeing-history-day-toggle {
+    grid-template-columns: 18px minmax(0, 1fr) auto;
+  }
+
+  .wellbeing-history-day-toggle > span:last-child {
+    display: none;
+  }
+
+  .wellbeing-history-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .miyagi-history-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .miyagi-history-list {
+    max-height: 210px;
+  }
+
+  .miyagi-history-detail {
+    padding: 12px 0 0;
+    border-left: 0;
+    border-top: 1px solid var(--border);
+  }
+}
+
+@media (max-width: 560px) {
+  .wellbeing-history-overlay,
+  .miyagi-history-overlay {
+    align-items: end;
+    padding: 10px;
+  }
+
+  .wellbeing-history-dialog,
+  .miyagi-history-dialog {
+    max-height: 90vh;
+    padding: 14px;
+    border-radius: 16px;
+  }
+
+  .wellbeing-history-day-body {
+    padding-left: 13px;
+  }
+
+  .journal-ai-followup form {
+    grid-template-columns: 1fr;
+  }
+}
