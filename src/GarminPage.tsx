@@ -45,12 +45,7 @@ export default function GarminPage() {
   if (state === "error") return <section className="garmin-page"><p className="empty-state">Garmin-data kunne ikke hentes.</p></section>;
 
   return (
-    <section className="garmin-page" aria-labelledby="garmin-heading">
-      <div className="module-page-hero">
-        <div className="module-page-icon tone-blue">⌖</div>
-        <div><p className="section-label">Sundhed</p><h2 id="garmin-heading">Garmin</h2><p>Din sundhedshistorik samlet og klar til analyse.</p></div>
-      </div>
-
+    <section className="garmin-page" aria-label="Garmin">
       {!daily && <p className="empty-state">Der er endnu ingen normaliserede Garmin-data. Importen styres under Indstillinger → Garmin.</p>}
 
       {daily && <>
