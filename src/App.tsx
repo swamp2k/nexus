@@ -63,35 +63,24 @@ function initials(user: User | null): string {
 
 function Dashboard({ onOpen }: { onOpen: (page: Page) => void }) {
   return (
-    <>
-      <section className="hero-card" aria-labelledby="today-heading">
-        <div>
-          <p className="section-label">I dag</p>
-          <h2 id="today-heading">Nexus samler de første rigtige datakilder</h2>
-          <p>Garmin, motion, velbefindende, vejr og strøm bygges som selvstændige områder, mens Nexus står for præsentation, cache og historik.</p>
-        </div>
-        <span className="status-pill">Building</span>
-      </section>
+    <section className="modules-section" aria-labelledby="modules-heading">
+      <p className="section-label">Moduler</p>
+      <h2 id="modules-heading">Dine øer, samlet</h2>
 
-      <section className="modules-section" aria-labelledby="modules-heading">
-        <p className="section-label">Moduler</p>
-        <h2 id="modules-heading">Dine øer, samlet</h2>
-
-        <div className="module-grid">
-          {modules.map((module) => (
-            <button className="module-card" key={module.name} type="button" onClick={() => onOpen(module.name as Page)}>
-              <div className={`module-icon tone-${module.tone}`}>{module.icon}</div>
-              <div className="module-copy">
-                <h3>{module.name}</h3>
-                <p>{module.detail}</p>
-                <span className={`module-badge tone-${module.tone}`}>{module.status}</span>
-              </div>
-              <span className="module-arrow">›</span>
-            </button>
-          ))}
-        </div>
-      </section>
-    </>
+      <div className="module-grid">
+        {modules.map((module) => (
+          <button className="module-card" key={module.name} type="button" onClick={() => onOpen(module.name as Page)}>
+            <div className={`module-icon tone-${module.tone}`}>{module.icon}</div>
+            <div className="module-copy">
+              <h3>{module.name}</h3>
+              <p>{module.detail}</p>
+              <span className={`module-badge tone-${module.tone}`}>{module.status}</span>
+            </div>
+            <span className="module-arrow">›</span>
+          </button>
+        ))}
+      </div>
+    </section>
   );
 }
 
