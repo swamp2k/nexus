@@ -32,7 +32,9 @@ export default function MotionRouteMap({ track }: { track: Point[] }) {
     map.fitBounds(route.getBounds(), { padding: [20, 20] });
 
     window.setTimeout(() => map.invalidateSize(), 0);
-    return () => map.remove();
+    return () => {
+      map.remove();
+    };
   }, [track]);
 
   return <div ref={element} className="motion-route-map" aria-label="Kort over aktivitetens rute" />;
