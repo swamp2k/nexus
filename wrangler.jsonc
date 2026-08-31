@@ -10,7 +10,8 @@
     "ENERGY_SUPPLIER_MARKUP_OERE": "0",
     "WEATHER_LAT": "56.1944",
     "WEATHER_LON": "10.6821",
-    "WEATHER_LABEL": "Ebeltoft"
+    "WEATHER_LABEL": "Ebeltoft",
+    "MIYAGI_MODEL": "claude-sonnet-4-6"
   },
   "assets": {
     "not_found_handling": "single-page-application",
