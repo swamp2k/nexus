@@ -30,14 +30,20 @@ The old Home module-link grid has been replaced with a real per-user dashboard a
 
 ### Widget model
 
-Feature views are now represented by reusable widgets with stable internal IDs. Initial widgets:
+Feature views are now represented by reusable widgets with stable internal IDs. Current widgets include:
 
 - `garmin.steps.today`
+- `garmin.steps.week`
 - `garmin.sleep.lastNight`
+- `garmin.sleep.week`
 - `garmin.bodyBattery.today`
 - `wellbeing.today`
 - `energy.price.current`
+- `energy.price.todayRange`
+- `energy.price.next24h`
 - `weather.current`
+- `weather.nextHours`
+- `weather.week`
 
 The registry is deliberately independent of Home layout storage so the same widget components can increasingly be reused on feature pages as those pages are refactored.
 
@@ -52,6 +58,8 @@ The registry is deliberately independent of Home layout storage so the same widg
 - component
 - default size
 - supported sizes
+
+Trend-style widgets live separately in `src/widgets/extendedWidgets.tsx` so the registry remains primarily declarative.
 
 ### Shared data access
 
@@ -92,6 +100,27 @@ After the first real deployment screenshot:
 - tightened Home vertical spacing and widget row height
 - made sizing behaviour explicit and predictable
 - expanded `wellbeing.today` with completion status and journal-state information so the widget earns its space instead of showing only two chips
+
+### Widget expansion pass
+
+Added compact dashboard views for data that benefits from short trends rather than only a single current value:
+
+- Garmin 7-day steps
+- Garmin 7-night sleep duration
+- today's electricity min/average/max
+- electricity price chart for the next 24 hours, deliberately keeping the same fixed 0–6 kr/kWh visual reference scale as the Strøm page
+- next-hours weather
+- 7-day weather
+
+### Next Home work — dynamic layout
+
+The next Home pass should focus on layout rather than adding more raw widgets:
+
+- let widget size materially change the amount/detail of content shown
+- improve packing and row-height behaviour so mixed small/medium/wide widgets compose naturally
+- evaluate direct resize/reorder interactions instead of only select + move buttons
+- preserve per-user layout and responsive mobile behaviour
+- avoid making every widget a fixed card with identical information density
 
 ### Next widget work
 
