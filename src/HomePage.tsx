@@ -117,10 +117,6 @@ export default function HomePage({ onOpenPage }: { onOpenPage: (page: WidgetTarg
   return (
     <section className="home-page" aria-label="Hjem">
       <div className="home-toolbar">
-        <div>
-          <p className="section-label">Dit overblik</p>
-          <h2>Det du vil se lige nu</h2>
-        </div>
         {!editing
           ? <button className="secondary-action" type="button" onClick={beginEdit}>Rediger Hjem</button>
           : <div className="home-edit-actions"><button className="secondary-action" type="button" onClick={() => { setDraft(layout); setEditing(false); setMessage(null); }}>Annuller</button><button className="primary-action" type="button" disabled={saving} onClick={() => void save()}>{saving ? "Gemmer…" : "Gem layout"}</button></div>}
@@ -131,7 +127,7 @@ export default function HomePage({ onOpenPage }: { onOpenPage: (page: WidgetTarg
       {message && <p className="home-layout-note home-layout-note--error">{message}</p>}
 
       {editing && <aside className="home-editor" aria-label="Rediger Hjem">
-        <div className="home-editor-copy"><strong>Vælg moduler</strong><span>Tilføj, fjern, flyt og vælg størrelse. Drag/drop kan komme senere uden at ændre layoutformatet.</span></div>
+        <div className="home-editor-copy"><strong>Vælg moduler</strong><span>Tilføj, fjern, flyt og vælg størrelse. Lille fylder 1 kolonne, mellem 2 og bred hele rækken.</span></div>
         <div className="home-editor-groups">
           {grouped.map(([group, widgets]) => <fieldset key={group}><legend>{group}</legend>{widgets.map((widget) => {
             const selected = selectedIds.has(widget.id);
@@ -155,7 +151,7 @@ export default function HomePage({ onOpenPage }: { onOpenPage: (page: WidgetTarg
           const widget = widgetById.get(item.id);
           if (!widget) return null;
           const Widget = widget.component;
-          return <article className={`home-widget home-widget--${item.size}`} key={item.id}>
+          return <article className={`home-widget home-widget--${item.size}`} data-widget-id={item.id} key={item.id}>
             <header><div><span>{widget.group}</span><h3>{widget.title}</h3></div><button type="button" onClick={() => onOpenPage(widget.page)}>{widget.page} ›</button></header>
             <div className="home-widget-content"><Widget /></div>
           </article>;
