@@ -27,6 +27,8 @@ export default function HomePage({ onOpenPage }: { onOpenPage: (page: WidgetTarg
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [draggedId, setDraggedId] = useState<string | null>(null);
+  const [dropTargetId, setDropTargetId] = useState<string | null>(null);
 
   useEffect(() => {
     void fetch("/api/home-layout", { credentials: "same-origin", cache: "no-store" })
@@ -78,6 +80,17 @@ export default function HomePage({ onOpenPage }: { onOpenPage: (page: WidgetTarg
     setDraft((current) => current.map((item) => item.id === id ? { ...item, size } : item));
   }
 
+  function stepSize(id: string, direction: -1 | 1) {
+    const widget = widgetById.get(id);
+    if (!widget) return;
+    setDraft((current) => current.map((item) => {
+      if (item.id !== id) return item;
+      const index = widget.supportedSizes.indexOf(item.size);
+      const nextIndex = Math.max(0, Math.min(widget.supportedSizes.length - 1, index + direction));
+      return { ...item, size: widget.supportedSizes[nextIndex] ?? item.size };
+    }));
+  }
+
   function move(id: string, direction: -1 | 1) {
     setDraft((current) => {
       const index = current.findIndex((item) => item.id === id);
@@ -87,6 +100,22 @@ export default function HomePage({ onOpenPage }: { onOpenPage: (page: WidgetTarg
       [copy[index], copy[nextIndex]] = [copy[nextIndex], copy[index]];
       return copy;
     });
+  }
+
+  function dropWidget(targetId: string) {
+    if (!draggedId || draggedId === targetId) return;
+    setDraft((current) => {
+      const sourceIndex = current.findIndex((item) => item.id === draggedId);
+      const targetIndex = current.findIndex((item) => item.id === targetId);
+      if (sourceIndex < 0 || targetIndex < 0) return current;
+      const copy = [...current];
+      const [moved] = copy.splice(sourceIndex, 1);
+      const adjustedTarget = sourceIndex < targetIndex ? targetIndex - 1 : targetIndex;
+      copy.splice(adjustedTarget, 0, moved);
+      return copy;
+    });
+    setDraggedId(null);
+    setDropTargetId(null);
   }
 
   async function save() {
@@ -115,11 +144,11 @@ export default function HomePage({ onOpenPage }: { onOpenPage: (page: WidgetTarg
   const renderedLayout = editing ? draft : layout;
 
   return (
-    <section className="home-page" aria-label="Hjem">
+    <section className={`home-page${editing ? " home-page--editing" : ""}`} aria-label="Hjem">
       <div className="home-toolbar">
         {!editing
           ? <button className="secondary-action" type="button" onClick={beginEdit}>Rediger Hjem</button>
-          : <div className="home-edit-actions"><button className="secondary-action" type="button" onClick={() => { setDraft(layout); setEditing(false); setMessage(null); }}>Annuller</button><button className="primary-action" type="button" disabled={saving} onClick={() => void save()}>{saving ? "Gemmer…" : "Gem layout"}</button></div>}
+          : <div className="home-edit-actions"><span className="home-edit-hint">Træk widgets for at flytte dem. Brug −/+ for størrelse.</span><button className="secondary-action" type="button" onClick={() => { setDraft(layout); setEditing(false); setMessage(null); }}>Annuller</button><button className="primary-action" type="button" disabled={saving} onClick={() => void save()}>{saving ? "Gemmer…" : "Gem layout"}</button></div>}
       </div>
 
       {state === "loading" && <p className="home-layout-note">Henter dit layout…</p>}
@@ -127,7 +156,7 @@ export default function HomePage({ onOpenPage }: { onOpenPage: (page: WidgetTarg
       {message && <p className="home-layout-note home-layout-note--error">{message}</p>}
 
       {editing && <aside className="home-editor" aria-label="Rediger Hjem">
-        <div className="home-editor-copy"><strong>Vælg moduler</strong><span>Tilføj, fjern, flyt og vælg størrelse. Lille fylder 1 kolonne, mellem 2 og bred hele rækken.</span></div>
+        <div className="home-editor-copy"><strong>Vælg moduler</strong><span>Tilføj og fjern widgets her. Rækkefølge og størrelse kan også ændres direkte på dashboardet nedenunder.</span></div>
         <div className="home-editor-groups">
           {grouped.map(([group, widgets]) => <fieldset key={group}><legend>{group}</legend>{widgets.map((widget) => {
             const selected = selectedIds.has(widget.id);
@@ -147,12 +176,29 @@ export default function HomePage({ onOpenPage }: { onOpenPage: (page: WidgetTarg
 
       {renderedLayout.length === 0
         ? <div className="home-empty"><strong>Hjem er tomt.</strong><span>Tryk Rediger Hjem og vælg de data du vil have her.</span></div>
-        : <div className="home-widget-grid">{renderedLayout.map((item) => {
+        : <div className="home-widget-grid">{renderedLayout.map((item, index) => {
           const widget = widgetById.get(item.id);
           if (!widget) return null;
           const Widget = widget.component;
-          return <article className={`home-widget home-widget--${item.size}`} data-widget-id={item.id} key={item.id}>
-            <header><div><span>{widget.group}</span><h3>{widget.title}</h3></div><button type="button" onClick={() => onOpenPage(widget.page)}>{widget.page} ›</button></header>
+          const sizeIndex = widget.supportedSizes.indexOf(item.size);
+          return <article
+            className={`home-widget home-widget--${item.size}${editing ? " home-widget--editing" : ""}${dropTargetId === item.id ? " home-widget--drop-target" : ""}`}
+            data-widget-id={item.id}
+            key={item.id}
+            onDragOver={editing ? (event) => { event.preventDefault(); if (draggedId && draggedId !== item.id) setDropTargetId(item.id); } : undefined}
+            onDragLeave={editing ? () => { if (dropTargetId === item.id) setDropTargetId(null); } : undefined}
+            onDrop={editing ? (event) => { event.preventDefault(); dropWidget(item.id); } : undefined}
+          >
+            <header><div><span>{widget.group}</span><h3>{widget.title}</h3></div>{editing
+              ? <div className="home-widget-direct-controls">
+                  <button type="button" title="Mindre" aria-label={`Gør ${widget.title} mindre`} disabled={sizeIndex <= 0} onClick={() => stepSize(item.id, -1)}>−</button>
+                  <button type="button" title="Større" aria-label={`Gør ${widget.title} større`} disabled={sizeIndex < 0 || sizeIndex >= widget.supportedSizes.length - 1} onClick={() => stepSize(item.id, 1)}>+</button>
+                  <button type="button" className="home-widget-order-button" title="Flyt tidligere" aria-label={`Flyt ${widget.title} tidligere`} disabled={index <= 0} onClick={() => move(item.id, -1)}>←</button>
+                  <button type="button" className="home-widget-order-button" title="Flyt senere" aria-label={`Flyt ${widget.title} senere`} disabled={index >= renderedLayout.length - 1} onClick={() => move(item.id, 1)}>→</button>
+                  <span className="home-widget-drag-handle" title="Træk for at flytte" aria-label={`Træk ${widget.title} for at flytte`} role="button" tabIndex={0} draggable onDragStart={(event) => { setDraggedId(item.id); event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/plain", item.id); }} onDragEnd={() => { setDraggedId(null); setDropTargetId(null); }}>⋮⋮</span>
+                  <button type="button" className="home-widget-remove" title="Fjern" aria-label={`Fjern ${widget.title}`} onClick={() => toggleWidget(item.id)}>×</button>
+                </div>
+              : <button type="button" onClick={() => onOpenPage(widget.page)}>{widget.page} ›</button>}</header>
             <div className="home-widget-content"><Widget /></div>
           </article>;
         })}</div>}
