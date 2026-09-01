@@ -38,7 +38,7 @@ export async function handleWellbeingHistoryRoute(request: Request, env: Env): P
   const [entries, journals, followups] = await Promise.all([
     env.DB.prepare(
       `SELECT e.entry_date AS entryDate, e.value, e.metric_id AS metricId,
-              m.name, m.emoji, m.direction, m.sort_order AS sortOrder
+              m.name, m.emoji, m.direction, m.value_type AS valueType, m.sort_order AS sortOrder
        FROM wellbeing_entries e
        JOIN wellbeing_metrics m ON m.id = e.metric_id
        WHERE e.user_id = ? AND e.entry_date BETWEEN ? AND ?
