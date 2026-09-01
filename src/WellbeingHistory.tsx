@@ -5,6 +5,7 @@ type MetricEntry = {
   name: string;
   emoji: string;
   direction: "high_good" | "high_bad";
+  valueType: "scale" | "boolean";
   value: number;
 };
 
@@ -38,6 +39,11 @@ function faceFor(metric: MetricEntry): string {
   const good = ["😫", "😕", "😐", "🙂", "😁"];
   const bad = [...good].reverse();
   return (metric.direction === "high_bad" ? bad : good)[Math.max(0, Math.min(4, metric.value - 1))];
+}
+
+function metricValue(metric: MetricEntry): string {
+  if (metric.valueType === "boolean") return metric.value === 1 ? "Ja" : "Nej";
+  return `${faceFor(metric)} ${metric.value}/5`;
 }
 
 export default function WellbeingHistory({ onClose }: { onClose: () => void }) {
@@ -97,7 +103,7 @@ export default function WellbeingHistory({ onClose }: { onClose: () => void }) {
 
             {open && <div className="wellbeing-history-day-body">
               {day.metrics.length > 0 && <div className="wellbeing-history-metrics">
-                {day.metrics.map((metric) => <div key={metric.metricId}><span>{metric.emoji}</span><strong>{metric.name}</strong><span>{faceFor(metric)} {metric.value}/5</span></div>)}
+                {day.metrics.map((metric) => <div key={metric.metricId}><span>{metric.emoji}</span><strong>{metric.name}</strong><span>{metricValue(metric)}</span></div>)}
               </div>}
 
               {day.journals.map((journal) => <section className="wellbeing-history-journal" key={journal.id}>
