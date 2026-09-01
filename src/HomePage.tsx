@@ -1,4 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
+import { useCachedJson } from "./data/queryCache";
+import { DashboardRefreshScope, resolveDashboardRefreshClass } from "./data/dashboardRefresh";
+import type { DashboardRefreshSettingsResponse } from "./data/dashboardRefresh";
 import { widgetById, widgetRegistry } from "./widgets/widgetRegistry";
 import type { WidgetSize, WidgetTargetPage } from "./widgets/widgetRegistry";
 
@@ -27,6 +30,7 @@ export default function HomePage({ onOpenPage }: { onOpenPage: (page: WidgetTarg
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const { data: refreshSettings } = useCachedJson<DashboardRefreshSettingsResponse>("/api/settings", 1_000);
 
   useEffect(() => {
     void fetch("/api/home-layout", { credentials: "same-origin", cache: "no-store" })
@@ -163,7 +167,8 @@ export default function HomePage({ onOpenPage }: { onOpenPage: (page: WidgetTarg
           if (!widget) return null;
           const Widget = widget.component;
           const sizeIndex = widget.supportedSizes.indexOf(item.size);
-          return <article className={`home-widget home-widget--${item.size}${editing ? " home-widget--editing" : ""}`} data-widget-id={item.id} key={item.id}>
+          const refreshClass = resolveDashboardRefreshClass(widget.group, refreshSettings);
+          return <article className={`home-widget home-widget--${item.size}${editing ? " home-widget--editing" : ""}`} data-widget-id={item.id} data-refresh-class={refreshClass} key={item.id}>
             <header><div><span>{widget.group}</span><h3>{widget.title}</h3></div>{editing
               ? <div className="home-widget-direct-controls">
                   <button type="button" title="Mindre" aria-label={`Gør ${widget.title} mindre`} disabled={sizeIndex <= 0} onClick={() => stepSize(item.id, -1)}>−</button>
@@ -173,7 +178,7 @@ export default function HomePage({ onOpenPage }: { onOpenPage: (page: WidgetTarg
                   <button type="button" className="home-widget-remove" title="Fjern" aria-label={`Fjern ${widget.title}`} onClick={() => toggleWidget(item.id)}>×</button>
                 </div>
               : <button type="button" onClick={() => onOpenPage(widget.page)}>{widget.page} ›</button>}</header>
-            <div className="home-widget-content"><Widget /></div>
+            <div className="home-widget-content"><DashboardRefreshScope refreshClass={refreshClass}><Widget /></DashboardRefreshScope></div>
           </article>;
         })}</div>}
     </section>
