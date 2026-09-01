@@ -108,6 +108,7 @@ With Modular Home v1 in place, the audit is now being applied selectively agains
 - Garmin A4: removed the two redundant historical-count cards; day/night counts now live as one compact caption in the overview heading.
 - Garmin B2: detail navigation uses one clear close action, truthful chevrons, and opens on the more useful 4w range by default. Users can still switch to 1d for a specific day/night.
 - Garmin D1: 1-year health charts are aggregated to weekly averages instead of rendering hundreds of daily bars; charts now include readable y-axis labels, series legends, and a clear `Ugegennemsnit · 1 år` marker while summary statistics continue to use the underlying daily data.
+- Garmin mobile chart follow-up: bar charts no longer impose a fixed mobile minimum width, so they stay inside the viewport. Chart interaction disables browser text selection/touch callouts, and an optional fullscreen control expands the chart and best-effort requests landscape orientation on supported mobile browsers.
 - Motion A5: replaced repeated stat labels with a real aligned activity table, one sticky header, month grouping, tabular numbers, and progressive `Vis flere` in 30-row chunks.
 - Motion scanability follow-up: month/year dividers use normal foreground text plus a subtle accent marker/background so long histories are easier to skim without increasing font size.
 - Velbefindende A3: today's recorded values and latest journal note appear directly on the page instead of only inside the editing dialog.
