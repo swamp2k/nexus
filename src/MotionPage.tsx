@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import MotionActivityDetail from "./MotionActivityDetail";
 
 type MotionOverview = {
@@ -36,6 +36,17 @@ function monthLabel(value: unknown): string {
   return new Intl.DateTimeFormat("da-DK", { month: "long", year: "numeric" }).format(parsed);
 }
 
+function groupActivities(items: Array<Record<string, unknown>>) {
+  const groups: Array<{ label: string; items: Array<Record<string, unknown>> }> = [];
+  for (const activity of items) {
+    const label = monthLabel(activity.start_time_local ?? activity.start_time_gmt);
+    const current = groups.at(-1);
+    if (!current || current.label !== label) groups.push({ label, items: [activity] });
+    else current.items.push(activity);
+  }
+  return groups;
+}
+
 export default function MotionPage() {
   const [overview, setOverview] = useState<MotionOverview | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
@@ -61,16 +72,7 @@ export default function MotionPage() {
 
   const activities = overview?.activities ?? [];
   const visible = activities.slice(0, visibleCount);
-  const grouped = useMemo(() => {
-    const groups: Array<{ label: string; items: Array<Record<string, unknown>> }> = [];
-    for (const activity of visible) {
-      const label = monthLabel(activity.start_time_local ?? activity.start_time_gmt);
-      const current = groups.at(-1);
-      if (!current || current.label !== label) groups.push({ label, items: [activity] });
-      else current.items.push(activity);
-    }
-    return groups;
-  }, [visible]);
+  const grouped = groupActivities(visible);
 
   return (
     <section className="motion-page" aria-label="Motion">
