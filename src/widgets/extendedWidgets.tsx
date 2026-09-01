@@ -32,6 +32,7 @@ type WeatherResponse = {
       symbol: string | null;
       precipitationMm: number | null;
       windSpeed: number | null;
+      windDirection: number | null;
     }>;
     daily: Array<{
       date: string;
@@ -39,6 +40,8 @@ type WeatherResponse = {
       maxTemperature: number;
       symbol: string | null;
       maxPrecipitationProbability: number | null;
+      windSpeed: number | null;
+      windDirection: number | null;
     }>;
   };
 };
@@ -68,6 +71,14 @@ function localHourKey(value: string): string {
   return `${map.year}-${map.month}-${map.day}-${map.hour}`;
 }
 
+function localDateKey(value: string): string {
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    year: "numeric", month: "2-digit", day: "2-digit", timeZone: TZ,
+  }).formatToParts(new Date(value));
+  const map = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${map.year}-${map.month}-${map.day}`;
+}
+
 function formatHour(value: string): string {
   return new Intl.DateTimeFormat("da-DK", { hour: "2-digit", timeZone: TZ }).format(new Date(value));
 }
@@ -86,6 +97,19 @@ function weatherIcon(symbol: string | null): string {
   if (value.includes("fair") || value.includes("partlycloudy")) return "⛅";
   if (value.includes("clearsky")) return "☀️";
   return "🌡️";
+}
+
+function compassDirection(degrees: number | null | undefined): string {
+  if (typeof degrees !== "number" || !Number.isFinite(degrees)) return "";
+  const directions = ["N", "NNØ", "NØ", "ØNØ", "Ø", "ØSØ", "SØ", "SSØ", "S", "SSV", "SV", "VSV", "V", "VNV", "NV", "NNV"];
+  const normalized = ((degrees % 360) + 360) % 360;
+  return directions[Math.round(normalized / 22.5) % 16];
+}
+
+function windLabel(speed: number | null | undefined, direction: number | null | undefined): string {
+  if (typeof speed !== "number" || !Number.isFinite(speed)) return "—";
+  const compass = compassDirection(direction);
+  return `${speed.toFixed(1)} m/s${compass ? ` ${compass}` : ""}`;
 }
 
 function average(values: number[]): number | null {
@@ -193,15 +217,39 @@ export function GarminSleepWeekWidget() {
 export function WeatherNextHoursWidget() {
   const { data, loading, error } = useCachedJson<WeatherResponse>("/api/sources/weather", 5 * 60_000);
   if (loading) return <WidgetState label="Henter timevejret…" />;
-  const hours = data?.data.hourly?.slice(0, 6) ?? [];
-  if (error || hours.length === 0) return <WidgetState label="Ingen timeudsigt" />;
-  return <div className="home-weather-hours">{hours.map((hour) => <div key={hour.time}><span>{new Intl.DateTimeFormat("da-DK", { hour: "2-digit", timeZone: TZ }).format(new Date(hour.time))}</span><b aria-hidden="true">{weatherIcon(hour.symbol)}</b><strong>{Math.round(hour.temperature)}°</strong><small>{hour.precipitationMm && hour.precipitationMm > 0 ? `${hour.precipitationMm.toFixed(1)} mm` : `${hour.windSpeed?.toFixed(1) ?? "—"} m/s`}</small></div>)}</div>;
+  const nextHours = data?.data.hourly?.slice(0, 6) ?? [];
+  if (error || nextHours.length === 0) return <WidgetState label="Ingen timeudsigt" />;
+  return <div className="home-weather-hours">{nextHours.map((hour) => <div key={hour.time}>
+    <span>{new Intl.DateTimeFormat("da-DK", { hour: "2-digit", timeZone: TZ }).format(new Date(hour.time))}</span>
+    <b aria-hidden="true">{weatherIcon(hour.symbol)}</b>
+    <strong>{Math.round(hour.temperature)}°</strong>
+    <small className="home-weather-wind">↗ {windLabel(hour.windSpeed, hour.windDirection)}</small>
+    <small className="home-weather-rain">☂ {hour.precipitationMm === null ? "—" : `${hour.precipitationMm.toFixed(1)} mm`}</small>
+  </div>)}</div>;
 }
 
 export function WeatherWeekWidget() {
   const { data, loading, error } = useCachedJson<WeatherResponse>("/api/sources/weather", 5 * 60_000);
+  const rainByDay = useMemo(() => {
+    const totals = new Map<string, number>();
+    for (const hour of data?.data.hourly ?? []) {
+      if (hour.precipitationMm === null || !Number.isFinite(hour.precipitationMm)) continue;
+      const key = localDateKey(hour.time);
+      totals.set(key, (totals.get(key) ?? 0) + hour.precipitationMm);
+    }
+    return totals;
+  }, [data]);
   if (loading) return <WidgetState label="Henter 7-dages udsigt…" />;
   const days = data?.data.daily?.slice(0, 7) ?? [];
   if (error || days.length === 0) return <WidgetState label="Ingen 7-dages udsigt" />;
-  return <div className="home-weather-week">{days.map((day) => <div key={day.date}><span>{shortDay(day.date)}</span><b aria-hidden="true">{weatherIcon(day.symbol)}</b><strong>{Math.round(day.maxTemperature)}°</strong><small>{Math.round(day.minTemperature)}°{day.maxPrecipitationProbability !== null ? ` · ☂ ${Math.round(day.maxPrecipitationProbability)}%` : ""}</small></div>)}</div>;
+  return <div className="home-weather-week">{days.map((day) => {
+    const rain = rainByDay.get(day.date);
+    return <div key={day.date}>
+      <span>{shortDay(day.date)}</span>
+      <b aria-hidden="true">{weatherIcon(day.symbol)}</b>
+      <strong>{Math.round(day.maxTemperature)}° <em>{Math.round(day.minTemperature)}°</em></strong>
+      <small className="home-weather-wind">↗ {windLabel(day.windSpeed, day.windDirection)}</small>
+      <small className="home-weather-rain">☂ {rain === undefined ? "—" : `${rain.toFixed(1)} mm`}{day.maxPrecipitationProbability !== null ? ` · ${Math.round(day.maxPrecipitationProbability)}%` : ""}</small>
+    </div>;
+  })}</div>;
 }
