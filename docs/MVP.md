@@ -4,6 +4,8 @@
 
 Prove that Nexus can operate as a simple family-facing PWA with one login, modular dashboard content, and one meaningful historical data pipeline without turning into a replacement for every underlying system.
 
+> Historical note: this document records the original MVP sequence. The project has moved beyond several early phases. The current implementation order and UI decisions live in `docs/ROADMAP.md`.
+
 ## Phase 0 — Foundations
 
 Before feature work:
@@ -29,7 +31,7 @@ Build the minimum usable PWA:
 - loading/error/empty states
 - accessible touch targets and readable typography
 
-Do not build a configurable drag-and-drop dashboard yet.
+The first shell did not need a configurable drag-and-drop dashboard. That decision was intentionally deferred until real module data and reusable visualizations existed.
 
 Deliverable: an installable Nexus app with static placeholder modules.
 
@@ -138,16 +140,31 @@ Prefer narrow APIs or event payloads. Do not copy those applications into Nexus.
 
 Deliverable: integrate one existing project through the documented contract, then use that experience to refine the contract.
 
-## Explicitly out of MVP
+## Current dashboard direction
+
+The original MVP deliberately deferred drag/drop. Nexus now has enough real module data to define the dashboard model properly.
+
+The next dashboard iteration is therefore:
+
+1. establish reusable widgets with stable IDs
+2. register widgets centrally
+3. let feature pages and Home render the same widget components
+4. persist Home layout per user
+5. add move/resize/edit controls only after the registry and persistence model are stable
+
+This is an evolution of the original module contract, not a separate Home-only feature.
+
+## Explicitly out of the original MVP
 
 - recreating Home Assistant
-- drag-and-drop dashboard builders
 - arbitrary user-authored automation engine
 - microservices
 - generalized analytics/AI chat over every dataset
 - importing every Garmin metric before useful views exist
 - moving existing projects into the Nexus repository
 - complex organization/tenant administration
+
+A configurable Home dashboard was originally deferred rather than rejected; it is now part of the active roadmap.
 
 ## Definition of MVP success
 
@@ -164,4 +181,4 @@ The MVP is successful when:
 
 ## Immediate next action
 
-Obtain and inspect a real Garmin account export before designing production Garmin migrations. In parallel, make the two remaining platform choices needed for the shell: frontend stack and authentication approach.
+Follow `docs/ROADMAP.md`: finish the small application-shell cleanup, then implement the reusable widget registry and replace the current Home module-link grid with the per-user modular dashboard.
