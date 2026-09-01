@@ -5,6 +5,7 @@ import { handleGarminCredentialRoute } from "./garmin/credential-routes";
 import { handleGarminProcessRoute } from "./garmin/process-routes";
 import { handleGarminRoute } from "./garmin/routes";
 import { queueScheduledGarminSyncs, shouldRunScheduledGarminSync } from "./garmin/scheduled-sync";
+import { handleMelCloudRoute } from "./melcloud/routes";
 import { handleHomeLayoutRoute } from "./settings/home-layout";
 import { handleSettingsRoute } from "./settings/routes";
 import { handleSourceRoute } from "./sources/routes";
@@ -58,6 +59,11 @@ export default {
         if (processResponse) return processResponse;
         const garminResponse = await handleGarminRoute(request, env);
         if (garminResponse) return garminResponse;
+      }
+
+      if (url.pathname.startsWith("/api/melcloud/")) {
+        const melCloudResponse = await handleMelCloudRoute(request, env);
+        if (melCloudResponse) return melCloudResponse;
       }
 
       if (url.pathname.startsWith("/api/wellbeing/miyagi/history")) {
