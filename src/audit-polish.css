@@ -1,0 +1,60 @@
+.electricity-price-breakdown {
+  max-width: 760px;
+}
+
+.electricity-price-breakdown .electricity-price-total {
+  margin-top: 4px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border-strong);
+}
+
+.electricity-price-breakdown .electricity-price-total span,
+.electricity-price-breakdown .electricity-price-total strong {
+  color: var(--text);
+  font-weight: 900;
+}
+
+.electricity-price-strip-wrap {
+  position: relative;
+  min-width: 0;
+}
+
+.electricity-price-strip-wrap::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 34px;
+  pointer-events: none;
+  background: linear-gradient(to right, transparent, var(--surface));
+}
+
+.electricity-price-strip-wrap .electricity-price-strip {
+  padding-right: 28px;
+}
+
+@media (min-width: 901px) {
+  .weather-days {
+    max-width: 900px;
+  }
+
+  .weather-day {
+    grid-template-columns: 120px 42px 160px 130px 90px 58px 58px;
+    justify-content: start;
+  }
+}
+
+.weather-hourly-strip {
+  padding-right: 32px;
+  mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 34px), transparent 100%);
+  -webkit-mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 34px), transparent 100%);
+}
+
+@media (max-width: 650px) {
+  .weather-hourly-strip {
+    padding-right: 26px;
+    mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 26px), transparent 100%);
+    -webkit-mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 26px), transparent 100%);
+  }
+}
