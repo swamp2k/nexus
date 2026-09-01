@@ -1,17 +1,52 @@
+import { createContext, createElement, useContext } from "react";
+import type { PropsWithChildren } from "react";
 import { useCachedJson } from "./queryCache";
 
-type SettingsResponse = { settings: { dashboardRefreshSeconds?: number | null } };
+export type RefreshClass = "live" | "standard" | "slow" | "event";
 
-const DEFAULT_REFRESH_SECONDS = 300;
+export const REFRESH_CLASS_SECONDS: Record<RefreshClass, number> = {
+  live: 60,
+  standard: 300,
+  slow: 1800,
+  event: 0,
+};
 
-export function useDashboardRefreshMs(): number {
-  const { data } = useCachedJson<SettingsResponse>("/api/settings", 1_000);
-  const seconds = Number(data?.settings.dashboardRefreshSeconds ?? DEFAULT_REFRESH_SECONDS);
-  const safe = Number.isFinite(seconds) && seconds >= 30 && seconds <= 3600 ? seconds : DEFAULT_REFRESH_SECONDS;
-  return Math.round(safe * 1000);
+export const REFRESH_CLASS_LABELS: Record<RefreshClass, string> = {
+  live: "Live · 1 min",
+  standard: "Normal · 5 min",
+  slow: "Langsom · 30 min",
+  event: "Ved åbning / event",
+};
+
+export type DashboardRefreshSettingsResponse = {
+  settings: {
+    dashboardRefreshClasses?: Record<string, RefreshClass> | null;
+  };
+};
+
+const RefreshClassContext = createContext<RefreshClass>("standard");
+
+export function DashboardRefreshScope({ refreshClass, children }: PropsWithChildren<{ refreshClass: RefreshClass }>) {
+  return createElement(RefreshClassContext.Provider, { value: refreshClass }, children);
+}
+
+export function isRefreshClass(value: unknown): value is RefreshClass {
+  return value === "live" || value === "standard" || value === "slow" || value === "event";
+}
+
+export function resolveDashboardRefreshClass(
+  group: string,
+  defaultClass: RefreshClass,
+  settings: DashboardRefreshSettingsResponse | null,
+): RefreshClass {
+  const configured = settings?.settings.dashboardRefreshClasses?.[group];
+  return isRefreshClass(configured) ? configured : defaultClass;
 }
 
 export function useDashboardJson<T>(url: string, ttlMs?: number) {
-  const refreshMs = useDashboardRefreshMs();
-  return useCachedJson<T>(url, ttlMs ?? refreshMs, refreshMs);
+  const refreshClass = useContext(RefreshClassContext);
+  const seconds = REFRESH_CLASS_SECONDS[refreshClass];
+  const pollMs = seconds > 0 ? seconds * 1000 : 0;
+  const cacheTtl = ttlMs ?? (pollMs > 0 ? pollMs : 30_000);
+  return useCachedJson<T>(url, cacheTtl, pollMs);
 }
