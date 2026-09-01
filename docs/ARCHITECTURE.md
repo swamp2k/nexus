@@ -78,6 +78,40 @@ A module may provide:
 
 Removal or disabling of one module should not break unrelated modules.
 
+## Widget and Home architecture
+
+Home is not a second module-navigation page. Its job is to show the current user's most useful data across modules.
+
+Feature visualizations should therefore be reusable widgets rather than components owned only by a full-page view.
+
+Each reusable widget should have a stable internal ID, for example:
+
+```text
+garmin.sleep.week
+garmin.steps.week
+wellbeing.today
+energy.price.current
+weather.current
+unraid.storage
+```
+
+A central widget registry should eventually describe at least:
+
+- stable widget ID
+- display title
+- source/module
+- render component
+- supported sizes
+- permissions/availability requirements
+
+Both feature pages and Home render registered widget components. Do not duplicate a chart or data card just because it appears in two places.
+
+Home layout is user-owned configuration. It should store widget IDs plus layout information per user, rather than hard-coded React components. The first implementation may use a simple grid/list; drag/drop and resize controls should be layered on only after the registry and persistence model are stable.
+
+Widgets should consume shared query/cache/data services where practical. Multiple Garmin widgets on Home should not each independently fetch overlapping Garmin datasets if one shared request/cache can serve them.
+
+See `docs/ROADMAP.md` for the implementation sequence.
+
 ## External integrations
 
 Existing projects stay independent by default.
@@ -222,3 +256,5 @@ Avoid adding infrastructure until a concrete requirement demands it.
 8. Optimize the end-user experience for ordinary family members, not developers.
 9. Prefer simple reversible decisions during the MVP.
 10. Validate assumptions against real source data before freezing schemas.
+11. Build reusable, registered data widgets rather than separate Home-only copies of feature visualizations.
+12. Keep dashboard layout user-specific and avoid hard-coded personal layouts.
