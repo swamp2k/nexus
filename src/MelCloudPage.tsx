@@ -72,19 +72,32 @@ export default function MelCloudPage() {
   const [response, setResponse] = useState<DeviceResponse | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
 
-  async function refresh() {
-    setState("loading");
+  async function refresh(showLoading = true) {
+    if (showLoading) setState("loading");
     try {
       const result = await fetch("/api/melcloud/devices", { credentials: "same-origin", cache: "no-store" });
       if (!result.ok) throw new Error(`HTTP ${result.status}`);
       setResponse(await result.json() as DeviceResponse);
       setState("ready");
     } catch {
-      setState("error");
+      if (showLoading || !response) setState("error");
     }
   }
 
-  useEffect(() => { void refresh(); }, []);
+  useEffect(() => {
+    void refresh(true);
+    const interval = window.setInterval(() => {
+      if (document.visibilityState === "visible") void refresh(false);
+    }, 60_000);
+    const onVisibilityChange = () => {
+      if (document.visibilityState === "visible") void refresh(false);
+    };
+    document.addEventListener("visibilitychange", onVisibilityChange);
+    return () => {
+      window.clearInterval(interval);
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, []);
 
   const device = response?.devices[0] ?? null;
   const deltaT = useMemo(() => device?.flowTemperature !== null && device?.flowTemperature !== undefined && device.returnTemperature !== null
@@ -96,7 +109,7 @@ export default function MelCloudPage() {
   }, [device]);
 
   if (state === "loading") return <section className="melcloud-state">Henter varmepumpen…</section>;
-  if (state === "error" || !device) return <section className="melcloud-state"><strong>Varmepumpen kunne ikke hentes.</strong><button className="secondary-action" type="button" onClick={() => void refresh()}>Prøv igen</button></section>;
+  if (state === "error" || !device) return <section className="melcloud-state"><strong>Varmepumpen kunne ikke hentes.</strong><button className="secondary-action" type="button" onClick={() => void refresh(true)}>Prøv igen</button></section>;
 
   const status = heatPumpState(device);
   const fault = device.hasError === true || (device.errorCode2Digit ?? 0) > 0;
@@ -109,7 +122,7 @@ export default function MelCloudPage() {
         <strong>{device.name}</strong>
         <p>{device.zone1Name ?? "Zone 1"} · {device.zone1InRoomMode ? "rumstyring" : "fremløbsstyring"}{device.zone1InHeatMode ? " · varme" : ""}</p>
       </div>
-      <button className="secondary-action" type="button" onClick={() => void refresh()}>Opdatér</button>
+      <button className="secondary-action" type="button" onClick={() => void refresh(true)}>Opdatér</button>
     </article>
 
     {fault && <div className="melcloud-alert"><strong>MELCloud melder fejl</strong><span>{device.errorMessages || `Fejlkode ${device.errorCode2Digit}`}</span></div>}
