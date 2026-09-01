@@ -92,6 +92,12 @@
   margin-bottom: 3px;
 }
 
+.sleep-chart-period {
+  color: var(--muted);
+  font-size: .72rem;
+  font-weight: 700;
+}
+
 .sleep-bars-chart {
   display: grid;
   grid-template-columns: 34px minmax(0, 1fr);
@@ -102,6 +108,11 @@
 .sleep-bars-plot {
   position: relative;
   height: 210px;
+}
+
+.sleep-bars-plot {
+  min-width: 0;
+  overflow: hidden;
 }
 
 .sleep-bars-y span {
@@ -125,6 +136,10 @@
   z-index: 1;
   height: 210px;
   padding-top: 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
   touch-action: pan-x;
 }
 
@@ -190,6 +205,8 @@
   min-width: 100%;
   overflow-x: auto;
   overflow-y: hidden;
+  overscroll-behavior-x: contain;
+  scrollbar-width: thin;
 }
 
 .sleep-consistency-columns button {
