@@ -1,6 +1,7 @@
 import type { ComponentType } from "react";
 import { useMemo } from "react";
 import { useCachedJson } from "../data/queryCache";
+import CalendarWasteWidget from "./CalendarWasteWidget";
 import {
   EnergyPriceChartWidget,
   EnergyTodayRangeWidget,
@@ -11,7 +12,7 @@ import {
 } from "./extendedWidgets";
 
 export type WidgetSize = "small" | "medium" | "wide";
-export type WidgetTargetPage = "Garmin" | "Velbefindende" | "Vejr" | "Strøm" | "Unraid" | "DBA" | "PC Watch" | "Motion";
+export type WidgetTargetPage = "Garmin" | "Velbefindende" | "Vejr" | "Strøm" | "Kalender" | "Unraid" | "DBA" | "PC Watch" | "Motion";
 
 export type WidgetDefinition = {
   id: string;
@@ -186,6 +187,7 @@ export const widgetRegistry: WidgetDefinition[] = [
   { id: "weather.current", title: "Vejr", description: "Vejret lige nu", group: "Vejr", page: "Vejr", defaultSize: "medium", supportedSizes: ["small", "medium"], component: WeatherCurrentWidget },
   { id: "weather.nextHours", title: "Vejr · næste timer", description: "Temperatur, vind og nedbør de næste timer", group: "Vejr", page: "Vejr", defaultSize: "medium", supportedSizes: FLEX_SIZES, component: WeatherNextHoursWidget },
   { id: "weather.week", title: "Vejr · 7 dage", description: "Kort 7-dages vejrudsigt", group: "Vejr", page: "Vejr", defaultSize: "medium", supportedSizes: FLEX_SIZES, component: WeatherWeekWidget },
+  { id: "calendar.waste.next", title: "Affald", description: "Næste tømning af rest, plast og papir", group: "Kalender", page: "Kalender", defaultSize: "medium", supportedSizes: FLEX_SIZES, component: CalendarWasteWidget },
   { id: "wellbeing.today", title: "Velbefindende", description: "Dagens check-in og journal", group: "Velbefindende", page: "Velbefindende", defaultSize: "medium", supportedSizes: FLEX_SIZES, component: WellbeingTodayWidget },
 ];
 
