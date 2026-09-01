@@ -8,70 +8,83 @@ This roadmap captures the current UI direction after the Nexus Air Audit and the
 
 Completed 2026-09-01:
 
-1. Reduce global page-header chrome:
+1. Reduced global page-header chrome:
    - smaller H1
    - less top spacing
-   - preserve the existing calm typography/design language rather than shrinking the whole UI
-2. Restore mobile account access:
+   - preserved the existing calm typography/design language rather than shrinking the whole UI
+2. Restored mobile account access:
    - avatar opens a user menu
    - user menu exposes Settings and Log out
-3. Restore a visible mobile-navigation affordance:
-   - keep labels
-   - keep horizontal scrolling
-   - add a right-edge fade so hidden destinations are discoverable
-4. Make controls tell the truth:
+3. Restored a visible mobile-navigation affordance:
+   - labels kept
+   - horizontal scrolling kept
+   - right-edge fade indicates hidden destinations
+4. Made controls tell the truth:
    - navigation/drill-down uses `›`
    - expansion uses a down arrow only when content actually expands inline
-   - remove the Systemstatus chevron until there is a real status detail action
+   - Systemstatus chevron removed until there is a real status detail action
 
-## Phase B — Modular Home (next)
+## Phase B — Modular Home ✅ foundation implemented
 
-Replace the current Home module-link grid with a real per-user dashboard.
+The old Home module-link grid has been replaced with a real per-user dashboard.
 
 ### Widget model
 
-Feature views should be reusable widgets instead of page-owned visualizations. Each widget gets a stable internal ID, for example:
+Feature views are now represented by reusable widgets with stable internal IDs. Initial widgets:
 
-- `garmin.sleep.week`
-- `garmin.steps.week`
+- `garmin.steps.today`
+- `garmin.sleep.lastNight`
+- `garmin.bodyBattery.today`
 - `wellbeing.today`
 - `energy.price.current`
 - `weather.current`
-- `unraid.storage`
 
-The same widget component can be rendered on its feature page and on Home.
+The registry is deliberately independent of Home layout storage so the same widget components can increasingly be reused on feature pages as those pages are refactored.
 
 ### Registry
 
-Introduce a central widget registry with metadata such as:
+`src/widgets/widgetRegistry.tsx` is the central registry and stores:
 
 - stable ID
-- title
-- source/module
+- title and description
+- source/module group
+- target feature page
 - component
+- default size
 - supported sizes
-- permissions/availability
 
-The Home layout stores widget IDs and layout configuration per user rather than hard-coding components.
+### Shared data access
 
-### Data access
+`src/data/queryCache.ts` provides a small shared in-memory JSON query cache. Widgets using the same endpoint share the in-flight request and cached result rather than independently fetching identical source data.
 
-Widgets must not independently duplicate fetches for the same source data. Feature pages and Home widgets should consume shared query/cache/data services where practical.
+This is intentionally small and dependency-free; introduce a larger query library only if a concrete requirement justifies it.
 
-### Editing
+### Per-user layout
 
-Home should eventually support:
+D1 migration `0015_home_layout.sql` adds `user_home_layout`.
+
+`GET /api/home-layout` returns the user's saved layout or a default layout. `PUT /api/home-layout` validates and stores the ordered widget list and size choices.
+
+### Home editing
+
+`Rediger Hjem` currently supports:
 
 - add/remove widgets
-- move widgets
-- resize widgets
+- change supported widget size
+- move widgets up/down
 - save layout per user
 
-Build the registry and rendering model before adding drag/drop complexity.
+The stored format is already suitable for later drag/drop. Drag/drop itself is deliberately deferred until it improves the UX enough to justify the extra interaction/code complexity.
 
-## Phase C — Revisit Air Audit
+### Next widget work
 
-After Modular Home is in place, review the audit again and cherry-pick remaining improvements that still apply to the real product.
+As new visualizations are built on Garmin, Strøm, Vejr, Velbefindende, Unraid and later integrations, create them as registered reusable widgets rather than page-only components where practical.
+
+Existing page-owned visualizations do not all need to be refactored immediately; do that when each area is touched again.
+
+## Phase C — Revisit Air Audit (next review pass)
+
+After Modular Home has had a real deployment/test pass, review the audit again and cherry-pick remaining improvements that still apply to the product.
 
 Likely candidates:
 
