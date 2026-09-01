@@ -79,9 +79,33 @@ export type MelCloudDevice = {
   offline: boolean | null;
   roomTemperature: number | null;
   setTemperature: number | null;
+  roomTemperatureZone1: number | null;
+  setTemperatureZone1: number | null;
+  zone1Name: string | null;
+  zone1InHeatMode: boolean | null;
+  zone1InRoomMode: boolean | null;
+  idleZone1: boolean | null;
   outdoorTemperature: number | null;
+  flowTemperature: number | null;
+  returnTemperature: number | null;
   tankTemperature: number | null;
   setTankTemperature: number | null;
+  heatPumpFrequency: number | null;
+  waterPump1Status: boolean | null;
+  ecoHotWater: boolean | null;
+  forcedHotWaterMode: boolean | null;
+  holidayMode: boolean | null;
+  boosterHeater1Status: boolean | null;
+  boosterHeater2Status: boolean | null;
+  immersionHeaterStatus: boolean | null;
+  dailyHeatingEnergyConsumed: number | null;
+  dailyHeatingEnergyProduced: number | null;
+  dailyHotWaterEnergyConsumed: number | null;
+  dailyHotWaterEnergyProduced: number | null;
+  wifiSignalStrength: number | null;
+  hasError: boolean | null;
+  errorCode2Digit: number | null;
+  errorMessages: string | null;
   operationMode: number | null;
   lastCommunication: string | null;
 };
@@ -96,19 +120,45 @@ export function normalizeClassicDevices(buildings: unknown[]): MelCloudDevice[] 
     if (id === null || seen.has(id)) continue;
     seen.add(id);
     const device = object(row.Device) ?? row;
+    const roomZone1 = numberValue(device.RoomTemperatureZone1);
+    const setZone1 = numberValue(device.SetTemperatureZone1);
     result.push({
       id,
       name: stringValue(row.DeviceName) ?? `MELCloud ${id}`,
       deviceType: numberValue(row.DeviceType),
       power: boolValue(device.Power),
       offline: boolValue(row.Offline) ?? boolValue(device.Offline),
-      roomTemperature: numberValue(device.RoomTemperature),
-      setTemperature: numberValue(device.SetTemperature),
+      roomTemperature: numberValue(device.RoomTemperature) ?? roomZone1,
+      setTemperature: numberValue(device.SetTemperature) ?? setZone1,
+      roomTemperatureZone1: roomZone1,
+      setTemperatureZone1: setZone1,
+      zone1Name: stringValue(device.Zone1Name),
+      zone1InHeatMode: boolValue(device.Zone1InHeatMode),
+      zone1InRoomMode: boolValue(device.Zone1InRoomMode),
+      idleZone1: boolValue(device.IdleZone1),
       outdoorTemperature: numberValue(device.OutdoorTemperature),
+      flowTemperature: numberValue(device.FlowTemperature),
+      returnTemperature: numberValue(device.ReturnTemperature),
       tankTemperature: numberValue(device.TankWaterTemperature),
       setTankTemperature: numberValue(device.SetTankWaterTemperature),
+      heatPumpFrequency: numberValue(device.HeatPumpFrequency),
+      waterPump1Status: boolValue(device.WaterPump1Status),
+      ecoHotWater: boolValue(device.EcoHotWater),
+      forcedHotWaterMode: boolValue(device.ForcedHotWaterMode),
+      holidayMode: boolValue(device.HolidayMode),
+      boosterHeater1Status: boolValue(device.BoosterHeater1Status),
+      boosterHeater2Status: boolValue(device.BoosterHeater2Status),
+      immersionHeaterStatus: boolValue(device.ImmersionHeaterStatus),
+      dailyHeatingEnergyConsumed: numberValue(device.DailyHeatingEnergyConsumed),
+      dailyHeatingEnergyProduced: numberValue(device.DailyHeatingEnergyProduced),
+      dailyHotWaterEnergyConsumed: numberValue(device.DailyHotWaterEnergyConsumed),
+      dailyHotWaterEnergyProduced: numberValue(device.DailyHotWaterEnergyProduced),
+      wifiSignalStrength: numberValue(device.WifiSignalStrength),
+      hasError: boolValue(device.HasError),
+      errorCode2Digit: numberValue(device.ErrorCode2Digit),
+      errorMessages: stringValue(device.ErrorMessages),
       operationMode: numberValue(device.OperationMode),
-      lastCommunication: stringValue(row.LastCommunication) ?? stringValue(device.LastCommunication),
+      lastCommunication: stringValue(row.LastCommunication) ?? stringValue(device.LastCommunication) ?? stringValue(device.LastTimeStamp),
     });
   }
   return result;
