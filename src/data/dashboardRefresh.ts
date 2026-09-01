@@ -18,6 +18,15 @@ export const REFRESH_CLASS_LABELS: Record<RefreshClass, string> = {
   event: "Ved åbning / event",
 };
 
+export const DEFAULT_WIDGET_REFRESH_CLASSES: Record<string, RefreshClass> = {
+  Garmin: "event",
+  Strøm: "standard",
+  Vejr: "standard",
+  Kalender: "slow",
+  MELCloud: "live",
+  Velbefindende: "event",
+};
+
 export type DashboardRefreshSettingsResponse = {
   settings: {
     dashboardRefreshClasses?: Record<string, RefreshClass> | null;
@@ -34,13 +43,16 @@ export function isRefreshClass(value: unknown): value is RefreshClass {
   return value === "live" || value === "standard" || value === "slow" || value === "event";
 }
 
+export function defaultRefreshClassForGroup(group: string): RefreshClass {
+  return DEFAULT_WIDGET_REFRESH_CLASSES[group] ?? "standard";
+}
+
 export function resolveDashboardRefreshClass(
   group: string,
-  defaultClass: RefreshClass,
   settings: DashboardRefreshSettingsResponse | null,
 ): RefreshClass {
   const configured = settings?.settings.dashboardRefreshClasses?.[group];
-  return isRefreshClass(configured) ? configured : defaultClass;
+  return isRefreshClass(configured) ? configured : defaultRefreshClassForGroup(group);
 }
 
 export function useDashboardJson<T>(url: string, ttlMs?: number) {
