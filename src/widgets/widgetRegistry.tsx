@@ -42,7 +42,7 @@ type EnergyPoint = {
 type EnergyResponse = { data: { intervals: EnergyPoint[] } };
 
 type WellbeingResponse = {
-  metrics: Array<{ id: string; name: string; emoji: string }>;
+  metrics: Array<{ id: string; name: string; emoji: string; valueType: "scale" | "boolean" }>;
   entries: Array<{ metricId: string; value: number }>;
   journals: Array<{ body: string }>;
 };
@@ -105,7 +105,7 @@ function weatherIcon(symbol: string | null): string {
 
 function compassDirection(degrees: number | null): string {
   if (typeof degrees !== "number" || !Number.isFinite(degrees)) return "";
-  const directions = ["N", "NNØ", "NØ", "ØNØ", "Ø", "ØSØ", "SØ", "SSØ", "S", "SSV", "SV", "VSV", "V", "VNV", "NV", "NNV"];
+  const directions = ["N", "NNØ", "NØ", "ØNØ", "Ø", "ØSØ", "SØ", "ØSØ", "S", "SSV", "SV", "VSV", "V", "VNV", "NV", "NNV"];
   const normalized = ((degrees % 360) + 360) % 360;
   return directions[Math.round(normalized / 22.5) % 16];
 }
@@ -154,7 +154,10 @@ function WellbeingTodayWidget() {
   const journal = data.journals[0]?.body?.trim() ?? "";
   return <div className="home-wellbeing">
     <div className="home-wellbeing-summary"><strong>{completed.length} af {data.metrics.length}</strong><span>målepunkter registreret i dag</span></div>
-    <div className="home-wellbeing-metrics">{completed.map((metric) => <span key={metric.id}>{metric.emoji} {metric.name}: <strong>{values.get(metric.id)}/5</strong></span>)}</div>
+    <div className="home-wellbeing-metrics">{completed.map((metric) => {
+      const value = values.get(metric.id);
+      return <span key={metric.id}>{metric.emoji} {metric.name}: <strong>{metric.valueType === "boolean" ? (value === 1 ? "Ja" : "Nej") : `${value}/5`}</strong></span>;
+    })}</div>
     {journal ? <div className="home-wellbeing-journal"><span>Journal</span><p>{journal}</p></div> : <small className="home-wellbeing-no-journal">Ingen journalnote i dag</small>}
   </div>;
 }
