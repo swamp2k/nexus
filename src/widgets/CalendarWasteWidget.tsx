@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { useDashboardJson } from "../data/dashboardRefresh";
 import { useCachedJson } from "../data/queryCache";
 
 type CalendarEvent = {
@@ -61,7 +62,7 @@ function daysUntil(value: string): string {
 }
 
 export default function CalendarWasteWidget() {
-  const { data, loading, error } = useCachedJson<EventsResponse>("/api/calendar/events?days=90", 15 * 60_000);
+  const { data, loading, error } = useDashboardJson<EventsResponse>("/api/calendar/events?days=90");
   const preferences = useCachedJson<PreferencesResponse>("/api/calendar/preferences", 15 * 60_000);
   const next = useMemo(() => {
     const events = data?.events ?? [];
