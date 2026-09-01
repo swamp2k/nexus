@@ -1,4 +1,5 @@
 import { useMemo } from "react";
+import { useDashboardJson } from "../data/dashboardRefresh";
 import { useCachedJson } from "../data/queryCache";
 
 type EnergyPoint = {
@@ -139,7 +140,7 @@ function hours(seconds: number | null): string {
 }
 
 export function EnergyPriceChartWidget() {
-  const { data, loading, error } = useCachedJson<EnergyResponse>("/api/sources/energy/prices", 10 * 60_000);
+  const { data, loading, error } = useDashboardJson<EnergyResponse>("/api/sources/energy/prices");
   const { data: settings } = useCachedJson<EnergySettingsResponse>("/api/settings", 10 * 60_000);
   const bands = priceBands(settings);
   const bars = useMemo(() => {
@@ -192,7 +193,7 @@ export function EnergyPriceChartWidget() {
 }
 
 export function EnergyTodayRangeWidget() {
-  const { data, loading, error } = useCachedJson<EnergyResponse>("/api/sources/energy/prices", 10 * 60_000);
+  const { data, loading, error } = useDashboardJson<EnergyResponse>("/api/sources/energy/prices");
   const stats = useMemo(() => {
     if (!data) return null;
     const today = new Intl.DateTimeFormat("en-CA", { year: "numeric", month: "2-digit", day: "2-digit", timeZone: TZ }).format(new Date());
@@ -211,7 +212,7 @@ export function EnergyTodayRangeWidget() {
 
 export function GarminStepsWeekWidget() {
   const url = `/api/garmin/health?date=${localDate()}&days=7`;
-  const { data, loading, error } = useCachedJson<GarminHealthResponse>(url, 5 * 60_000);
+  const { data, loading, error } = useDashboardJson<GarminHealthResponse>(url);
   if (loading) return <WidgetState label="Henter skridt for 7 dage…" />;
   const rows = data?.history ?? [];
   if (error || rows.length === 0) return <WidgetState label="Ingen skridthistorik" />;
@@ -223,7 +224,7 @@ export function GarminStepsWeekWidget() {
 
 export function GarminSleepWeekWidget() {
   const url = `/api/garmin/sleep?date=${localDate()}&days=7`;
-  const { data, loading, error } = useCachedJson<GarminSleepResponse>(url, 5 * 60_000);
+  const { data, loading, error } = useDashboardJson<GarminSleepResponse>(url);
   if (loading) return <WidgetState label="Henter søvn for 7 dage…" />;
   const rows = (data?.history ?? []).filter((row) => (row.sleep_seconds ?? 0) > 0);
   if (error || rows.length === 0) return <WidgetState label="Ingen søvnhistorik" />;
@@ -233,7 +234,7 @@ export function GarminSleepWeekWidget() {
 }
 
 export function WeatherNextHoursWidget() {
-  const { data, loading, error } = useCachedJson<WeatherResponse>("/api/sources/weather", 5 * 60_000);
+  const { data, loading, error } = useDashboardJson<WeatherResponse>("/api/sources/weather");
   if (loading) return <WidgetState label="Henter timevejret…" />;
   const nextHours = data?.data.hourly?.slice(0, 6) ?? [];
   if (error || nextHours.length === 0) return <WidgetState label="Ingen timeudsigt" />;
@@ -247,7 +248,7 @@ export function WeatherNextHoursWidget() {
 }
 
 export function WeatherWeekWidget() {
-  const { data, loading, error } = useCachedJson<WeatherResponse>("/api/sources/weather", 5 * 60_000);
+  const { data, loading, error } = useDashboardJson<WeatherResponse>("/api/sources/weather");
   if (loading) return <WidgetState label="Henter 7-dages udsigt…" />;
   const days = data?.data.daily?.slice(0, 7) ?? [];
   if (error || days.length === 0) return <WidgetState label="Ingen 7-dages udsigt" />;
