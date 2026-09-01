@@ -140,8 +140,10 @@ async function dayState(request: Request, env: Env): Promise<Response> {
        FROM wellbeing_metrics WHERE user_id = ? AND active = 1 ORDER BY sort_order, created_at`,
     ).bind(user.id).all<MetricRow>(),
     env.DB.prepare(
-      `SELECT metric_id AS metricId, value FROM wellbeing_entries
-       WHERE user_id = ? AND entry_date = ?`,
+      `SELECT e.metric_id AS metricId, e.value
+       FROM wellbeing_entries e
+       JOIN wellbeing_metrics m ON m.id = e.metric_id AND m.user_id = e.user_id
+       WHERE e.user_id = ? AND e.entry_date = ? AND m.active = 1`,
     ).bind(user.id, date).all<EntryRow>(),
     env.DB.prepare(
       `SELECT id, entry_date AS entryDate, body, created_at AS createdAt, updated_at AS updatedAt
@@ -175,7 +177,7 @@ async function saveDay(request: Request, env: Env): Promise<Response> {
 
   for (const metricId of metricIds) {
     const valueType = allowed.get(metricId);
-    if (!valueType) return json({ error: "metric_not_found" }, { status: 404 });
+    if (!valueType) continue;
     const raw = values[metricId];
     if (raw === null || raw === undefined || raw === "") {
       statements.push(env.DB.prepare(
