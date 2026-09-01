@@ -5,6 +5,8 @@ const DEFAULT_LOW_PRICE_DKK = 1;
 const DEFAULT_HIGH_PRICE_DKK = 2;
 const DEFAULT_DASHBOARD_REFRESH_SECONDS = 300;
 
+type RefreshClass = "live" | "standard" | "slow" | "event";
+
 type SettingsRow = {
   weatherLabel: string | null;
   weatherLat: number | null;
@@ -15,7 +17,12 @@ type SettingsRow = {
   energyLowPriceDkk: number | null;
   energyHighPriceDkk: number | null;
   dashboardRefreshSeconds: number | null;
+  dashboardRefreshClasses: Record<string, RefreshClass>;
   updatedAt: string | null;
+};
+
+type SettingsDbRow = Omit<SettingsRow, "dashboardRefreshClasses"> & {
+  dashboardRefreshClasses: string | null;
 };
 
 type SettingsBody = {
@@ -28,6 +35,7 @@ type SettingsBody = {
   energyLowPriceDkk?: unknown;
   energyHighPriceDkk?: unknown;
   dashboardRefreshSeconds?: unknown;
+  dashboardRefreshClasses?: unknown;
 };
 
 type SettingsEnv = Env & {
@@ -82,6 +90,24 @@ function cleanDashboardRefresh(value: unknown): number {
   return Math.round(parsed);
 }
 
+function isRefreshClass(value: unknown): value is RefreshClass {
+  return value === "live" || value === "standard" || value === "slow" || value === "event";
+}
+
+function cleanRefreshClasses(value: unknown): Record<string, RefreshClass> {
+  let source = value;
+  if (typeof value === "string") {
+    try { source = JSON.parse(value); } catch { return {}; }
+  }
+  if (!source || typeof source !== "object" || Array.isArray(source)) return {};
+  const output: Record<string, RefreshClass> = {};
+  for (const [rawKey, rawValue] of Object.entries(source as Record<string, unknown>)) {
+    const key = rawKey.trim().slice(0, 80);
+    if (key && isRefreshClass(rawValue)) output[key] = rawValue;
+  }
+  return output;
+}
+
 function fallbackSettings(env: SettingsEnv): SettingsRow {
   return {
     weatherLabel: String(env.WEATHER_LABEL ?? "Hjem").trim() || "Hjem",
@@ -93,6 +119,7 @@ function fallbackSettings(env: SettingsEnv): SettingsRow {
     energyLowPriceDkk: DEFAULT_LOW_PRICE_DKK,
     energyHighPriceDkk: DEFAULT_HIGH_PRICE_DKK,
     dashboardRefreshSeconds: DEFAULT_DASHBOARD_REFRESH_SECONDS,
+    dashboardRefreshClasses: {},
     updatedAt: null,
   };
 }
@@ -109,10 +136,11 @@ async function readSettings(env: SettingsEnv, userId: string): Promise<SettingsR
               energy_low_price_dkk AS energyLowPriceDkk,
               energy_high_price_dkk AS energyHighPriceDkk,
               dashboard_refresh_seconds AS dashboardRefreshSeconds,
+              dashboard_refresh_classes AS dashboardRefreshClasses,
               updated_at AS updatedAt
        FROM user_settings
        WHERE user_id = ?`,
-    ).bind(userId).first<SettingsRow>();
+    ).bind(userId).first<SettingsDbRow>();
 
     if (!row) return fallbackSettings(env);
     return {
@@ -123,6 +151,7 @@ async function readSettings(env: SettingsEnv, userId: string): Promise<SettingsR
       energyLowPriceDkk: cleanPriceBand(row.energyLowPriceDkk, DEFAULT_LOW_PRICE_DKK),
       energyHighPriceDkk: cleanPriceBand(row.energyHighPriceDkk, DEFAULT_HIGH_PRICE_DKK),
       dashboardRefreshSeconds: cleanDashboardRefresh(row.dashboardRefreshSeconds),
+      dashboardRefreshClasses: cleanRefreshClasses(row.dashboardRefreshClasses),
     };
   } catch {
     return fallbackSettings(env);
@@ -156,6 +185,7 @@ export async function handleSettingsRoute(request: Request, env: SettingsEnv): P
     return json({ error: "invalid_json" }, { status: 400 });
   }
 
+  const current = await readSettings(env, user.id);
   const weatherLabel = cleanLabel(body.weatherLabel);
   const weatherLat = cleanCoordinate(body.weatherLat, -90, 90);
   const weatherLon = cleanCoordinate(body.weatherLon, -180, 180);
@@ -164,7 +194,12 @@ export async function handleSettingsRoute(request: Request, env: SettingsEnv): P
   const energySupplierMarkupOere = cleanMarkup(body.energySupplierMarkupOere);
   const energyLowPriceDkk = cleanPriceBand(body.energyLowPriceDkk, DEFAULT_LOW_PRICE_DKK);
   const energyHighPriceDkk = cleanPriceBand(body.energyHighPriceDkk, DEFAULT_HIGH_PRICE_DKK);
-  const dashboardRefreshSeconds = cleanDashboardRefresh(body.dashboardRefreshSeconds);
+  const dashboardRefreshSeconds = body.dashboardRefreshSeconds === undefined
+    ? cleanDashboardRefresh(current.dashboardRefreshSeconds)
+    : cleanDashboardRefresh(body.dashboardRefreshSeconds);
+  const dashboardRefreshClasses = body.dashboardRefreshClasses === undefined
+    ? current.dashboardRefreshClasses
+    : cleanRefreshClasses(body.dashboardRefreshClasses);
 
   if (weatherLat === null || weatherLon === null) {
     return json({ error: "invalid_weather_location" }, { status: 400 });
@@ -181,8 +216,9 @@ export async function handleSettingsRoute(request: Request, env: SettingsEnv): P
     `INSERT INTO user_settings (
        user_id, weather_label, weather_lat, weather_lon,
        energy_price_area, energy_grid_provider, energy_supplier_markup_oere,
-       energy_low_price_dkk, energy_high_price_dkk, dashboard_refresh_seconds, updated_at
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       energy_low_price_dkk, energy_high_price_dkk, dashboard_refresh_seconds,
+       dashboard_refresh_classes, updated_at
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(user_id) DO UPDATE SET
        weather_label = excluded.weather_label,
        weather_lat = excluded.weather_lat,
@@ -193,6 +229,7 @@ export async function handleSettingsRoute(request: Request, env: SettingsEnv): P
        energy_low_price_dkk = excluded.energy_low_price_dkk,
        energy_high_price_dkk = excluded.energy_high_price_dkk,
        dashboard_refresh_seconds = excluded.dashboard_refresh_seconds,
+       dashboard_refresh_classes = excluded.dashboard_refresh_classes,
        updated_at = excluded.updated_at`,
   ).bind(
     user.id,
@@ -205,6 +242,7 @@ export async function handleSettingsRoute(request: Request, env: SettingsEnv): P
     energyLowPriceDkk,
     energyHighPriceDkk,
     dashboardRefreshSeconds,
+    JSON.stringify(dashboardRefreshClasses),
     updatedAt,
   ).run();
 
@@ -219,6 +257,7 @@ export async function handleSettingsRoute(request: Request, env: SettingsEnv): P
       energyLowPriceDkk,
       energyHighPriceDkk,
       dashboardRefreshSeconds,
+      dashboardRefreshClasses,
       updatedAt,
     },
   });
