@@ -1,15 +1,17 @@
 import { useEffect, useMemo, useState } from "react";
 
+type MetricValueType = "scale" | "boolean";
 type Metric = {
   id: string;
   name: string;
   emoji: string;
   direction: "high_good" | "high_bad";
+  valueType: MetricValueType;
   active: number;
   sortOrder: number;
 };
 
-type MetricPatch = Partial<Omit<Metric, "active">> & { active?: boolean };
+type MetricPatch = Partial<Omit<Metric, "active" | "valueType">> & { active?: boolean };
 
 async function errorText(response: Response): Promise<string> {
   try {
@@ -18,11 +20,17 @@ async function errorText(response: Response): Promise<string> {
   } catch { return `HTTP ${response.status}`; }
 }
 
+function metricDescription(metric: Metric): string {
+  if (metric.valueType === "boolean") return "Ja / nej";
+  return metric.direction === "high_good" ? "1–5 · 5 = godt" : "1–5 · 5 = meget / dårligt";
+}
+
 export default function WellbeingMetricSettings() {
   const [metrics, setMetrics] = useState<Metric[]>([]);
   const [name, setName] = useState("");
   const [emoji, setEmoji] = useState("🙂");
   const [direction, setDirection] = useState<"high_good" | "high_bad">("high_good");
+  const [valueType, setValueType] = useState<MetricValueType>("scale");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [showHidden, setShowHidden] = useState(false);
@@ -46,10 +54,10 @@ export default function WellbeingMetricSettings() {
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: name.trim(), emoji, direction }),
+        body: JSON.stringify({ name: name.trim(), emoji, direction, valueType }),
       });
       if (!response.ok) throw new Error(await errorText(response));
-      setName(""); setEmoji("🙂"); setDirection("high_good");
+      setName(""); setEmoji("🙂"); setDirection("high_good"); setValueType("scale");
       await refresh();
     } catch (error) { setMessage(error instanceof Error ? error.message : "Målepunktet kunne ikke oprettes."); }
     finally { setBusy(false); }
@@ -86,7 +94,7 @@ export default function WellbeingMetricSettings() {
           method: "POST",
           credentials: "same-origin",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: metricName, emoji: metricEmoji, direction: metricDirection }),
+          body: JSON.stringify({ name: metricName, emoji: metricEmoji, direction: metricDirection, valueType: "scale" }),
         });
         if (!response.ok) throw new Error(await errorText(response));
       }
@@ -103,7 +111,7 @@ export default function WellbeingMetricSettings() {
 
       {activeMetrics.length > 0 && <div className="wellbeing-settings-list">{activeMetrics.map((metric) => <div key={metric.id} className="wellbeing-setting-row">
         <span className="wellbeing-setting-emoji">{metric.emoji}</span>
-        <div><strong>{metric.name}</strong><small>{metric.direction === "high_good" ? "5 = godt" : "5 = meget / dårligt"}</small></div>
+        <div><strong>{metric.name}</strong><small>{metricDescription(metric)}</small></div>
         <button className="secondary-action" type="button" disabled={busy} onClick={() => void patchMetric(metric, { active: false })}>Skjul</button>
       </div>)}</div>}
 
@@ -116,9 +124,11 @@ export default function WellbeingMetricSettings() {
       <div className="wellbeing-new-metric">
         <label><span>Emoji</span><input value={emoji} onChange={(event) => setEmoji(event.target.value)} maxLength={8} /></label>
         <label className="wellbeing-name-input"><span>Navn</span><input value={name} onChange={(event) => setName(event.target.value)} maxLength={80} placeholder="Fx koncentration" /></label>
-        <label><span>Skala</span><select value={direction} onChange={(event) => setDirection(event.target.value as "high_good" | "high_bad")}><option value="high_good">5 = godt</option><option value="high_bad">5 = meget / dårligt</option></select></label>
+        <label><span>Type</span><select value={valueType} onChange={(event) => setValueType(event.target.value as MetricValueType)}><option value="scale">Skala 1–5</option><option value="boolean">Ja / nej</option></select></label>
+        {valueType === "scale" && <label><span>Retning</span><select value={direction} onChange={(event) => setDirection(event.target.value as "high_good" | "high_bad")}><option value="high_good">5 = godt</option><option value="high_bad">5 = meget / dårligt</option></select></label>}
         <button className="primary-action" type="button" disabled={busy || !name.trim()} onClick={() => void createMetric()}>Tilføj</button>
       </div>
+      <p className="settings-help">Manglende værdi betyder “ikke registreret / ikke relevant”. Det er forskelligt fra Nej på et ja/nej-punkt.</p>
       {message && <p className="settings-feedback error">{message}</p>}
     </div>
 
@@ -127,7 +137,7 @@ export default function WellbeingMetricSettings() {
         <div className="wellbeing-hidden-heading"><div><p className="section-label">Velbefindende</p><h3 id="wellbeing-hidden-title">Skjulte målepunkter</h3></div><button className="secondary-action" type="button" onClick={() => setShowHidden(false)}>Luk</button></div>
         <div className="wellbeing-settings-list">{hiddenMetrics.map((metric) => <div key={metric.id} className="wellbeing-setting-row">
           <span className="wellbeing-setting-emoji">{metric.emoji}</span>
-          <div><strong>{metric.name}</strong><small>{metric.direction === "high_good" ? "5 = godt" : "5 = meget / dårligt"}</small></div>
+          <div><strong>{metric.name}</strong><small>{metricDescription(metric)}</small></div>
           <button className="secondary-action" type="button" disabled={busy} onClick={() => void patchMetric(metric, { active: true })}>Aktivér</button>
         </div>)}</div>
       </section>
