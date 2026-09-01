@@ -75,12 +75,16 @@ D1 migration `0015_home_layout.sql` adds `user_home_layout`.
 
 ### Home editing
 
-`Rediger Hjem` currently supports:
+`Rediger Hjem` supports:
 
-- add/remove widgets
+- add/remove widgets from the catalogue
 - change supported widget size
-- move widgets up/down
+- direct `−/+` resize controls on each widget
+- direct desktop drag-and-drop reorder using the widget handle
+- inline earlier/later buttons as a deterministic fallback, including touch/mobile use
 - save layout per user
+
+The original selector + move controls remain available as a fallback rather than making drag/drop the only way to edit the dashboard.
 
 Widget sizing has explicit semantics on desktop:
 
@@ -90,7 +94,7 @@ Widget sizing has explicit semantics on desktop:
 
 Responsive breakpoints collapse these predictably to two columns and then one column on mobile.
 
-The stored format is already suitable for later drag/drop. Drag/drop itself is deliberately deferred until it improves the UX enough to justify the extra interaction/code complexity.
+The stored format remains the intentionally simple `{ id, size }` model; no new migration was needed for direct editing.
 
 ### First polish pass
 
@@ -112,15 +116,22 @@ Added compact dashboard views for data that benefits from short trends rather th
 - next-hours weather
 - 7-day weather
 
-### Next Home work — dynamic layout
+`weather.current` now keeps wind strength/direction and current precipitation amount together in the same default widget size.
 
-The next Home pass should focus on layout rather than adding more raw widgets:
+### Dynamic-content pass
 
-- let widget size materially change the amount/detail of content shown
-- improve packing and row-height behaviour so mixed small/medium/wide widgets compose naturally
-- evaluate direct resize/reorder interactions instead of only select + move buttons
-- preserve per-user layout and responsive mobile behaviour
-- avoid making every widget a fixed card with identical information density
+Home widgets use CSS container queries so content responds to the actual widget width rather than only the browser viewport:
+
+- compact widgets prioritize the glanceable value and trim tertiary detail
+- medium widgets expose useful context
+- wide widgets expose richer trends, longer forecasts and journal content
+- rich widgets can use small/medium/wide sizes where the content can degrade gracefully
+
+This means resizing a widget changes information density, not only card width.
+
+### Next Home work
+
+After direct reorder/resize is tested on real desktop/mobile layouts, next layout work can be driven by observed friction rather than introducing a heavier grid library pre-emptively. Candidates include row-height tuning, smarter packing, and pointer-based touch drag only if the button fallback proves insufficient.
 
 ### Next widget work
 
