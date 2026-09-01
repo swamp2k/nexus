@@ -1,6 +1,6 @@
 import type { ComponentType } from "react";
 import { useMemo } from "react";
-import { useCachedJson } from "../data/queryCache";
+import { useDashboardJson } from "../data/dashboardRefresh";
 import CalendarWasteWidget from "./CalendarWasteWidget";
 import MelCloudWidget from "./MelCloudWidget";
 import {
@@ -77,7 +77,7 @@ function WidgetState({ label }: { label: string }) {
 }
 
 function GarminStepsWidget() {
-  const { data, loading, error } = useCachedJson<GarminOverview>("/api/garmin/overview", 5 * 60_000);
+  const { data, loading, error } = useDashboardJson<GarminOverview>("/api/garmin/overview");
   if (loading) return <WidgetState label="Henter skridt…" />;
   if (error || !data?.daily) return <WidgetState label="Ingen Garmin-data" />;
   const steps = numberValue(data.daily, "steps");
@@ -87,14 +87,14 @@ function GarminStepsWidget() {
 }
 
 function GarminSleepWidget() {
-  const { data, loading, error } = useCachedJson<GarminOverview>("/api/garmin/overview", 5 * 60_000);
+  const { data, loading, error } = useDashboardJson<GarminOverview>("/api/garmin/overview");
   if (loading) return <WidgetState label="Henter søvn…" />;
   if (error || !data?.sleep) return <WidgetState label="Ingen søvndata" />;
   return <div className="home-metric"><strong>{hours(data.sleep.sleep_seconds)}</strong><span>sidste nat</span><small>Dyb {hours(data.sleep.deep_seconds)} · REM {hours(data.sleep.rem_seconds)}</small></div>;
 }
 
 function GarminBodyBatteryWidget() {
-  const { data, loading, error } = useCachedJson<GarminOverview>("/api/garmin/overview", 5 * 60_000);
+  const { data, loading, error } = useDashboardJson<GarminOverview>("/api/garmin/overview");
   if (loading) return <WidgetState label="Henter Body Battery…" />;
   if (error || !data?.daily) return <WidgetState label="Ingen Garmin-data" />;
   const latest = numberValue(data.daily, "body_battery_latest");
@@ -122,7 +122,7 @@ function compassDirection(degrees: number | null): string {
 }
 
 function WeatherCurrentWidget() {
-  const { data, loading, error } = useCachedJson<WeatherResponse>("/api/sources/weather", 5 * 60_000);
+  const { data, loading, error } = useDashboardJson<WeatherResponse>("/api/sources/weather");
   if (loading) return <WidgetState label="Henter vejret…" />;
   if (error || !data?.data.current) return <WidgetState label="Vejret kunne ikke hentes" />;
   const current = data.data.current;
@@ -132,7 +132,7 @@ function WeatherCurrentWidget() {
 }
 
 function EnergyCurrentWidget() {
-  const { data, loading, error } = useCachedJson<EnergyResponse>("/api/sources/energy/prices", 10 * 60_000);
+  const { data, loading, error } = useDashboardJson<EnergyResponse>("/api/sources/energy/prices");
   const current = useMemo(() => {
     if (!data) return null;
     const now = Date.now();
@@ -157,7 +157,7 @@ function localDate(): string {
 
 function WellbeingTodayWidget() {
   const url = `/api/wellbeing/day?date=${encodeURIComponent(localDate())}`;
-  const { data, loading, error } = useCachedJson<WellbeingResponse>(url, 60_000);
+  const { data, loading, error } = useDashboardJson<WellbeingResponse>(url);
   if (loading) return <WidgetState label="Henter dagens check-in…" />;
   if (error || !data) return <WidgetState label="Check-in kunne ikke hentes" />;
   const values = new Map(data.entries.map((entry) => [entry.metricId, entry.value]));
