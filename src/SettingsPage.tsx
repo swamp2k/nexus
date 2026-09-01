@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import CalendarSourceSettings from "./CalendarSourceSettings";
 import GarminImportSettings from "./GarminImportSettings";
+import MelCloudSettings from "./MelCloudSettings";
 import WellbeingMetricSettings from "./WellbeingMetricSettings";
 
 type GridProviderOption = { key: string; label: string };
@@ -168,6 +169,11 @@ export default function SettingsPage() {
       <details className="settings-card settings-collapsible settings-component-wrapper">
         <summary className="settings-card-heading"><div><p className="section-label">Datakilde</p><h2>Kalender · iCal</h2></div><span className="settings-icon" aria-hidden="true">▦</span></summary>
         <CalendarSourceSettings />
+      </details>
+
+      <details className="settings-card settings-collapsible settings-component-wrapper">
+        <summary className="settings-card-heading"><div><p className="section-label">Datakilde</p><h2>MELCloud</h2></div><span className="settings-icon" aria-hidden="true">◫</span></summary>
+        <MelCloudSettings />
       </details>
 
       <WellbeingMetricSettings />
