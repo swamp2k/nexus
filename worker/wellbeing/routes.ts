@@ -1,10 +1,12 @@
 import { getAuthenticatedUser } from "../auth/session";
 
+type MetricValueType = "scale" | "boolean";
 type MetricRow = {
   id: string;
   name: string;
   emoji: string;
   direction: "high_good" | "high_bad";
+  valueType: MetricValueType;
   sortOrder: number;
   active: number;
   createdAt: string;
@@ -40,6 +42,10 @@ function cleanEmoji(value: unknown): string {
   return trimmed ? [...trimmed].slice(0, 4).join("") : "🙂";
 }
 
+function cleanValueType(value: unknown): MetricValueType {
+  return value === "boolean" ? "boolean" : "scale";
+}
+
 async function requireUser(request: Request, env: Env) {
   return getAuthenticatedUser(request, env.DB);
 }
@@ -49,7 +55,7 @@ async function listMetrics(request: Request, env: Env): Promise<Response> {
   if (!user) return json({ error: "unauthorized" }, { status: 401 });
 
   const result = await env.DB.prepare(
-    `SELECT id, name, emoji, direction, sort_order AS sortOrder, active,
+    `SELECT id, name, emoji, direction, value_type AS valueType, sort_order AS sortOrder, active,
             created_at AS createdAt, updated_at AS updatedAt
      FROM wellbeing_metrics
      WHERE user_id = ?
@@ -64,11 +70,12 @@ async function createMetric(request: Request, env: Env): Promise<Response> {
   if (!user) return json({ error: "unauthorized" }, { status: 401 });
   if (user.role === "viewer") return json({ error: "forbidden" }, { status: 403 });
 
-  let body: { name?: unknown; emoji?: unknown; direction?: unknown } = {};
+  let body: { name?: unknown; emoji?: unknown; direction?: unknown; valueType?: unknown } = {};
   try { body = await request.json(); } catch { return json({ error: "invalid_json" }, { status: 400 }); }
 
   const name = typeof body.name === "string" ? body.name.trim().slice(0, 80) : "";
   const direction = body.direction === "high_bad" ? "high_bad" : "high_good";
+  const valueType = cleanValueType(body.valueType);
   if (!name) return json({ error: "name_required" }, { status: 400 });
 
   const max = await env.DB.prepare(
@@ -82,11 +89,11 @@ async function createMetric(request: Request, env: Env): Promise<Response> {
 
   await env.DB.prepare(
     `INSERT INTO wellbeing_metrics
-       (id, user_id, name, emoji, direction, sort_order, active, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, 1, ?, ?)`,
-  ).bind(id, user.id, name, emoji, direction, sortOrder, now, now).run();
+       (id, user_id, name, emoji, direction, value_type, sort_order, active, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
+  ).bind(id, user.id, name, emoji, direction, valueType, sortOrder, now, now).run();
 
-  return json({ metric: { id, name, emoji, direction, sortOrder, active: 1, createdAt: now, updatedAt: now } }, { status: 201 });
+  return json({ metric: { id, name, emoji, direction, valueType, sortOrder, active: 1, createdAt: now, updatedAt: now } }, { status: 201 });
 }
 
 async function updateMetric(request: Request, env: Env, metricId: string): Promise<Response> {
@@ -95,7 +102,7 @@ async function updateMetric(request: Request, env: Env, metricId: string): Promi
   if (user.role === "viewer") return json({ error: "forbidden" }, { status: 403 });
 
   const existing = await env.DB.prepare(
-    `SELECT id, name, emoji, direction, sort_order AS sortOrder, active
+    `SELECT id, name, emoji, direction, value_type AS valueType, sort_order AS sortOrder, active
      FROM wellbeing_metrics WHERE id = ? AND user_id = ? LIMIT 1`,
   ).bind(metricId, user.id).first<MetricRow>();
   if (!existing) return json({ error: "metric_not_found" }, { status: 404 });
@@ -117,7 +124,7 @@ async function updateMetric(request: Request, env: Env, metricId: string): Promi
      WHERE id = ? AND user_id = ?`,
   ).bind(name, emoji, direction, active, sortOrder, now, metricId, user.id).run();
 
-  return json({ metric: { id: metricId, name, emoji, direction, active, sortOrder, updatedAt: now } });
+  return json({ metric: { id: metricId, name, emoji, direction, valueType: existing.valueType, active, sortOrder, updatedAt: now } });
 }
 
 async function dayState(request: Request, env: Env): Promise<Response> {
@@ -128,7 +135,7 @@ async function dayState(request: Request, env: Env): Promise<Response> {
 
   const [metrics, entries, journals] = await Promise.all([
     env.DB.prepare(
-      `SELECT id, name, emoji, direction, sort_order AS sortOrder, active,
+      `SELECT id, name, emoji, direction, value_type AS valueType, sort_order AS sortOrder, active,
               created_at AS createdAt, updated_at AS updatedAt
        FROM wellbeing_metrics WHERE user_id = ? AND active = 1 ORDER BY sort_order, created_at`,
     ).bind(user.id).all<MetricRow>(),
@@ -160,16 +167,27 @@ async function saveDay(request: Request, env: Env): Promise<Response> {
   const metricIds = Object.keys(values);
   if (metricIds.length > 50) return json({ error: "too_many_values" }, { status: 400 });
 
-  const owned = await env.DB.prepare(`SELECT id FROM wellbeing_metrics WHERE user_id = ? AND active = 1`)
-    .bind(user.id).all<{ id: string }>();
-  const allowed = new Set(owned.results.map((row) => row.id));
+  const owned = await env.DB.prepare(`SELECT id, value_type AS valueType FROM wellbeing_metrics WHERE user_id = ? AND active = 1`)
+    .bind(user.id).all<{ id: string; valueType: MetricValueType }>();
+  const allowed = new Map(owned.results.map((row) => [row.id, row.valueType]));
   const now = new Date().toISOString();
   const statements: D1PreparedStatement[] = [];
 
   for (const metricId of metricIds) {
-    if (!allowed.has(metricId)) return json({ error: "metric_not_found" }, { status: 404 });
-    const value = Number(values[metricId]);
-    if (!Number.isInteger(value) || value < 1 || value > 5) return json({ error: "invalid_metric_value" }, { status: 400 });
+    const valueType = allowed.get(metricId);
+    if (!valueType) return json({ error: "metric_not_found" }, { status: 404 });
+    const raw = values[metricId];
+    if (raw === null || raw === undefined || raw === "") {
+      statements.push(env.DB.prepare(
+        `DELETE FROM wellbeing_entries WHERE user_id = ? AND metric_id = ? AND entry_date = ?`,
+      ).bind(user.id, metricId, date));
+      continue;
+    }
+    const value = Number(raw);
+    const valid = valueType === "boolean"
+      ? Number.isInteger(value) && (value === 0 || value === 1)
+      : Number.isInteger(value) && value >= 1 && value <= 5;
+    if (!valid) return json({ error: "invalid_metric_value" }, { status: 400 });
     statements.push(env.DB.prepare(
       `INSERT INTO wellbeing_entries (id, user_id, metric_id, entry_date, value, created_at, updated_at)
        VALUES (?, ?, ?, ?, ?, ?, ?)
@@ -190,7 +208,7 @@ async function listRecent(request: Request, env: Env): Promise<Response> {
 
   const result = await env.DB.prepare(
     `SELECT e.entry_date AS entryDate, e.metric_id AS metricId, e.value,
-            m.name, m.emoji, m.direction
+            m.name, m.emoji, m.direction, m.value_type AS valueType
      FROM wellbeing_entries e
      JOIN wellbeing_metrics m ON m.id = e.metric_id
      WHERE e.user_id = ?
