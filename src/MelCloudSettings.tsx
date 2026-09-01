@@ -16,6 +16,14 @@ type MelCloudDevice = {
   lastCommunication: string | null;
 };
 type DeviceResponse = { devices: MelCloudDevice[]; fetchedAt: string; provider: string };
+type DiagnosticDevice = {
+  id: number;
+  name: string;
+  deviceType: number | null;
+  atwFields: Record<string, string | number | boolean | null>;
+  allPrimitiveFields: Record<string, string | number | boolean | null>;
+};
+type DiagnosticResponse = { provider: string; purpose: string; fetchedAt: string; devices: DiagnosticDevice[] };
 
 async function errorText(response: Response): Promise<string> {
   try {
@@ -39,6 +47,7 @@ export default function MelCloudSettings() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [devices, setDevices] = useState<MelCloudDevice[]>([]);
+  const [diagnostics, setDiagnostics] = useState<DiagnosticResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [working, setWorking] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
@@ -58,7 +67,7 @@ export default function MelCloudSettings() {
   }, []);
 
   async function saveAndTest() {
-    setWorking(true); setMessage(null);
+    setWorking(true); setMessage(null); setDiagnostics(null);
     try {
       const response = await fetch("/api/melcloud/credentials", {
         method: "PUT",
@@ -94,10 +103,26 @@ export default function MelCloudSettings() {
     }
   }
 
+  async function runAtwTest() {
+    setWorking(true); setMessage(null); setDiagnostics(null);
+    try {
+      const response = await fetch("/api/melcloud/diagnostics", { credentials: "same-origin", cache: "no-store" });
+      if (!response.ok) throw new Error(await errorText(response));
+      const body = await response.json() as DiagnosticResponse;
+      setDiagnostics(body);
+      const fieldCount = body.devices.reduce((sum, device) => sum + Object.keys(device.atwFields).length, 0);
+      setMessage(`ATW-test færdig · ${body.devices.length} enhed(er), ${fieldCount} relevante felter fundet.`);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "ATW-testen kunne ikke køres.");
+    } finally {
+      setWorking(false);
+    }
+  }
+
   async function remove() {
     if (!window.confirm("Fjern MELCloud-login fra Nexus?")) return;
     await fetch("/api/melcloud/credentials", { method: "DELETE", credentials: "same-origin" });
-    setConfigured(false); setUsername(""); setPassword(""); setDevices([]); setMessage("MELCloud-login er fjernet.");
+    setConfigured(false); setUsername(""); setPassword(""); setDevices([]); setDiagnostics(null); setMessage("MELCloud-login er fjernet.");
   }
 
   if (loading) return <p className="settings-loading">Henter MELCloud-indstillinger…</p>;
@@ -111,9 +136,10 @@ export default function MelCloudSettings() {
     <div className="settings-location-actions">
       <button className="primary-action" type="button" disabled={working || !username.trim() || !password} onClick={() => void saveAndTest()}>{working ? "Arbejder…" : configured ? "Opdatér login og test" : "Gem og test forbindelse"}</button>
       {configured && <button className="secondary-action" type="button" disabled={working} onClick={() => void refreshDevices()}>Hent enheder</button>}
+      {configured && <button className="secondary-action" type="button" disabled={working} onClick={() => void runAtwTest()}>Kør luft/vand-test</button>}
       {configured && <button className="secondary-action" type="button" disabled={working} onClick={() => void remove()}>Fjern login</button>}
     </div>
-    <p className="settings-help">Credentials gemmes krypteret i D1. Nexus bruger en separat MELCloud-nøgle hvis den findes, ellers samme AES-GCM nøgle som Garmin. Ingen styring af varmepumpen er aktiveret endnu.</p>
+    <p className="settings-help">Credentials gemmes krypteret i D1. Luft/vand-testen er kun læsning og viser de rå primitive MELCloud-felter, så vi kan mappe netop din Ecodan/ATW-enhed uden at gætte. Felter der ligner credentials, tokens eller sessionsdata filtreres fra.</p>
     {message && <p className="settings-feedback">{message}</p>}
     {devices.length > 0 && <div className="melcloud-device-list">{devices.map((device) => <article key={device.id}>
       <div><strong>{device.name}</strong><span>#{device.id}{device.deviceType === null ? "" : ` · type ${device.deviceType}`}</span></div>
@@ -125,5 +151,14 @@ export default function MelCloudSettings() {
         {device.tankTemperature !== null && <div><dt>Tank</dt><dd>{temp(device.tankTemperature)}</dd></div>}
       </dl>
     </article>)}</div>}
+    {diagnostics && <div className="melcloud-diagnostics">
+      <div><strong>Luft/vand diagnostik</strong><span>{new Intl.DateTimeFormat("da-DK", { dateStyle: "short", timeStyle: "medium" }).format(new Date(diagnostics.fetchedAt))}</span></div>
+      {diagnostics.devices.map((device) => <details key={device.id} open>
+        <summary>{device.name} · #{device.id}{device.deviceType === null ? "" : ` · type ${device.deviceType}`}</summary>
+        <h4>Relevante ATW-felter</h4>
+        <pre>{JSON.stringify(device.atwFields, null, 2)}</pre>
+        <details><summary>Alle primitive felter</summary><pre>{JSON.stringify(device.allPrimitiveFields, null, 2)}</pre></details>
+      </details>)}
+    </div>}
   </div>;
 }
