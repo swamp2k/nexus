@@ -36,6 +36,7 @@ type WeatherResponse = {
       temperature: number;
       windSpeed: number | null;
       windDirection: number | null;
+      precipitationMm: number | null;
       symbol: string | null;
     };
   };
@@ -124,7 +125,8 @@ function WeatherCurrentWidget() {
   if (error || !data?.data.current) return <WidgetState label="Vejret kunne ikke hentes" />;
   const current = data.data.current;
   const wind = current.windSpeed === null ? "—" : `${current.windSpeed.toFixed(1)} m/s ${compassDirection(current.windDirection)}`.trim();
-  return <div className="home-weather"><span className="home-weather-icon" aria-hidden="true">{weatherIcon(current.symbol)}</span><div><strong>{Math.round(current.temperature)}°</strong><span>{data.data.location.label}</span><small>Vind {wind}</small></div></div>;
+  const precipitation = current.precipitationMm === null ? "—" : `${current.precipitationMm.toFixed(1)} mm`;
+  return <div className="home-weather"><span className="home-weather-icon" aria-hidden="true">{weatherIcon(current.symbol)}</span><div><strong>{Math.round(current.temperature)}°</strong><span>{data.data.location.label}</span><small className="home-weather-details"><span>Vind {wind}</span><span>Nedbør {precipitation}</span></small></div></div>;
 }
 
 function EnergyCurrentWidget() {
