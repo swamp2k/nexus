@@ -13,6 +13,8 @@ type EventsResponse = {
   failures: Array<{ sourceId: string; sourceName: string; error: string }>;
 };
 
+type PreferencesResponse = { preferences: { wasteWarningDays: number; updatedAt: string | null } };
+
 type WasteKind = "rest" | "plast" | "papir";
 
 type WasteMatch = {
@@ -41,14 +43,18 @@ function dateLabel(value: string): string {
   return new Intl.DateTimeFormat("da-DK", { weekday: "short", day: "numeric", month: "short", timeZone: "Europe/Copenhagen" }).format(new Date(value));
 }
 
+function daysUntilNumber(value: string): number {
+  const todayParts = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Copenhagen", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date());
+  const targetParts = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Copenhagen", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date(value));
+  const toKey = (parts: Intl.DateTimeFormatPart[]) => {
+    const map = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+    return Date.UTC(Number(map.year), Number(map.month) - 1, Number(map.day));
+  };
+  return Math.round((toKey(targetParts) - toKey(todayParts)) / 86_400_000);
+}
+
 function daysUntil(value: string): string {
-  const today = new Date();
-  const target = new Date(value);
-  const todayKey = Date.UTC(today.getFullYear(), today.getMonth(), today.getDate());
-  const targetParts = new Intl.DateTimeFormat("en-CA", { timeZone: "Europe/Copenhagen", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(target);
-  const map = Object.fromEntries(targetParts.map((part) => [part.type, part.value]));
-  const targetKey = Date.UTC(Number(map.year), Number(map.month) - 1, Number(map.day));
-  const days = Math.round((targetKey - todayKey) / 86_400_000);
+  const days = daysUntilNumber(value);
   if (days === 0) return "i dag";
   if (days === 1) return "i morgen";
   return `om ${days} dage`;
@@ -56,18 +62,25 @@ function daysUntil(value: string): string {
 
 export default function CalendarWasteWidget() {
   const { data, loading, error } = useCachedJson<EventsResponse>("/api/calendar/events?days=90", 15 * 60_000);
+  const preferences = useCachedJson<PreferencesResponse>("/api/calendar/preferences", 15 * 60_000);
   const next = useMemo(() => {
     const events = data?.events ?? [];
     return WASTE_TYPES.map((type) => ({ type, event: events.find((event) => matchEvent(event, type)) ?? null }));
   }, [data]);
 
-  if (loading) return <div className="home-widget-state">Henter affaldskalender…</div>;
+  if (loading || preferences.loading) return <div className="home-widget-state">Henter affaldskalender…</div>;
   if (error || !data) return <div className="home-widget-state">Affaldskalenderen kunne ikke hentes</div>;
   if (!data.events.length) return <div className="home-widget-state">Ingen kalender-events fundet</div>;
 
-  return <div className="home-waste-list">{next.map(({ type, event }) => <div className="home-waste-row" key={type.kind}>
-    <span className="home-waste-icon" aria-hidden="true">{type.icon}</span>
-    <div><strong>{type.label}</strong>{event ? <small>{event.title}</small> : <small>Ingen match de næste 90 dage</small>}</div>
-    <div className="home-waste-date">{event ? <><strong>{dateLabel(event.start)}</strong><span>{daysUntil(event.start)}</span></> : <strong>—</strong>}</div>
-  </div>)}</div>;
+  const warningDays = preferences.data?.preferences.wasteWarningDays ?? 1;
+
+  return <div className="home-waste-list">{next.map(({ type, event }) => {
+    const days = event ? daysUntilNumber(event.start) : null;
+    const warning = days !== null && days >= 0 && days <= warningDays;
+    return <div className={`home-waste-row${warning ? " home-waste-row--warning" : ""}`} key={type.kind}>
+      <span className="home-waste-icon" aria-hidden="true">{type.icon}</span>
+      <div><strong>{type.label}</strong>{event ? <small>{event.title}</small> : <small>Ingen match de næste 90 dage</small>}</div>
+      <div className="home-waste-date">{event ? <><strong>{dateLabel(event.start)}</strong><span>{daysUntil(event.start)}</span></> : <strong>—</strong>}</div>
+    </div>;
+  })}</div>;
 }
