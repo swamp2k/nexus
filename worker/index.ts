@@ -3,6 +3,7 @@ import { handleGarminAgentRoute } from "./garmin/agent-routes";
 import { handleGarminCredentialRoute } from "./garmin/credential-routes";
 import { handleGarminProcessRoute } from "./garmin/process-routes";
 import { handleGarminRoute } from "./garmin/routes";
+import { handleHomeLayoutRoute } from "./settings/home-layout";
 import { handleSettingsRoute } from "./settings/routes";
 import { handleSourceRoute } from "./sources/routes";
 import { handleJournalAiRoute } from "./wellbeing/journal-ai";
@@ -75,6 +76,11 @@ export default {
       if (url.pathname.startsWith("/api/wellbeing/")) {
         const wellbeingResponse = await handleWellbeingRoute(request, env);
         if (wellbeingResponse) return wellbeingResponse;
+      }
+
+      if (url.pathname === "/api/home-layout") {
+        const homeLayoutResponse = await handleHomeLayoutRoute(request, env);
+        if (homeLayoutResponse) return homeLayoutResponse;
       }
 
       if (url.pathname === "/api/settings") {
