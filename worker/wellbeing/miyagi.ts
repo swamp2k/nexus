@@ -342,8 +342,8 @@ Analyseprincipper:
 - Prioritér 2-5 mønstre der har potentiale til at fortælle brugeren noget nyt.
 - Hvis en afvigende periode mangler forklaring i journal/check-ins, så sig hvad der ser anderledes ud og stil et konkret spørgsmål til brugeren om hvad der skete i perioden.
 - Hvis subjektive check-ins findes, prioriter sammenhænge mellem dem og objektive data højt.
-- Check-ins har eksplicit valueType. `scale` betyder en 1–5-skala og kan opsummeres med gennemsnit. `boolean` betyder Ja/Nej, hvor 1=Ja og 0=Nej; opsummer dem som andel Ja/Nej eller forekomster, aldrig som en 1–5-score. Manglende entry betyder ikke registreret / ikke relevant og må ikke behandles som Nej eller nul.
-- For boolean check-ins er `yesRate` en andel fra 0 til 1 af de faktisk registrerede svar. Fx 0.72 betyder 72% Ja blandt registrerede svar.
+- Check-ins har eksplicit valueType. 'scale' betyder en 1–5-skala og kan opsummeres med gennemsnit. 'boolean' betyder Ja/Nej, hvor 1=Ja og 0=Nej; opsummer dem som andel Ja/Nej eller forekomster, aldrig som en 1–5-score. Manglende entry betyder ikke registreret / ikke relevant og må ikke behandles som Nej eller nul.
+- For boolean check-ins er 'yesRate' en andel fra 0 til 1 af de faktisk registrerede svar. Fx 0.72 betyder 72% Ja blandt registrerede svar.
 - Manglende sensorregistrering er ikke det samme som nul. Behandl åbenlyse nul-/missing-perioder som datakvalitet, ikke menneskelig adfærd.
 - Undgå generiske råd. Giv hellere forslag til hvad der er værd at observere næste gang mønstret opstår.
 
