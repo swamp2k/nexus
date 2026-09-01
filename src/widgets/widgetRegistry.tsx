@@ -105,7 +105,7 @@ function weatherIcon(symbol: string | null): string {
 
 function compassDirection(degrees: number | null): string {
   if (typeof degrees !== "number" || !Number.isFinite(degrees)) return "";
-  const directions = ["N", "NNØ", "NØ", "ØNØ", "Ø", "ØSØ", "SØ", "ØSØ", "S", "SSV", "SV", "VSV", "V", "VNV", "NV", "NNV"];
+  const directions = ["N", "NNØ", "NØ", "ØNØ", "Ø", "ØSØ", "SØ", "SSØ", "S", "SSV", "SV", "VSV", "V", "VNV", "NV", "NNV"];
   const normalized = ((degrees % 360) + 360) % 360;
   return directions[Math.round(normalized / 22.5) % 16];
 }
