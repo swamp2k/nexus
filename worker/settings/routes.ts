@@ -3,6 +3,7 @@ import { GRID_PROVIDERS, normalizeGridProvider, type GridProviderKey } from "../
 
 const DEFAULT_LOW_PRICE_DKK = 1;
 const DEFAULT_HIGH_PRICE_DKK = 2;
+const DEFAULT_DASHBOARD_REFRESH_SECONDS = 300;
 
 type SettingsRow = {
   weatherLabel: string | null;
@@ -13,6 +14,7 @@ type SettingsRow = {
   energySupplierMarkupOere: number | null;
   energyLowPriceDkk: number | null;
   energyHighPriceDkk: number | null;
+  dashboardRefreshSeconds: number | null;
   updatedAt: string | null;
 };
 
@@ -25,6 +27,7 @@ type SettingsBody = {
   energySupplierMarkupOere?: unknown;
   energyLowPriceDkk?: unknown;
   energyHighPriceDkk?: unknown;
+  dashboardRefreshSeconds?: unknown;
 };
 
 type SettingsEnv = Env & {
@@ -73,6 +76,12 @@ function cleanPriceBand(value: unknown, fallback: number): number {
   return Math.round(parsed * 100) / 100;
 }
 
+function cleanDashboardRefresh(value: unknown): number {
+  const parsed = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(parsed) || parsed < 30 || parsed > 3600) return DEFAULT_DASHBOARD_REFRESH_SECONDS;
+  return Math.round(parsed);
+}
+
 function fallbackSettings(env: SettingsEnv): SettingsRow {
   return {
     weatherLabel: String(env.WEATHER_LABEL ?? "Hjem").trim() || "Hjem",
@@ -83,6 +92,7 @@ function fallbackSettings(env: SettingsEnv): SettingsRow {
     energySupplierMarkupOere: cleanMarkup(env.ENERGY_SUPPLIER_MARKUP_OERE),
     energyLowPriceDkk: DEFAULT_LOW_PRICE_DKK,
     energyHighPriceDkk: DEFAULT_HIGH_PRICE_DKK,
+    dashboardRefreshSeconds: DEFAULT_DASHBOARD_REFRESH_SECONDS,
     updatedAt: null,
   };
 }
@@ -98,6 +108,7 @@ async function readSettings(env: SettingsEnv, userId: string): Promise<SettingsR
               energy_supplier_markup_oere AS energySupplierMarkupOere,
               energy_low_price_dkk AS energyLowPriceDkk,
               energy_high_price_dkk AS energyHighPriceDkk,
+              dashboard_refresh_seconds AS dashboardRefreshSeconds,
               updated_at AS updatedAt
        FROM user_settings
        WHERE user_id = ?`,
@@ -111,6 +122,7 @@ async function readSettings(env: SettingsEnv, userId: string): Promise<SettingsR
       energySupplierMarkupOere: cleanMarkup(row.energySupplierMarkupOere ?? env.ENERGY_SUPPLIER_MARKUP_OERE),
       energyLowPriceDkk: cleanPriceBand(row.energyLowPriceDkk, DEFAULT_LOW_PRICE_DKK),
       energyHighPriceDkk: cleanPriceBand(row.energyHighPriceDkk, DEFAULT_HIGH_PRICE_DKK),
+      dashboardRefreshSeconds: cleanDashboardRefresh(row.dashboardRefreshSeconds),
     };
   } catch {
     return fallbackSettings(env);
@@ -152,6 +164,7 @@ export async function handleSettingsRoute(request: Request, env: SettingsEnv): P
   const energySupplierMarkupOere = cleanMarkup(body.energySupplierMarkupOere);
   const energyLowPriceDkk = cleanPriceBand(body.energyLowPriceDkk, DEFAULT_LOW_PRICE_DKK);
   const energyHighPriceDkk = cleanPriceBand(body.energyHighPriceDkk, DEFAULT_HIGH_PRICE_DKK);
+  const dashboardRefreshSeconds = cleanDashboardRefresh(body.dashboardRefreshSeconds);
 
   if (weatherLat === null || weatherLon === null) {
     return json({ error: "invalid_weather_location" }, { status: 400 });
@@ -168,8 +181,8 @@ export async function handleSettingsRoute(request: Request, env: SettingsEnv): P
     `INSERT INTO user_settings (
        user_id, weather_label, weather_lat, weather_lon,
        energy_price_area, energy_grid_provider, energy_supplier_markup_oere,
-       energy_low_price_dkk, energy_high_price_dkk, updated_at
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       energy_low_price_dkk, energy_high_price_dkk, dashboard_refresh_seconds, updated_at
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(user_id) DO UPDATE SET
        weather_label = excluded.weather_label,
        weather_lat = excluded.weather_lat,
@@ -179,6 +192,7 @@ export async function handleSettingsRoute(request: Request, env: SettingsEnv): P
        energy_supplier_markup_oere = excluded.energy_supplier_markup_oere,
        energy_low_price_dkk = excluded.energy_low_price_dkk,
        energy_high_price_dkk = excluded.energy_high_price_dkk,
+       dashboard_refresh_seconds = excluded.dashboard_refresh_seconds,
        updated_at = excluded.updated_at`,
   ).bind(
     user.id,
@@ -190,6 +204,7 @@ export async function handleSettingsRoute(request: Request, env: SettingsEnv): P
     energySupplierMarkupOere,
     energyLowPriceDkk,
     energyHighPriceDkk,
+    dashboardRefreshSeconds,
     updatedAt,
   ).run();
 
@@ -203,6 +218,7 @@ export async function handleSettingsRoute(request: Request, env: SettingsEnv): P
       energySupplierMarkupOere,
       energyLowPriceDkk,
       energyHighPriceDkk,
+      dashboardRefreshSeconds,
       updatedAt,
     },
   });
