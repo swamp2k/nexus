@@ -24,9 +24,9 @@ Completed 2026-09-01:
    - expansion uses a down arrow only when content actually expands inline
    - Systemstatus chevron removed until there is a real status detail action
 
-## Phase B — Modular Home ✅ foundation implemented
+## Phase B — Modular Home v1 ✅
 
-The old Home module-link grid has been replaced with a real per-user dashboard.
+The old Home module-link grid has been replaced with a real per-user dashboard and has had its first deployed visual polish pass.
 
 ### Widget model
 
@@ -74,7 +74,24 @@ D1 migration `0015_home_layout.sql` adds `user_home_layout`.
 - move widgets up/down
 - save layout per user
 
+Widget sizing has explicit semantics on desktop:
+
+- small = 1 of 4 columns
+- medium = 2 of 4 columns
+- wide = full row
+
+Responsive breakpoints collapse these predictably to two columns and then one column on mobile.
+
 The stored format is already suitable for later drag/drop. Drag/drop itself is deliberately deferred until it improves the UX enough to justify the extra interaction/code complexity.
+
+### First polish pass
+
+After the first real deployment screenshot:
+
+- removed the duplicate Home sub-heading hierarchy, leaving the global `Hjem` heading as the page introduction
+- tightened Home vertical spacing and widget row height
+- made sizing behaviour explicit and predictable
+- expanded `wellbeing.today` with completion status and journal-state information so the widget earns its space instead of showing only two chips
 
 ### Next widget work
 
@@ -84,7 +101,7 @@ Existing page-owned visualizations do not all need to be refactored immediately;
 
 ## Phase C — Revisit Air Audit (next review pass)
 
-After Modular Home has had a real deployment/test pass, review the audit again and cherry-pick remaining improvements that still apply to the product.
+With Modular Home v1 in place, review the audit again and cherry-pick remaining improvements that still apply to the product.
 
 Likely candidates:
 
