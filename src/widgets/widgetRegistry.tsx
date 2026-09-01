@@ -150,7 +150,13 @@ function WellbeingTodayWidget() {
   if (error || !data) return <WidgetState label="Check-in kunne ikke hentes" />;
   const values = new Map(data.entries.map((entry) => [entry.metricId, entry.value]));
   if (data.entries.length === 0) return <WidgetState label="Ingen check-in endnu i dag" />;
-  return <div className="home-wellbeing"><div className="home-wellbeing-metrics">{data.metrics.filter((metric) => values.has(metric.id)).map((metric) => <span key={metric.id}>{metric.emoji} {metric.name}: <strong>{values.get(metric.id)}/5</strong></span>)}</div>{data.journals[0]?.body && <p>{data.journals[0].body}</p>}</div>;
+  const completed = data.metrics.filter((metric) => values.has(metric.id));
+  const journal = data.journals[0]?.body?.trim() ?? "";
+  return <div className="home-wellbeing">
+    <div className="home-wellbeing-summary"><strong>{completed.length} af {data.metrics.length}</strong><span>målepunkter registreret i dag</span></div>
+    <div className="home-wellbeing-metrics">{completed.map((metric) => <span key={metric.id}>{metric.emoji} {metric.name}: <strong>{values.get(metric.id)}/5</strong></span>)}</div>
+    {journal ? <div className="home-wellbeing-journal"><span>Journal</span><p>{journal}</p></div> : <small className="home-wellbeing-no-journal">Ingen journalnote i dag</small>}
+  </div>;
 }
 
 export const widgetRegistry: WidgetDefinition[] = [
