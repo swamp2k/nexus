@@ -170,6 +170,87 @@
   white-space: nowrap;
 }
 
+.home-weather-details {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 12px;
+}
+
+.home-weather-details > span {
+  color: inherit !important;
+  font-weight: inherit !important;
+}
+
+/* Direct dashboard editing. The selector panel remains as the add/remove
+   catalogue, while resize/reorder can happen on the widgets themselves. */
+.home-edit-actions {
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.home-edit-hint {
+  margin-right: auto;
+  color: var(--muted);
+  font-size: .78rem;
+}
+
+.home-page--editing .home-widget {
+  outline: 1px dashed color-mix(in srgb, var(--accent) 45%, transparent);
+  outline-offset: -4px;
+}
+
+.home-widget--drop-target {
+  outline: 2px solid var(--accent) !important;
+  background: color-mix(in srgb, var(--surface) 92%, var(--accent));
+}
+
+.home-widget-direct-controls {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.home-widget > header .home-widget-direct-controls button,
+.home-widget-drag-handle {
+  width: 30px;
+  height: 30px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-soft);
+  color: var(--muted-strong);
+  font: inherit;
+  font-size: .82rem;
+  font-weight: 900;
+  line-height: 1;
+  user-select: none;
+}
+
+.home-widget > header .home-widget-direct-controls button {
+  cursor: pointer;
+}
+
+.home-widget > header .home-widget-direct-controls button:disabled {
+  opacity: .3;
+  cursor: default;
+}
+
+.home-widget-drag-handle {
+  cursor: grab;
+  letter-spacing: -3px;
+}
+
+.home-widget-drag-handle:active {
+  cursor: grabbing;
+}
+
+.home-widget > header .home-widget-direct-controls .home-widget-remove {
+  color: #d95b5b;
+}
+
 /* Compact cards: keep the glanceable number and remove tertiary detail. */
 @container home-widget (max-width: 300px) {
   .home-widget-content {
@@ -231,6 +312,20 @@
 
   .home-mini-chart {
     max-height: 145px;
+  }
+
+  .home-widget-direct-controls {
+    gap: 3px;
+  }
+
+  .home-widget > header .home-widget-direct-controls button,
+  .home-widget-drag-handle {
+    width: 27px;
+    height: 27px;
+  }
+
+  .home-widget-order-button {
+    display: none !important;
   }
 }
 
@@ -295,5 +390,18 @@
   .home-mini-chart-summary small {
     margin-left: 0;
     flex-basis: 100%;
+  }
+
+  .home-edit-actions {
+    width: 100%;
+  }
+
+  .home-edit-hint {
+    width: 100%;
+    margin: 0 0 4px;
+  }
+
+  .home-widget-drag-handle {
+    display: none;
   }
 }
