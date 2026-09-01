@@ -40,17 +40,6 @@ function timestamp(value: unknown): number | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function timezoneOffsetMs(epochMs: number, timeZone = "Europe/Copenhagen"): number {
-  const parts = new Intl.DateTimeFormat("en-GB", {
-    timeZone,
-    year: "numeric", month: "2-digit", day: "2-digit",
-    hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
-  }).formatToParts(new Date(epochMs));
-  const map = Object.fromEntries(parts.map((part) => [part.type, part.value]));
-  const asUtc = Date.UTC(Number(map.year), Number(map.month) - 1, Number(map.day), Number(map.hour), Number(map.minute), Number(map.second));
-  return asUtc - Math.floor(epochMs / 1000) * 1000;
-}
-
 function pointList(value: unknown): RawPoint[] {
   return Array.isArray(value) ? value.filter((item): item is RawPoint => object(item) !== null) : [];
 }
@@ -64,22 +53,11 @@ function normalizeStage(value: unknown): "deep" | "light" | "rem" | "awake" | nu
   return null;
 }
 
-function normalizeSeries(value: unknown, valueKey: string, offsetMs: number, timeKey = "startGMT") {
-  return pointList(value).map((item) => {
-    const time = timestamp(item[timeKey]);
-    return {
-      time: time === null ? null : time + offsetMs,
-      value: num(item[valueKey]),
-    };
-  }).filter((item): item is { time: number; value: number } => item.time !== null && item.value !== null);
-}
-
-function displayRow(row: SleepRow, fallbackOffsetMs: number): SleepRow {
-  return {
-    ...row,
-    sleep_start_ms: row.sleep_start_display_ms ?? (row.sleep_start_ms === null ? null : row.sleep_start_ms + fallbackOffsetMs),
-    sleep_end_ms: row.sleep_end_display_ms ?? (row.sleep_end_ms === null ? null : row.sleep_end_ms + fallbackOffsetMs),
-  };
+function normalizeSeries(value: unknown, valueKey: string, timeKey = "startGMT") {
+  return pointList(value).map((item) => ({
+    time: timestamp(item[timeKey]),
+    value: num(item[valueKey]),
+  })).filter((item): item is { time: number; value: number } => item.time !== null && item.value !== null);
 }
 
 const SELECT_SLEEP = `date, import_id, sleep_start_ms, sleep_end_ms,
@@ -115,10 +93,6 @@ export async function getSleepDetail(env: Env, userId: string, requestedDate: st
   ]);
 
   let detail: Record<string, unknown> | null = null;
-  let displayOffsetMs = 0;
-  if (rawSelected.sleep_start_display_ms !== null && rawSelected.sleep_start_ms !== null) {
-    displayOffsetMs = rawSelected.sleep_start_display_ms - rawSelected.sleep_start_ms;
-  }
 
   if (rawSelected.import_id) {
     const [importRow, fileRow] = await Promise.all([
@@ -139,31 +113,20 @@ export async function getSleepDetail(env: Env, userId: string, requestedDate: st
         const raw = object(JSON.parse(text));
         const dto = object(raw?.dailySleepDTO);
         const gmtStart = num(dto?.sleepStartTimestampGMT) ?? rawSelected.sleep_start_ms;
-        const localStart = num(dto?.sleepStartTimestampLocal);
         const gmtEnd = num(dto?.sleepEndTimestampGMT) ?? rawSelected.sleep_end_ms;
+        const localStart = num(dto?.sleepStartTimestampLocal);
         const localEnd = num(dto?.sleepEndTimestampLocal);
-        if (gmtStart !== null && localStart !== null) {
-          // Garmin Local values encode wall-clock time as if it were UTC.
-          displayOffsetMs = localStart - gmtStart - timezoneOffsetMs(gmtStart);
-        }
 
-        const displayStart = gmtStart === null ? null : gmtStart + displayOffsetMs;
-        const displayEnd = gmtEnd === null ? null : gmtEnd + displayOffsetMs;
-        if ((rawSelected.sleep_start_display_ms === null || rawSelected.sleep_end_display_ms === null) && displayStart !== null && displayEnd !== null) {
-          await env.DB.prepare(
-            `UPDATE garmin_sleep SET sleep_start_display_ms = ?, sleep_end_display_ms = ?, updated_at = ?
-             WHERE user_id = ? AND date = ?`,
-          ).bind(displayStart, displayEnd, new Date().toISOString(), userId, rawSelected.date).run();
-          rawSelected.sleep_start_display_ms = displayStart;
-          rawSelected.sleep_end_display_ms = displayEnd;
-        }
-
+        // Keep Garmin's GMT timestamps as real instants. The client formats them in
+        // Europe/Copenhagen, which handles both local time and DST correctly. The
+        // Garmin "Local" fields are wall-clock encoded values and must not be added
+        // as an offset; doing so can shift sleep by several hours.
         const stages = pointList(raw?.sleepLevels).map((item) => {
           const start = timestamp(item.startGMT);
           const end = timestamp(item.endGMT);
           return {
-            start: start === null ? null : start + displayOffsetMs,
-            end: end === null ? null : end + displayOffsetMs,
+            start,
+            end,
             stage: normalizeStage(item.activityLevel),
           };
         }).filter((item): item is { start: number; end: number; stage: "deep" | "light" | "rem" | "awake" } => (
@@ -171,29 +134,25 @@ export async function getSleepDetail(env: Env, userId: string, requestedDate: st
         ));
 
         detail = {
-          sleepStartMs: displayStart,
-          sleepEndMs: displayEnd,
+          sleepStartMs: gmtStart,
+          sleepEndMs: gmtEnd,
           localStartRawMs: localStart,
           localEndRawMs: localEnd,
-          displayOffsetMs,
           bodyBatteryChange: num(raw?.bodyBatteryChange),
           restingHeartRate: num(raw?.restingHeartRate),
           stages,
-          heartRate: normalizeSeries(raw?.sleepHeartRate, "value", displayOffsetMs),
-          stress: normalizeSeries(raw?.sleepStress, "value", displayOffsetMs),
-          bodyBattery: normalizeSeries(raw?.sleepBodyBattery, "value", displayOffsetMs),
-          respiration: normalizeSeries(raw?.wellnessEpochRespirationDataDTOList, "respirationValue", displayOffsetMs, "startTimeGMT"),
+          heartRate: normalizeSeries(raw?.sleepHeartRate, "value"),
+          stress: normalizeSeries(raw?.sleepStress, "value"),
+          bodyBattery: normalizeSeries(raw?.sleepBodyBattery, "value"),
+          respiration: normalizeSeries(raw?.wellnessEpochRespirationDataDTOList, "respirationValue", "startTimeGMT"),
         };
       }
     }
   }
 
-  const history = rawHistory.map((row) => displayRow(row, displayOffsetMs));
-  const selected = displayRow(rawSelected, displayOffsetMs);
-
   return {
-    selected: { ...selected, detail },
-    history: [...history].reverse(),
+    selected: { ...rawSelected, detail },
+    history: [...rawHistory].reverse(),
     navigation: {
       previousDate: previousRow?.date ?? null,
       nextDate: nextRow?.date ?? null,
