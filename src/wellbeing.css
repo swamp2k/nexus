@@ -98,6 +98,75 @@
   white-space: nowrap;
 }
 
+.wellbeing-today-summary {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  box-shadow: var(--shadow-soft);
+}
+
+.wellbeing-today-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.wellbeing-today-heading h2 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.wellbeing-today-metrics {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 8px;
+}
+
+.wellbeing-today-metrics > div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-soft);
+}
+
+.wellbeing-today-metrics span,
+.wellbeing-today-journal > span {
+  color: var(--muted);
+  font-size: .78rem;
+  font-weight: 800;
+}
+
+.wellbeing-today-metrics strong {
+  white-space: nowrap;
+}
+
+.wellbeing-today-journal {
+  display: grid;
+  gap: 5px;
+  padding-top: 2px;
+}
+
+.wellbeing-today-journal p {
+  max-width: 75ch;
+  margin: 0;
+  color: var(--muted-strong);
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.wellbeing-today-journal p.is-empty {
+  color: var(--muted);
+  font-style: italic;
+}
+
 .wellbeing-checkin-overlay {
   position: fixed;
   inset: 0;
@@ -585,6 +654,19 @@
   .wellbeing-command-action {
     grid-column: 1 / -1;
     width: 100%;
+  }
+
+  .wellbeing-today-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .wellbeing-today-heading .secondary-action {
+    width: 100%;
+  }
+
+  .wellbeing-today-metrics {
+    grid-template-columns: 1fr;
   }
 
   .wellbeing-checkin-overlay {
