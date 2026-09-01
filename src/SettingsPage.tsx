@@ -3,6 +3,9 @@ import CalendarSourceSettings from "./CalendarSourceSettings";
 import GarminImportSettings from "./GarminImportSettings";
 import MelCloudSettings from "./MelCloudSettings";
 import WellbeingMetricSettings from "./WellbeingMetricSettings";
+import { defaultRefreshClassForGroup, REFRESH_CLASS_LABELS } from "./data/dashboardRefresh";
+import type { RefreshClass } from "./data/dashboardRefresh";
+import { widgetRegistry } from "./widgets/widgetRegistry";
 
 type GridProviderOption = { key: string; label: string };
 type SettingsResponse = {
@@ -16,6 +19,7 @@ type SettingsResponse = {
     energyLowPriceDkk: number | null;
     energyHighPriceDkk: number | null;
     dashboardRefreshSeconds: number | null;
+    dashboardRefreshClasses: Record<string, RefreshClass> | null;
     updatedAt: string | null;
   };
   options?: { gridProviders?: GridProviderOption[] };
@@ -23,6 +27,9 @@ type SettingsResponse = {
 
 type SaveState = "idle" | "saving" | "saved" | "error";
 type LocateState = "idle" | "locating" | "error";
+
+const REFRESH_CLASSES: RefreshClass[] = ["live", "standard", "slow", "event"];
+const REFRESH_GROUPS = [...new Set(widgetRegistry.map((widget) => widget.group))];
 
 async function responseError(response: Response): Promise<string> {
   try {
@@ -42,7 +49,7 @@ export default function SettingsPage() {
   const [energySupplierMarkupOere, setEnergySupplierMarkupOere] = useState("0");
   const [energyLowPriceDkk, setEnergyLowPriceDkk] = useState("1");
   const [energyHighPriceDkk, setEnergyHighPriceDkk] = useState("2");
-  const [dashboardRefreshSeconds, setDashboardRefreshSeconds] = useState("300");
+  const [dashboardRefreshClasses, setDashboardRefreshClasses] = useState<Record<string, RefreshClass>>({});
   const [gridProviders, setGridProviders] = useState<GridProviderOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [saveState, setSaveState] = useState<SaveState>("idle");
@@ -64,7 +71,7 @@ export default function SettingsPage() {
         setEnergySupplierMarkupOere(String(settings.energySupplierMarkupOere ?? 0));
         setEnergyLowPriceDkk(String(settings.energyLowPriceDkk ?? 1));
         setEnergyHighPriceDkk(String(settings.energyHighPriceDkk ?? 2));
-        setDashboardRefreshSeconds(String(settings.dashboardRefreshSeconds ?? 300));
+        setDashboardRefreshClasses(settings.dashboardRefreshClasses ?? {});
         setGridProviders(options?.gridProviders ?? []);
       })
       .catch(() => undefined)
@@ -72,6 +79,16 @@ export default function SettingsPage() {
   }, []);
 
   function changed() { setSaveState("idle"); setSaveError(null); }
+
+  function setRefreshClass(group: string, refreshClass: RefreshClass) {
+    setDashboardRefreshClasses((current) => {
+      const next = { ...current };
+      if (refreshClass === defaultRefreshClassForGroup(group)) delete next[group];
+      else next[group] = refreshClass;
+      return next;
+    });
+    changed();
+  }
 
   function useCurrentLocation() {
     if (!navigator.geolocation) { setLocateState("error"); return; }
@@ -113,7 +130,7 @@ export default function SettingsPage() {
           energySupplierMarkupOere: Number(energySupplierMarkupOere),
           energyLowPriceDkk: lowBand,
           energyHighPriceDkk: highBand,
-          dashboardRefreshSeconds: Number(dashboardRefreshSeconds),
+          dashboardRefreshClasses,
         }),
       });
       if (!response.ok) throw new Error(await responseError(response));
@@ -126,7 +143,7 @@ export default function SettingsPage() {
       setEnergySupplierMarkupOere(String(settings.energySupplierMarkupOere ?? 0));
       setEnergyLowPriceDkk(String(settings.energyLowPriceDkk ?? 1));
       setEnergyHighPriceDkk(String(settings.energyHighPriceDkk ?? 2));
-      setDashboardRefreshSeconds(String(settings.dashboardRefreshSeconds ?? 300));
+      setDashboardRefreshClasses(settings.dashboardRefreshClasses ?? {});
       setSaveState("saved");
     } catch (error) {
       setSaveError(error instanceof Error ? error.message : "Ukendt fejl");
@@ -152,11 +169,18 @@ export default function SettingsPage() {
       </details>
 
       <details className="settings-card settings-collapsible" open>
-        <summary className="settings-card-heading"><div><p className="section-label">Dashboard</p><h2>Automatisk opdatering</h2></div><span className="settings-icon" aria-hidden="true">↻</span></summary>
+        <summary className="settings-card-heading"><div><p className="section-label">Dashboard</p><h2>Widget-opdatering</h2></div><span className="settings-icon" aria-hidden="true">↻</span></summary>
         {loading ? <p className="settings-loading">Henter indstillinger…</p> : (
           <div className="settings-form">
-            <label><span>Opdatér dashboard-værdier</span><select value={dashboardRefreshSeconds} onChange={(event) => { setDashboardRefreshSeconds(event.target.value); changed(); }}><option value="60">Hvert minut</option><option value="120">Hvert 2. minut</option><option value="300">Hvert 5. minut</option><option value="600">Hvert 10. minut</option><option value="900">Hvert 15. minut</option><option value="1800">Hvert 30. minut</option></select></label>
-            <p className="settings-help">Gælder widgets på Hjem. Polling stopper, når browserfanen ikke er synlig, og fortsætter straks når du vender tilbage. Standard er 5 minutter.</p>
+            <p className="settings-help">Hver widgetgruppe har én opdateringsklasse. Alle Garmin-widgets følger Garmin-klassen, alle MELCloud-widgets følger MELCloud-klassen osv. Polling kører kun mens browserfanen er synlig.</p>
+            <div className="settings-coordinate-grid">
+              {REFRESH_GROUPS.map((group) => {
+                const defaultClass = defaultRefreshClassForGroup(group);
+                const value = dashboardRefreshClasses[group] ?? defaultClass;
+                return <label key={group}><span>{group}</span><select value={value} onChange={(event) => setRefreshClass(group, event.target.value as RefreshClass)}>{REFRESH_CLASSES.map((refreshClass) => <option value={refreshClass} key={refreshClass}>{REFRESH_CLASS_LABELS[refreshClass]}</option>)}</select><small>Standard: {REFRESH_CLASS_LABELS[defaultClass]}</small></label>;
+              })}
+            </div>
+            <p className="settings-help"><strong>Live</strong> = 1 min · <strong>Normal</strong> = 5 min · <strong>Langsom</strong> = 30 min · <strong>Ved åbning / event</strong> = ingen periodisk polling.</p>
           </div>
         )}
       </details>
