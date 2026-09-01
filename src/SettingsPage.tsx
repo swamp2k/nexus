@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import CalendarSourceSettings from "./CalendarSourceSettings";
 import GarminImportSettings from "./GarminImportSettings";
 import WellbeingMetricSettings from "./WellbeingMetricSettings";
 
@@ -162,6 +163,11 @@ export default function SettingsPage() {
             <p className="settings-help">Farvegrænserne bruges på elprissøjlerne på både Strøm-siden og køkkendisplayet. Faste abonnementer fordeles ikke ind i timeprisen.</p>
           </div>
         )}
+      </details>
+
+      <details className="settings-card settings-collapsible settings-component-wrapper">
+        <summary className="settings-card-heading"><div><p className="section-label">Datakilde</p><h2>Kalender · iCal</h2></div><span className="settings-icon" aria-hidden="true">▦</span></summary>
+        <CalendarSourceSettings />
       </details>
 
       <WellbeingMetricSettings />
