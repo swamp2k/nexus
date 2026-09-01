@@ -56,11 +56,14 @@
 
 .motion-month-group h4 {
   margin: 0;
-  padding: 8px 14px;
+  padding: 8px 14px 8px 11px;
   border-bottom: 1px solid var(--border);
-  background: color-mix(in srgb, var(--surface) 78%, var(--surface-soft));
-  color: var(--muted-strong);
+  border-left: 3px solid var(--accent);
+  background: color-mix(in srgb, var(--accent) 7%, var(--surface));
+  color: var(--text);
   font-size: .78rem;
+  font-weight: 850;
+  letter-spacing: .025em;
   text-transform: capitalize;
 }
 
