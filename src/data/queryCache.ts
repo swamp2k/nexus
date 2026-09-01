@@ -9,11 +9,11 @@ type CacheEntry<T> = {
 
 const cache = new Map<string, CacheEntry<unknown>>();
 
-async function loadJson<T>(url: string, ttlMs: number): Promise<T> {
+async function loadJson<T>(url: string, ttlMs: number, force = false): Promise<T> {
   const now = Date.now();
   const existing = cache.get(url) as CacheEntry<T> | undefined;
-  if (existing?.data !== undefined && existing.expiresAt > now) return existing.data;
   if (existing?.promise) return existing.promise;
+  if (!force && existing?.data !== undefined && existing.expiresAt > now) return existing.data;
 
   const promise = fetch(url, { credentials: "same-origin", cache: "no-store" })
     .then(async (response) => {
@@ -38,7 +38,7 @@ export function invalidateQuery(url: string): void {
   cache.delete(url);
 }
 
-export function useCachedJson<T>(url: string, ttlMs = 60_000): {
+export function useCachedJson<T>(url: string, ttlMs = 60_000, pollMs = 0): {
   data: T | null;
   loading: boolean;
   error: Error | null;
@@ -50,22 +50,42 @@ export function useCachedJson<T>(url: string, ttlMs = 60_000): {
 
   useEffect(() => {
     let active = true;
+
+    const apply = (force = false) => {
+      if (!active) return;
+      void loadJson<T>(url, ttlMs, force)
+        .then((value) => {
+          if (!active) return;
+          setData(value);
+          setError(null);
+        })
+        .catch((value: Error) => {
+          if (!active) return;
+          setError(value);
+        })
+        .finally(() => {
+          if (active) setLoading(false);
+        });
+    };
+
     setLoading(cache.get(url)?.data === undefined);
-    void loadJson<T>(url, ttlMs)
-      .then((value) => {
-        if (!active) return;
-        setData(value);
-        setError(null);
-      })
-      .catch((value: Error) => {
-        if (!active) return;
-        setError(value);
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-    return () => { active = false; };
-  }, [url, ttlMs]);
+    apply(false);
+
+    const interval = pollMs > 0 ? window.setInterval(() => {
+      if (document.visibilityState === "visible") apply(true);
+    }, pollMs) : null;
+
+    const onVisibilityChange = () => {
+      if (pollMs > 0 && document.visibilityState === "visible") apply(true);
+    };
+    if (pollMs > 0) document.addEventListener("visibilitychange", onVisibilityChange);
+
+    return () => {
+      active = false;
+      if (interval !== null) window.clearInterval(interval);
+      if (pollMs > 0) document.removeEventListener("visibilitychange", onVisibilityChange);
+    };
+  }, [url, ttlMs, pollMs]);
 
   return { data, loading, error };
 }
