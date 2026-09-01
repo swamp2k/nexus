@@ -1,0 +1,299 @@
+.home-widget {
+  container-type: inline-size;
+  container-name: home-widget;
+}
+
+/* Let richer widgets use the space they are given without forcing every card
+   to expose the same amount of detail. The registry still controls width;
+   the component content now reacts to the real rendered width. */
+.home-mini-chart-block,
+.home-week-bars-block,
+.home-weather-hours,
+.home-weather-week,
+.home-wellbeing {
+  width: 100%;
+  min-width: 0;
+}
+
+.home-mini-chart {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 220px;
+}
+
+.home-mini-chart-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 14px;
+  margin-bottom: 8px;
+  color: var(--muted);
+  font-size: .76rem;
+}
+
+.home-mini-chart-summary strong {
+  color: var(--text);
+}
+
+.home-mini-chart-summary small {
+  margin-left: auto;
+  color: var(--muted);
+}
+
+.home-three-stats {
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.home-three-stats > div {
+  min-width: 0;
+  display: grid;
+  gap: 3px;
+}
+
+.home-three-stats span,
+.home-three-stats small {
+  color: var(--muted);
+  font-size: .76rem;
+}
+
+.home-three-stats strong {
+  font-size: 1.35rem;
+  letter-spacing: -.035em;
+}
+
+.home-three-stats > small {
+  grid-column: 1 / -1;
+}
+
+.home-week-bars-block {
+  display: grid;
+  gap: 10px;
+}
+
+.home-week-summary {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+}
+
+.home-week-summary strong {
+  font-size: 1.5rem;
+  letter-spacing: -.04em;
+}
+
+.home-week-summary span {
+  color: var(--muted);
+  font-size: .78rem;
+}
+
+.home-week-bars {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+  align-items: end;
+  gap: 5px;
+  min-height: 92px;
+}
+
+.home-week-bars > div {
+  display: grid;
+  grid-template-rows: 68px auto;
+  align-items: end;
+  gap: 5px;
+  text-align: center;
+}
+
+.home-week-bars > div > span {
+  width: min(100%, 24px);
+  justify-self: center;
+  min-height: 3px;
+  border-radius: 4px 4px 1px 1px;
+  background: var(--accent);
+}
+
+.home-week-bars--sleep > div > span {
+  background: var(--sleep-light, var(--accent));
+}
+
+.home-week-bars small {
+  color: var(--muted);
+  font-size: .64rem;
+}
+
+.home-weather-hours,
+.home-weather-week {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 6px;
+}
+
+.home-weather-week {
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.home-weather-hours > div,
+.home-weather-week > div {
+  min-width: 0;
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+  padding: 7px 4px;
+  border-radius: 9px;
+  background: var(--surface-soft);
+  text-align: center;
+}
+
+.home-weather-hours span,
+.home-weather-week span {
+  color: var(--muted);
+  font-size: .68rem;
+}
+
+.home-weather-hours b,
+.home-weather-week b {
+  font-size: 1.25rem;
+}
+
+.home-weather-hours strong,
+.home-weather-week strong {
+  font-size: 1rem;
+}
+
+.home-weather-hours small,
+.home-weather-week small {
+  min-width: 0;
+  color: var(--muted);
+  font-size: .65rem;
+  white-space: nowrap;
+}
+
+/* Compact cards: keep the glanceable number and remove tertiary detail. */
+@container home-widget (max-width: 300px) {
+  .home-widget-content {
+    padding-top: 10px;
+  }
+
+  .home-metric > small {
+    display: none;
+  }
+
+  .home-weather {
+    gap: 10px;
+  }
+
+  .home-weather-icon {
+    font-size: 2rem;
+  }
+
+  .home-weather small {
+    display: none;
+  }
+
+  .home-wellbeing-journal,
+  .home-wellbeing-no-journal {
+    display: none;
+  }
+
+  .home-wellbeing-metrics span:nth-child(n+3) {
+    display: none;
+  }
+
+  .home-three-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .home-three-stats > div:nth-child(2) {
+    display: none;
+  }
+
+  .home-weather-hours {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .home-weather-hours > div:nth-child(n+4) {
+    display: none;
+  }
+
+  .home-weather-week {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .home-weather-week > div:nth-child(n+4) {
+    display: none;
+  }
+
+  .home-mini-chart-summary small {
+    display: none;
+  }
+
+  .home-mini-chart {
+    max-height: 145px;
+  }
+}
+
+/* Medium cards show useful context, but reserve long-form detail for wide cards. */
+@container home-widget (min-width: 301px) and (max-width: 650px) {
+  .home-wellbeing-journal {
+    display: none;
+  }
+
+  .home-weather-hours {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .home-weather-hours > div:nth-child(n+5) {
+    display: none;
+  }
+
+  .home-weather-week {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+
+  .home-weather-week > div:nth-child(n+6) {
+    display: none;
+  }
+
+  .home-mini-chart {
+    max-height: 185px;
+  }
+}
+
+/* Wide cards earn their space: show the complete forecast/journal and give
+   charts more vertical resolution. */
+@container home-widget (min-width: 651px) {
+  .home-widget-content {
+    align-items: stretch;
+  }
+
+  .home-mini-chart {
+    max-height: 250px;
+  }
+
+  .home-wellbeing-journal p {
+    max-width: 90ch;
+  }
+
+  .home-week-bars {
+    min-height: 125px;
+  }
+
+  .home-week-bars > div {
+    grid-template-rows: 98px auto;
+  }
+}
+
+@media (max-width: 760px) {
+  /* On a one-column phone layout, medium/wide names should not force desktop
+     density. Container queries above decide how much content actually fits. */
+  .home-widget {
+    min-height: 0;
+  }
+
+  .home-mini-chart-summary small {
+    margin-left: 0;
+    flex-basis: 100%;
+  }
+}
