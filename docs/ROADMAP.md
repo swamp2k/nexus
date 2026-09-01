@@ -4,7 +4,9 @@ Updated: 2026-09-01
 
 This roadmap captures the current UI direction after the Nexus Air Audit and the decision to replace the existing Home page with a user-configurable widget dashboard.
 
-## Phase A — UI cleanup (now)
+## Phase A — UI cleanup ✅
+
+Completed 2026-09-01:
 
 1. Reduce global page-header chrome:
    - smaller H1
