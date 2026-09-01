@@ -99,24 +99,58 @@ export function SleepDurationBars({ rows, onSelect }: { rows: SleepBar[]; onSele
   </div>;
 }
 
+function unwrapNear(value: number, reference: number): number {
+  let result = value;
+  while (result - reference > DAY / 2) result -= DAY;
+  while (result - reference < -DAY / 2) result += DAY;
+  return result;
+}
+
 export function SleepConsistencyChart({ rows, avgBed, avgWake, onSelect }: { rows: ConsistencyRow[]; avgBed: number | null; avgWake: number | null; onSelect: (date: string) => void }) {
   const [active, setActive] = useState<number | null>(null);
   const [tooltip, setTooltip] = useState<TooltipPos | null>(null);
-  const axisStart = 21 * 3600, axisEnd = 33 * 3600, ticks = [21, 25, 29, 33];
-  const normalize = (seconds: number | null) => { if (seconds === null) return null; let value = seconds; if (value < 12 * 3600) value += DAY; return value; };
-  const yPct = (seconds: number) => Math.max(0, Math.min(100, ((seconds - axisStart) / (axisEnd - axisStart)) * 100));
-  const avgBedN = normalize(avgBed), avgWakeN = normalize(avgWake), selected = active === null ? null : rows[active];
+  const fallbackBed = rows.find((row) => row.bedSeconds !== null)?.bedSeconds ?? 0;
+  const referenceBed = avgBed ?? fallbackBed;
+  const normalizedRows = rows.map((row) => {
+    if (row.bedSeconds === null || row.wakeSeconds === null) return { ...row, bed: null as number | null, wake: null as number | null };
+    const bed = unwrapNear(row.bedSeconds, referenceBed);
+    let wake = unwrapNear(row.wakeSeconds, bed + 8 * 3600);
+    while (wake <= bed) wake += DAY;
+    return { ...row, bed, wake };
+  });
+  const avgBedN = avgBed === null ? null : unwrapNear(avgBed, referenceBed);
+  let avgWakeN = avgWake === null ? null : unwrapNear(avgWake, (avgBedN ?? referenceBed) + 8 * 3600);
+  if (avgWakeN !== null && avgBedN !== null) while (avgWakeN <= avgBedN) avgWakeN += DAY;
+
+  const axisValues = normalizedRows.flatMap((row) => row.bed === null || row.wake === null ? [] : [row.bed, row.wake]);
+  if (avgBedN !== null) axisValues.push(avgBedN);
+  if (avgWakeN !== null) axisValues.push(avgWakeN);
+  const rawStart = axisValues.length ? Math.min(...axisValues) : 21 * 3600;
+  const rawEnd = axisValues.length ? Math.max(...axisValues) : 33 * 3600;
+  const twoHours = 2 * 3600;
+  let axisStart = Math.floor((rawStart - 3600) / twoHours) * twoHours;
+  let axisEnd = Math.ceil((rawEnd + 3600) / twoHours) * twoHours;
+  if (axisEnd - axisStart < 10 * 3600) {
+    const middle = (axisStart + axisEnd) / 2;
+    axisStart = Math.floor((middle - 5 * 3600) / twoHours) * twoHours;
+    axisEnd = axisStart + 10 * 3600;
+  }
+  const axisSpan = Math.max(1, axisEnd - axisStart);
+  const tickCount = 4;
+  const ticks = Array.from({ length: tickCount }, (_, index) => axisStart + (axisSpan * index) / (tickCount - 1));
+  const yPct = (seconds: number) => Math.max(0, Math.min(100, ((seconds - axisStart) / axisSpan) * 100));
+  const selected = active === null ? null : rows[active];
   const move = (index: number, clientX: number, clientY: number, el: HTMLElement) => { setActive(index); setTooltip(pointerPos(clientX, clientY, el.closest(".sleep-consistency-plot") ?? el)); };
 
   return <div className="sleep-consistency-axis-chart">
-    <div className="sleep-consistency-y">{ticks.map((h) => <span key={h} style={{ top: `${((h-21)/12)*100}%` }}>{timeOfDay(h*3600)}</span>)}</div>
+    <div className="sleep-consistency-y">{ticks.map((tick) => <span key={tick} style={{ top: `${yPct(tick)}%` }}>{timeOfDay(tick)}</span>)}</div>
     <div className="sleep-consistency-plot">
-      {ticks.map((h) => <i key={h} className="sleep-consistency-grid" style={{ top: `${((h-21)/12)*100}%` }} />)}
+      {ticks.map((tick) => <i key={tick} className="sleep-consistency-grid" style={{ top: `${yPct(tick)}%` }} />)}
       {avgBedN !== null && <i className="sleep-average-line bedtime" style={{ top: `${yPct(avgBedN)}%` }} />}
       {avgWakeN !== null && <i className="sleep-average-line wake" style={{ top: `${yPct(avgWakeN)}%` }} />}
-      <div className="sleep-consistency-columns">{rows.map((row, index) => {
-        const bed = normalize(row.bedSeconds), wake = normalize(row.wakeSeconds), valid = bed !== null && wake !== null && wake > bed;
-        const top = valid ? yPct(bed) : 0, bottom = valid ? yPct(wake) : 0;
+      <div className="sleep-consistency-columns">{normalizedRows.map((row, index) => {
+        const valid = row.bed !== null && row.wake !== null && row.wake > row.bed;
+        const top = valid ? yPct(row.bed!) : 0, bottom = valid ? yPct(row.wake!) : 0;
         return <button key={row.date} type="button" className={active===index?"active":""} onClick={() => onSelect(row.date)}
           onPointerEnter={(e) => move(index, e.clientX, e.clientY, e.currentTarget)} onPointerMove={(e) => move(index, e.clientX, e.clientY, e.currentTarget)} onPointerLeave={() => { setActive(null); setTooltip(null); }}>
           {valid && <span style={{ top: `${top}%`, height: `${Math.max(1.5, bottom-top)}%` }} />}<small>{rows.length <= 8 ? weekday(row.date) : shortDate(row.date)}</small>
