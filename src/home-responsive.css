@@ -139,6 +139,7 @@
   min-width: 0;
   display: grid;
   justify-items: center;
+  align-content: start;
   gap: 3px;
   padding: 7px 4px;
   border-radius: 9px;
@@ -162,12 +163,28 @@
   font-size: 1rem;
 }
 
+.home-weather-week strong em {
+  color: var(--muted);
+  font-size: .78em;
+  font-style: normal;
+  font-weight: 700;
+}
+
 .home-weather-hours small,
 .home-weather-week small {
   min-width: 0;
   color: var(--muted);
-  font-size: .65rem;
+  font-size: .62rem;
+  line-height: 1.25;
   white-space: nowrap;
+}
+
+.home-weather-wind {
+  color: var(--muted-strong) !important;
+}
+
+.home-weather-rain {
+  color: var(--muted) !important;
 }
 
 .home-weather-details {
@@ -329,26 +346,23 @@
   }
 }
 
-/* Medium cards show useful context, but reserve long-form detail for wide cards. */
+/* Medium cards show the full named forecast horizon while staying compact. */
 @container home-widget (min-width: 301px) and (max-width: 650px) {
   .home-wellbeing-journal {
     display: none;
   }
 
   .home-weather-hours {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-
-  .home-weather-hours > div:nth-child(n+5) {
-    display: none;
+    grid-template-columns: repeat(6, minmax(0, 1fr));
   }
 
   .home-weather-week {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
+    grid-template-columns: repeat(7, minmax(0, 1fr));
   }
 
-  .home-weather-week > div:nth-child(n+6) {
-    display: none;
+  .home-weather-hours small,
+  .home-weather-week small {
+    font-size: .58rem;
   }
 
   .home-mini-chart {
