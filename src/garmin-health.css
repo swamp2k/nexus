@@ -26,6 +26,52 @@
   font-size: 0.82rem;
 }
 
+.garmin-health-heading-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.garmin-health-heading-actions > span {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.garmin-refresh-button {
+  min-height: 34px;
+  padding: 7px 11px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--surface-soft);
+  color: var(--accent);
+  font: inherit;
+  font-size: .78rem;
+  font-weight: 850;
+  cursor: pointer;
+}
+
+.garmin-refresh-button:hover:not(:disabled) {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent-soft) 55%, var(--surface-soft));
+}
+
+.garmin-refresh-button:disabled {
+  opacity: .7;
+  cursor: default;
+}
+
+.garmin-sync-error {
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in srgb, #d64545 45%, var(--border));
+  border-radius: 10px;
+  background: color-mix(in srgb, #d64545 8%, var(--surface));
+  color: #d64545;
+  font-size: .86rem;
+}
+
 .garmin-metric-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -614,6 +660,11 @@
   .garmin-health-heading,
   .garmin-deep-heading {
     display: block;
+  }
+
+  .garmin-health-heading-actions {
+    justify-content: flex-start;
+    margin-top: 8px;
   }
 
   .garmin-health-heading > span {
