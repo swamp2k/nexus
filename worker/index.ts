@@ -1,4 +1,5 @@
 import { handleAuthRoute } from "./auth/routes";
+import { handleCalendarRoute } from "./calendar/routes";
 import { handleGarminAgentRoute } from "./garmin/agent-routes";
 import { handleGarminCredentialRoute } from "./garmin/credential-routes";
 import { handleGarminProcessRoute } from "./garmin/process-routes";
@@ -41,6 +42,11 @@ export default {
       if (url.pathname.startsWith("/api/auth/")) {
         const authResponse = await handleAuthRoute(request, env);
         if (authResponse) return authResponse;
+      }
+
+      if (url.pathname.startsWith("/api/calendar/")) {
+        const calendarResponse = await handleCalendarRoute(request, env);
+        if (calendarResponse) return calendarResponse;
       }
 
       if (url.pathname.startsWith("/api/garmin/")) {
