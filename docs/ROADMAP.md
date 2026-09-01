@@ -103,20 +103,21 @@ Existing page-owned visualizations do not all need to be refactored immediately;
 
 With Modular Home v1 in place, the audit is now being applied selectively against the current product rather than copied blindly.
 
-### Completed in this pass
+### Completed so far
 
 - Garmin A4: removed the two redundant historical-count cards; day/night counts now live as one compact caption in the overview heading.
-- Garmin B2 (partial): only one visible back/close action remains inside a detail view; the misleading down arrows were already changed to navigation chevrons in Phase A.
+- Garmin B2: detail navigation uses one clear close action, truthful chevrons, and now opens on the more useful 4w range by default. Users can still switch to 1d for a specific day/night.
 - Motion A5: replaced repeated stat labels with a real aligned activity table, one sticky header, month grouping, tabular numbers, and progressive `Vis flere` in 30-row chunks.
+- Motion scanability follow-up: month/year dividers use normal foreground text plus a subtle accent marker/background so long histories are easier to skim without increasing font size.
+- Velbefindende A3: today's recorded values and latest journal note now appear directly on the page instead of only inside the editing dialog. Closing a historical check-in returns the page state to today so the summary remains truthful.
 
 ### Next candidates
 
-- Velbefindende A3: show today's recorded values and journal information inline rather than hiding useful data behind editing UI; add short trend views where the history endpoint supports it cleanly.
-- Garmin B2: default detail ranges to a useful multi-day view (likely 4w) instead of opening on the sparse 1d state.
 - Check-in B4: one clear save action and unsaved-change protection.
 - Strøm B5: combine the price breakdown so `I alt` is not buried under `Øvrigt`; add scroll affordance to the 15-minute strip. Keep the deliberate fixed 0–6 kr/kWh chart scale.
 - Vejr B6: tighten wide forecast column alignment and make horizontal overflow discoverable where needed.
 - Garmin D1: improve long-range chart labelling/aggregation where useful.
+- Velbefindende follow-up: add short trend views where the history endpoint supports it cleanly and the visual adds real value.
 - Mobile C3: revisit which destinations belong in the mobile nav once placeholder/roadmap modules are actually useful.
 
 Items for modules that are not implemented yet should not create placeholder work merely to satisfy the audit.
