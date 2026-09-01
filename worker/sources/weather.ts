@@ -49,6 +49,7 @@ type ParsedPoint = {
   pressure: number | null;
   symbol: string | null;
   precipitationMm: number | null;
+  precipitation6hMm: number | null;
   precipitationProbability: number | null;
 };
 
@@ -86,6 +87,7 @@ export type WeatherForecast = {
     minTemperature: number;
     maxTemperature: number;
     symbol: string | null;
+    precipitationMm: number | null;
     maxPrecipitationProbability: number | null;
     windSpeed: number | null;
     windDirection: number | null;
@@ -150,12 +152,28 @@ function parsePoint(value: unknown): ParsedPoint | null {
     pressure: number(item.data.instant.details.air_pressure_at_sea_level),
     symbol: typeof preferredPeriod?.summary?.symbol_code === "string" ? preferredPeriod.summary.symbol_code : null,
     precipitationMm: number(item.data.next_1_hours?.details?.precipitation_amount),
+    precipitation6hMm: number(item.data.next_6_hours?.details?.precipitation_amount),
     precipitationProbability: number(
       item.data.next_1_hours?.details?.probability_of_precipitation
         ?? item.data.next_6_hours?.details?.probability_of_precipitation
         ?? item.data.next_12_hours?.details?.probability_of_precipitation,
     ),
   };
+}
+
+function dailyPrecipitation(dayPoints: ParsedPoint[]): number | null {
+  const hourly = dayPoints.filter((point) => point.precipitationMm !== null);
+  if (hourly.length >= 12) {
+    return hourly.reduce((sum, point) => sum + (point.precipitationMm ?? 0), 0);
+  }
+
+  const sixHourly = dayPoints.filter((point) => point.precipitation6hMm !== null && point.localHour % 6 === 0);
+  if (sixHourly.length) {
+    return sixHourly.reduce((sum, point) => sum + (point.precipitation6hMm ?? 0), 0);
+  }
+
+  if (hourly.length) return hourly.reduce((sum, point) => sum + (point.precipitationMm ?? 0), 0);
+  return null;
 }
 
 function buildDaily(points: ParsedPoint[]): WeatherForecast["daily"] {
@@ -186,6 +204,7 @@ function buildDaily(points: ParsedPoint[]): WeatherForecast["daily"] {
       minTemperature: Math.min(...temperatures),
       maxTemperature: Math.max(...temperatures),
       symbol: symbolPoint?.symbol ?? null,
+      precipitationMm: dailyPrecipitation(dayPoints),
       maxPrecipitationProbability: probabilities.length > 0 ? Math.max(...probabilities) : null,
       windSpeed: daytimePoint?.windSpeed ?? null,
       windDirection: daytimePoint?.windDirection ?? null,
