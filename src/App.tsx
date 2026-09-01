@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import type { FormEvent } from "react";
+import type { FormEvent, MouseEvent } from "react";
 import GarminPage from "./GarminPage";
 import MotionPage from "./MotionPage";
 import WellbeingPage from "./WellbeingPage";
@@ -136,6 +136,10 @@ function App() {
     setSession({ authenticated: false, user: null });
   }
 
+  function closeUserMenu(event: MouseEvent<HTMLButtonElement>) {
+    event.currentTarget.closest("details")?.removeAttribute("open");
+  }
+
   if (!session) return <div className="screen-state">Indlæser Nexus…</div>;
 
   if (!session.authenticated) {
@@ -209,7 +213,7 @@ function App() {
             </button>
           ))}
         </nav>
-        <div className="system-status"><span className="status-dot" /><div><small>Systemstatus</small><strong>Alt kører</strong></div><span className="status-arrow">›</span></div>
+        <div className="system-status"><span className="status-dot" /><div><small>Systemstatus</small><strong>Alt kører</strong></div></div>
       </aside>
 
       <div className="content-shell">
@@ -217,7 +221,15 @@ function App() {
           <div><h1>{heading}</h1>{subheading && <p>{subheading}</p>}</div>
           <div className="header-actions">
             <button className="theme-toggle" onClick={() => setTheme(theme === "light" ? "dark" : "light")} aria-label="Skift tema">{theme === "light" ? "☾" : "☀"}</button>
-            <div className="user-menu"><span className="avatar">{initials(session.user)}</span><span className="user-name">{displayName}</span><button className="logout-button" type="button" onClick={logout}>Log ud</button></div>
+            <details className="user-menu">
+              <summary className="user-menu-summary" aria-label="Åbn brugermenu">
+                <span className="avatar">{initials(session.user)}</span><span className="user-name">{displayName}</span>
+              </summary>
+              <div className="user-menu-popover">
+                <button type="button" onClick={(event) => { setPage("Indstillinger"); closeUserMenu(event); }}>Indstillinger</button>
+                <button className="logout-button" type="button" onClick={logout}>Log ud</button>
+              </div>
+            </details>
           </div>
         </header>
 
