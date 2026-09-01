@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import type { FormEvent, MouseEvent } from "react";
+import HomePage from "./HomePage";
 import GarminPage from "./GarminPage";
 import MotionPage from "./MotionPage";
 import WellbeingPage from "./WellbeingPage";
@@ -20,27 +21,8 @@ type SessionResponse = {
   user: User | null;
 };
 
-type Module = {
-  name: string;
-  detail: string;
-  status: string;
-  tone: "blue" | "sky" | "amber" | "green" | "violet" | "teal";
-  icon: string;
-};
-
 type Page = "Hjem" | "Garmin" | "Motion" | "Velbefindende" | "Vejr" | "Strøm" | "DBA" | "Unraid" | "PC Watch" | "Indstillinger";
 type PrimaryPage = Exclude<Page, "Indstillinger">;
-
-const modules: Module[] = [
-  { name: "Garmin", status: "Active", detail: "Sundhed, søvn og historik", tone: "blue", icon: "⌖" },
-  { name: "Motion", status: "Active", detail: "Aktiviteter og træningshistorik", tone: "teal", icon: "↗" },
-  { name: "Velbefindende", status: "Active", detail: "Dagligt check-in og journal", tone: "violet", icon: "♥" },
-  { name: "Vejr", status: "Active", detail: "MET Norway prognose", tone: "sky", icon: "☁" },
-  { name: "Strøm", status: "Active", detail: "Spotpriser og bedste tidspunkter", tone: "amber", icon: "ϟ" },
-  { name: "DBA", status: "Later integration", detail: "Fund og monitorering", tone: "green", icon: "◇" },
-  { name: "Unraid", status: "Later integration", detail: "Serverstatus og advarsler", tone: "violet", icon: "▤" },
-  { name: "PC Watch", status: "Later integration", detail: "Maskinstatus samlet ét sted", tone: "teal", icon: "▣" },
-];
 
 const primaryNav: PrimaryPage[] = ["Hjem", "Garmin", "Motion", "Velbefindende", "Vejr", "Strøm", "DBA", "Unraid", "PC Watch"];
 const secondaryNav = ["Overblik", "Notifikationer", "Indstillinger"] as const;
@@ -59,29 +41,6 @@ function initials(user: User | null): string {
   if (!user) return "N";
   const source = user.displayName?.trim() || user.email;
   return source.slice(0, 1).toUpperCase();
-}
-
-function Dashboard({ onOpen }: { onOpen: (page: Page) => void }) {
-  return (
-    <section className="modules-section" aria-labelledby="modules-heading">
-      <p className="section-label">Moduler</p>
-      <h2 id="modules-heading">Dine øer, samlet</h2>
-
-      <div className="module-grid">
-        {modules.map((module) => (
-          <button className="module-card" key={module.name} type="button" onClick={() => onOpen(module.name as Page)}>
-            <div className={`module-icon tone-${module.tone}`}>{module.icon}</div>
-            <div className="module-copy">
-              <h3>{module.name}</h3>
-              <p>{module.detail}</p>
-              <span className={`module-badge tone-${module.tone}`}>{module.status}</span>
-            </div>
-            <span className="module-arrow">›</span>
-          </button>
-        ))}
-      </div>
-    </section>
-  );
 }
 
 function App() {
@@ -166,9 +125,9 @@ function App() {
   if (isKitchenDisplay) return <KitchenDisplay />;
 
   const isHome = page === "Hjem";
-  const heading = isHome ? "Overblik uden bøvl." : page;
+  const heading = isHome ? "Hjem" : page;
   const subheading = isHome
-    ? "Én rolig indgang til data, overvågning og de små værktøjer familien faktisk bruger."
+    ? "Dit personlige overblik over de data, du faktisk vil se."
     : page === "Garmin"
       ? "Din sundhedshistorik samlet, importeret og klar til analyse."
       : page === "Motion"
@@ -234,7 +193,7 @@ function App() {
         </header>
 
         <main className="main-content">
-          {page === "Hjem" && <Dashboard onOpen={setPage} />}
+          {page === "Hjem" && <HomePage onOpenPage={setPage} />}
           {page === "Garmin" && <GarminPage />}
           {page === "Motion" && <MotionPage />}
           {page === "Velbefindende" && <WellbeingPage />}
