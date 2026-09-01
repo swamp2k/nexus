@@ -15,6 +15,7 @@ type SettingsResponse = {
     energySupplierMarkupOere: number | null;
     energyLowPriceDkk: number | null;
     energyHighPriceDkk: number | null;
+    dashboardRefreshSeconds: number | null;
     updatedAt: string | null;
   };
   options?: { gridProviders?: GridProviderOption[] };
@@ -41,6 +42,7 @@ export default function SettingsPage() {
   const [energySupplierMarkupOere, setEnergySupplierMarkupOere] = useState("0");
   const [energyLowPriceDkk, setEnergyLowPriceDkk] = useState("1");
   const [energyHighPriceDkk, setEnergyHighPriceDkk] = useState("2");
+  const [dashboardRefreshSeconds, setDashboardRefreshSeconds] = useState("300");
   const [gridProviders, setGridProviders] = useState<GridProviderOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [saveState, setSaveState] = useState<SaveState>("idle");
@@ -62,6 +64,7 @@ export default function SettingsPage() {
         setEnergySupplierMarkupOere(String(settings.energySupplierMarkupOere ?? 0));
         setEnergyLowPriceDkk(String(settings.energyLowPriceDkk ?? 1));
         setEnergyHighPriceDkk(String(settings.energyHighPriceDkk ?? 2));
+        setDashboardRefreshSeconds(String(settings.dashboardRefreshSeconds ?? 300));
         setGridProviders(options?.gridProviders ?? []);
       })
       .catch(() => undefined)
@@ -110,6 +113,7 @@ export default function SettingsPage() {
           energySupplierMarkupOere: Number(energySupplierMarkupOere),
           energyLowPriceDkk: lowBand,
           energyHighPriceDkk: highBand,
+          dashboardRefreshSeconds: Number(dashboardRefreshSeconds),
         }),
       });
       if (!response.ok) throw new Error(await responseError(response));
@@ -122,6 +126,7 @@ export default function SettingsPage() {
       setEnergySupplierMarkupOere(String(settings.energySupplierMarkupOere ?? 0));
       setEnergyLowPriceDkk(String(settings.energyLowPriceDkk ?? 1));
       setEnergyHighPriceDkk(String(settings.energyHighPriceDkk ?? 2));
+      setDashboardRefreshSeconds(String(settings.dashboardRefreshSeconds ?? 300));
       setSaveState("saved");
     } catch (error) {
       setSaveError(error instanceof Error ? error.message : "Ukendt fejl");
@@ -142,6 +147,16 @@ export default function SettingsPage() {
             <div className="settings-location-actions"><button className="primary-action" type="button" onClick={useCurrentLocation} disabled={locateState === "locating"}>{locateState === "locating" ? "Finder placering…" : "Brug min aktuelle placering"}</button><span>Browseren spørger om tilladelse til lokation.</span></div>
             <details className="settings-advanced"><summary>Avanceret: koordinater</summary><div className="settings-coordinate-grid"><label><span>Breddegrad</span><input inputMode="decimal" value={latitude} onChange={(event) => { setLatitude(event.target.value); changed(); }} /></label><label><span>Længdegrad</span><input inputMode="decimal" value={longitude} onChange={(event) => { setLongitude(event.target.value); changed(); }} /></label></div></details>
             {locateState === "error" && <p className="settings-feedback error">Placeringen kunne ikke læses fra browseren.</p>}
+          </div>
+        )}
+      </details>
+
+      <details className="settings-card settings-collapsible" open>
+        <summary className="settings-card-heading"><div><p className="section-label">Dashboard</p><h2>Automatisk opdatering</h2></div><span className="settings-icon" aria-hidden="true">↻</span></summary>
+        {loading ? <p className="settings-loading">Henter indstillinger…</p> : (
+          <div className="settings-form">
+            <label><span>Opdatér dashboard-værdier</span><select value={dashboardRefreshSeconds} onChange={(event) => { setDashboardRefreshSeconds(event.target.value); changed(); }}><option value="60">Hvert minut</option><option value="120">Hvert 2. minut</option><option value="300">Hvert 5. minut</option><option value="600">Hvert 10. minut</option><option value="900">Hvert 15. minut</option><option value="1800">Hvert 30. minut</option></select></label>
+            <p className="settings-help">Gælder widgets på Hjem. Polling stopper, når browserfanen ikke er synlig, og fortsætter straks når du vender tilbage. Standard er 5 minutter.</p>
           </div>
         )}
       </details>
