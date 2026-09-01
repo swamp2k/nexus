@@ -7,6 +7,7 @@ import WellbeingPage from "./WellbeingPage";
 import WeatherPage from "./WeatherPage";
 import ElectricityPage from "./ElectricityPage";
 import CalendarPage from "./CalendarPage";
+import MelCloudPage from "./MelCloudPage";
 import SettingsPage from "./SettingsPage";
 import KitchenDisplay from "./KitchenDisplay";
 
@@ -22,12 +23,12 @@ type SessionResponse = {
   user: User | null;
 };
 
-type Page = "Hjem" | "Garmin" | "Motion" | "Velbefindende" | "Vejr" | "Strøm" | "Kalender" | "DBA" | "Unraid" | "PC Watch" | "Indstillinger";
+type Page = "Hjem" | "Garmin" | "Motion" | "Velbefindende" | "Vejr" | "Strøm" | "Kalender" | "Varmepumpe" | "DBA" | "Unraid" | "PC Watch" | "Indstillinger";
 type PrimaryPage = Exclude<Page, "Indstillinger">;
 
-const primaryNav: PrimaryPage[] = ["Hjem", "Garmin", "Motion", "Velbefindende", "Vejr", "Strøm", "Kalender", "DBA", "Unraid", "PC Watch"];
+const primaryNav: PrimaryPage[] = ["Hjem", "Garmin", "Motion", "Velbefindende", "Vejr", "Strøm", "Kalender", "Varmepumpe", "DBA", "Unraid", "PC Watch"];
 const secondaryNav = ["Overblik", "Notifikationer", "Indstillinger"] as const;
-const navIcons = ["⌂", "⌖", "↗", "♥", "☁", "ϟ", "▦", "◇", "▤", "▣"];
+const navIcons = ["⌂", "⌖", "↗", "♥", "☁", "ϟ", "▦", "♨", "◇", "▤", "▣"];
 const mobileNav: Array<{ page: Page; icon: string; label: string }> = [
   { page: "Hjem", icon: "⌂", label: "Hjem" },
   { page: "Garmin", icon: "⌖", label: "Garmin" },
@@ -36,6 +37,7 @@ const mobileNav: Array<{ page: Page; icon: string; label: string }> = [
   { page: "Vejr", icon: "☁", label: "Vejr" },
   { page: "Strøm", icon: "ϟ", label: "Strøm" },
   { page: "Kalender", icon: "▦", label: "Kalender" },
+  { page: "Varmepumpe", icon: "♨", label: "Varmepumpe" },
   { page: "Indstillinger", icon: "⚙", label: "Indstillinger" },
 ];
 
@@ -142,7 +144,9 @@ function App() {
               ? "Spotpriser og de bedste tidspunkter at bruge strøm på."
               : page === "Kalender"
                 ? "Dine kommende aftaler samlet fra iCal-kalendere."
-                : "";
+                : page === "Varmepumpe"
+                  ? "Luft/vand-varmepumpen samlet fra MELCloud."
+                  : "";
 
   return (
     <div className="app-frame">
@@ -204,8 +208,9 @@ function App() {
           {page === "Vejr" && <WeatherPage />}
           {page === "Strøm" && <ElectricityPage />}
           {page === "Kalender" && <CalendarPage />}
+          {page === "Varmepumpe" && <MelCloudPage />}
           {page === "Indstillinger" && <SettingsPage />}
-          {!isHome && page !== "Garmin" && page !== "Motion" && page !== "Velbefindende" && page !== "Vejr" && page !== "Strøm" && page !== "Kalender" && page !== "Indstillinger" && <section className="placeholder-card"><p className="section-label">Planlagt</p><h2>{page}</h2><p>Modulet er på vej ind i Nexus.</p></section>}
+          {!isHome && page !== "Garmin" && page !== "Motion" && page !== "Velbefindende" && page !== "Vejr" && page !== "Strøm" && page !== "Kalender" && page !== "Varmepumpe" && page !== "Indstillinger" && <section className="placeholder-card"><p className="section-label">Planlagt</p><h2>{page}</h2><p>Modulet er på vej ind i Nexus.</p></section>}
         </main>
 
         <footer><span>Nexus v0.1</span><span>Simple by design.</span></footer>
