@@ -27,8 +27,6 @@ export default function HomePage({ onOpenPage }: { onOpenPage: (page: WidgetTarg
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
-  const [draggedId, setDraggedId] = useState<string | null>(null);
-  const [dropTargetId, setDropTargetId] = useState<string | null>(null);
 
   useEffect(() => {
     void fetch("/api/home-layout", { credentials: "same-origin", cache: "no-store" })
@@ -102,22 +100,6 @@ export default function HomePage({ onOpenPage }: { onOpenPage: (page: WidgetTarg
     });
   }
 
-  function dropWidget(targetId: string) {
-    if (!draggedId || draggedId === targetId) return;
-    setDraft((current) => {
-      const sourceIndex = current.findIndex((item) => item.id === draggedId);
-      const targetIndex = current.findIndex((item) => item.id === targetId);
-      if (sourceIndex < 0 || targetIndex < 0) return current;
-      const copy = [...current];
-      const [moved] = copy.splice(sourceIndex, 1);
-      const adjustedTarget = sourceIndex < targetIndex ? targetIndex - 1 : targetIndex;
-      copy.splice(adjustedTarget, 0, moved);
-      return copy;
-    });
-    setDraggedId(null);
-    setDropTargetId(null);
-  }
-
   async function save() {
     setSaving(true);
     setMessage(null);
@@ -148,7 +130,7 @@ export default function HomePage({ onOpenPage }: { onOpenPage: (page: WidgetTarg
       <div className="home-toolbar">
         {!editing
           ? <button className="secondary-action" type="button" onClick={beginEdit}>Rediger Hjem</button>
-          : <div className="home-edit-actions"><span className="home-edit-hint">Træk widgets for at flytte dem. Brug −/+ for størrelse.</span><button className="secondary-action" type="button" onClick={() => { setDraft(layout); setEditing(false); setMessage(null); }}>Annuller</button><button className="primary-action" type="button" disabled={saving} onClick={() => void save()}>{saving ? "Gemmer…" : "Gem layout"}</button></div>}
+          : <div className="home-edit-actions"><span className="home-edit-hint">Brug ←/→ til rækkefølge og −/+ til størrelse.</span><button className="secondary-action" type="button" onClick={() => { setDraft(layout); setEditing(false); setMessage(null); }}>Annuller</button><button className="primary-action" type="button" disabled={saving} onClick={() => void save()}>{saving ? "Gemmer…" : "Gem layout"}</button></div>}
       </div>
 
       {state === "loading" && <p className="home-layout-note">Henter dit layout…</p>}
@@ -181,21 +163,13 @@ export default function HomePage({ onOpenPage }: { onOpenPage: (page: WidgetTarg
           if (!widget) return null;
           const Widget = widget.component;
           const sizeIndex = widget.supportedSizes.indexOf(item.size);
-          return <article
-            className={`home-widget home-widget--${item.size}${editing ? " home-widget--editing" : ""}${dropTargetId === item.id ? " home-widget--drop-target" : ""}`}
-            data-widget-id={item.id}
-            key={item.id}
-            onDragOver={editing ? (event) => { event.preventDefault(); if (draggedId && draggedId !== item.id) setDropTargetId(item.id); } : undefined}
-            onDragLeave={editing ? () => { if (dropTargetId === item.id) setDropTargetId(null); } : undefined}
-            onDrop={editing ? (event) => { event.preventDefault(); dropWidget(item.id); } : undefined}
-          >
+          return <article className={`home-widget home-widget--${item.size}${editing ? " home-widget--editing" : ""}`} data-widget-id={item.id} key={item.id}>
             <header><div><span>{widget.group}</span><h3>{widget.title}</h3></div>{editing
               ? <div className="home-widget-direct-controls">
                   <button type="button" title="Mindre" aria-label={`Gør ${widget.title} mindre`} disabled={sizeIndex <= 0} onClick={() => stepSize(item.id, -1)}>−</button>
                   <button type="button" title="Større" aria-label={`Gør ${widget.title} større`} disabled={sizeIndex < 0 || sizeIndex >= widget.supportedSizes.length - 1} onClick={() => stepSize(item.id, 1)}>+</button>
                   <button type="button" className="home-widget-order-button" title="Flyt tidligere" aria-label={`Flyt ${widget.title} tidligere`} disabled={index <= 0} onClick={() => move(item.id, -1)}>←</button>
                   <button type="button" className="home-widget-order-button" title="Flyt senere" aria-label={`Flyt ${widget.title} senere`} disabled={index >= renderedLayout.length - 1} onClick={() => move(item.id, 1)}>→</button>
-                  <span className="home-widget-drag-handle" title="Træk for at flytte" aria-label={`Træk ${widget.title} for at flytte`} role="button" tabIndex={0} draggable onDragStart={(event) => { setDraggedId(item.id); event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/plain", item.id); }} onDragEnd={() => { setDraggedId(null); setDropTargetId(null); }}>⋮⋮</span>
                   <button type="button" className="home-widget-remove" title="Fjern" aria-label={`Fjern ${widget.title}`} onClick={() => toggleWidget(item.id)}>×</button>
                 </div>
               : <button type="button" onClick={() => onOpenPage(widget.page)}>{widget.page} ›</button>}</header>
