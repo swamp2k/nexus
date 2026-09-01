@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 type RangeKey = "1d" | "7d" | "4w" | "1y";
 type MetricKey = "steps" | "heart" | "stress" | "bodyBattery" | "respiration";
@@ -91,6 +91,8 @@ function BarChart({ rows, primary, secondary, min = 0, max, stress = false, goal
   aggregated?: boolean;
 }) {
   const [hover, setHover] = useState<TooltipState>(null);
+  const [expanded, setExpanded] = useState(false);
+  const hostRef = useRef<HTMLDivElement>(null);
   const width = 900, height = 260, padLeft = 54, padRight = 20, padY = 24;
   const primaryValues = rows.map(primary);
   const secondaryValues = secondary ? rows.map(secondary) : [];
@@ -104,6 +106,33 @@ function BarChart({ rows, primary, secondary, min = 0, max, stress = false, goal
   const x = (index: number) => padLeft + index * slot + slot / 2;
   const ticks = [0, .25, .5, .75, 1].map((step) => ({ step, value: top - step * (top - min) }));
 
+  useEffect(() => {
+    const syncFullscreen = () => {
+      if (!document.fullscreenElement) setExpanded(false);
+    };
+    document.addEventListener("fullscreenchange", syncFullscreen);
+    return () => document.removeEventListener("fullscreenchange", syncFullscreen);
+  }, []);
+
+  async function toggleExpanded() {
+    const orientation = screen.orientation as unknown as { lock?: (value: "landscape") => Promise<void>; unlock?: () => void };
+    if (expanded) {
+      if (document.fullscreenElement) {
+        try { await document.exitFullscreen(); } catch { /* CSS overlay still closes below */ }
+      }
+      try { orientation.unlock?.(); } catch { /* optional browser API */ }
+      setExpanded(false);
+      return;
+    }
+
+    setExpanded(true);
+    const host = hostRef.current;
+    if (host?.requestFullscreen) {
+      try { await host.requestFullscreen(); } catch { /* keep CSS fullscreen fallback */ }
+    }
+    try { await orientation.lock?.("landscape"); } catch { /* users can rotate manually */ }
+  }
+
   function move(clientX: number, clientY: number, svg: SVGSVGElement) {
     const rect = svg.getBoundingClientRect();
     const ratio = Math.max(0, Math.min(0.999999, (clientX - rect.left) / Math.max(1, rect.width)));
@@ -116,10 +145,10 @@ function BarChart({ rows, primary, secondary, min = 0, max, stress = false, goal
   const hoveredPrimary = hover === null ? null : primaryValues[hover.index];
   const hoveredSecondary = hover === null ? null : secondaryValues[hover.index] ?? null;
 
-  return <div className="health-chart-wrap health-bar-chart-wrap">
+  return <div ref={hostRef} className={`health-chart-wrap health-bar-chart-wrap ${expanded ? "is-expanded" : ""}`} onContextMenu={(event) => event.preventDefault()}>
     <div className="health-bar-meta">
       <div className="health-bar-legend"><span><i className="primary" />{primaryLabel}</span>{secondary && <span><i className="secondary" />{secondaryLabel}</span>}</div>
-      {aggregated && <small>Ugegennemsnit · 1 år</small>}
+      <div className="health-bar-actions">{aggregated && <small>Ugegennemsnit · 1 år</small>}<button type="button" className="health-chart-expand" onClick={() => void toggleExpanded()}>{expanded ? "Luk fuld skærm" : "⛶ Fuld skærm"}</button></div>
     </div>
     <svg className="health-chart health-bar-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label={aggregated ? "Historik som ugentlige gennemsnit" : "Historik som søjlediagram"}
       onPointerEnter={(e) => move(e.clientX, e.clientY, e.currentTarget)}
