@@ -6,6 +6,7 @@ import MotionPage from "./MotionPage";
 import WellbeingPage from "./WellbeingPage";
 import WeatherPage from "./WeatherPage";
 import ElectricityPage from "./ElectricityPage";
+import CalendarPage from "./CalendarPage";
 import SettingsPage from "./SettingsPage";
 import KitchenDisplay from "./KitchenDisplay";
 
@@ -21,12 +22,12 @@ type SessionResponse = {
   user: User | null;
 };
 
-type Page = "Hjem" | "Garmin" | "Motion" | "Velbefindende" | "Vejr" | "Strøm" | "DBA" | "Unraid" | "PC Watch" | "Indstillinger";
+type Page = "Hjem" | "Garmin" | "Motion" | "Velbefindende" | "Vejr" | "Strøm" | "Kalender" | "DBA" | "Unraid" | "PC Watch" | "Indstillinger";
 type PrimaryPage = Exclude<Page, "Indstillinger">;
 
-const primaryNav: PrimaryPage[] = ["Hjem", "Garmin", "Motion", "Velbefindende", "Vejr", "Strøm", "DBA", "Unraid", "PC Watch"];
+const primaryNav: PrimaryPage[] = ["Hjem", "Garmin", "Motion", "Velbefindende", "Vejr", "Strøm", "Kalender", "DBA", "Unraid", "PC Watch"];
 const secondaryNav = ["Overblik", "Notifikationer", "Indstillinger"] as const;
-const navIcons = ["⌂", "⌖", "↗", "♥", "☁", "ϟ", "◇", "▤", "▣"];
+const navIcons = ["⌂", "⌖", "↗", "♥", "☁", "ϟ", "▦", "◇", "▤", "▣"];
 const mobileNav: Array<{ page: Page; icon: string; label: string }> = [
   { page: "Hjem", icon: "⌂", label: "Hjem" },
   { page: "Garmin", icon: "⌖", label: "Garmin" },
@@ -34,6 +35,7 @@ const mobileNav: Array<{ page: Page; icon: string; label: string }> = [
   { page: "Velbefindende", icon: "♥", label: "Velbefindende" },
   { page: "Vejr", icon: "☁", label: "Vejr" },
   { page: "Strøm", icon: "ϟ", label: "Strøm" },
+  { page: "Kalender", icon: "▦", label: "Kalender" },
   { page: "Indstillinger", icon: "⚙", label: "Indstillinger" },
 ];
 
@@ -138,7 +140,9 @@ function App() {
             ? "Dine personlige Nexus-indstillinger."
             : page === "Strøm"
               ? "Spotpriser og de bedste tidspunkter at bruge strøm på."
-              : "";
+              : page === "Kalender"
+                ? "Dine kommende aftaler samlet fra iCal-kalendere."
+                : "";
 
   return (
     <div className="app-frame">
@@ -199,8 +203,9 @@ function App() {
           {page === "Velbefindende" && <WellbeingPage />}
           {page === "Vejr" && <WeatherPage />}
           {page === "Strøm" && <ElectricityPage />}
+          {page === "Kalender" && <CalendarPage />}
           {page === "Indstillinger" && <SettingsPage />}
-          {!isHome && page !== "Garmin" && page !== "Motion" && page !== "Velbefindende" && page !== "Vejr" && page !== "Strøm" && page !== "Indstillinger" && <section className="placeholder-card"><p className="section-label">Planlagt</p><h2>{page}</h2><p>Modulet er på vej ind i Nexus.</p></section>}
+          {!isHome && page !== "Garmin" && page !== "Motion" && page !== "Velbefindende" && page !== "Vejr" && page !== "Strøm" && page !== "Kalender" && page !== "Indstillinger" && <section className="placeholder-card"><p className="section-label">Planlagt</p><h2>{page}</h2><p>Modulet er på vej ind i Nexus.</p></section>}
         </main>
 
         <footer><span>Nexus v0.1</span><span>Simple by design.</span></footer>
