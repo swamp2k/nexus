@@ -13,6 +13,7 @@ import "./garmin-navigation.css";
 import "./garmin-agent.css";
 import "./motion.css";
 import "./wellbeing.css";
+import "./wellbeing-types.css";
 import "./miyagi.css";
 import "./wellbeing-history.css";
 import "./weather.css";
