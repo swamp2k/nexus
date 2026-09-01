@@ -19,6 +19,7 @@ import "./miyagi.css";
 import "./wellbeing-history.css";
 import "./weather.css";
 import "./electricity.css";
+import "./calendar.css";
 import "./audit-polish.css";
 import "./settings.css";
 import "./kitchen-display.css";
