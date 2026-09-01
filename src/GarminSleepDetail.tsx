@@ -170,7 +170,28 @@ function averageSleepRow(rows: SleepRow[]): SleepRow | null {
   };
 }
 
-function RangeView({ history, onSelect }: { history: SleepRow[]; onSelect: (date: string) => void }) {
+type SleepChartRow = { date: string; seconds: number | null; bedSeconds: number | null; wakeSeconds: number | null };
+
+function sleepChartRows(history: SleepRow[], range: RangeKey): SleepChartRow[] {
+  const daily = history.map((row) => ({ date: row.date, seconds: row.sleep_seconds, bedSeconds: secondsOfDay(row.sleep_start_ms), wakeSeconds: secondsOfDay(row.sleep_end_ms) }));
+  if (range !== "1y") return daily;
+  const result: SleepChartRow[] = [];
+  for (let index = 0; index < daily.length; index += 7) {
+    const slice = daily.slice(index, index + 7);
+    const durations = slice.map((row) => row.seconds).filter((value): value is number => value !== null && value > 0);
+    const beds = slice.map((row) => row.bedSeconds).filter((value): value is number => value !== null);
+    const wakes = slice.map((row) => row.wakeSeconds).filter((value): value is number => value !== null);
+    result.push({
+      date: slice.at(-1)?.date ?? "",
+      seconds: durations.length ? durations.reduce((sum, value) => sum + value, 0) / durations.length : null,
+      bedSeconds: circularMean(beds),
+      wakeSeconds: circularMean(wakes),
+    });
+  }
+  return result;
+}
+
+function RangeView({ history, range, onSelect }: { history: SleepRow[]; range: RangeKey; onSelect: (date: string) => void }) {
   const valid = history.filter((row) => (row.sleep_seconds ?? 0) > 0);
   const avg = valid.length ? valid.reduce((sum, row) => sum + (row.sleep_seconds ?? 0), 0) / valid.length : 0;
   const averageRow = averageSleepRow(history);
@@ -178,11 +199,13 @@ function RangeView({ history, onSelect }: { history: SleepRow[]; onSelect: (date
   const wakeTimes = valid.map((row) => secondsOfDay(row.sleep_end_ms)).filter((value): value is number => value !== null);
   const avgBed = circularMean(bedtimes);
   const avgWake = circularMean(wakeTimes);
-  const consistencyRows = history.map((row) => ({ date: row.date, bedSeconds: secondsOfDay(row.sleep_start_ms), wakeSeconds: secondsOfDay(row.sleep_end_ms) }));
+  const plotted = sleepChartRows(history, range);
+  const durationRows = plotted.map((row) => ({ date: row.date, seconds: row.seconds }));
+  const consistencyRows = plotted.map((row) => ({ date: row.date, bedSeconds: row.bedSeconds, wakeSeconds: row.wakeSeconds }));
   return <div className="sleep-range-view">
     {averageRow && <SleepStageOverview row={averageRow} average />}
-    <article className="sleep-garmin-section"><h4>Søvnvarighed</h4><SleepDurationBars rows={history.map((row) => ({ date: row.date, seconds: row.sleep_seconds }))} onSelect={onSelect} /><div className="sleep-range-stat"><strong>{duration(avg)}</strong><span>Gns. søvnvarighed</span></div></article>
-    <article className="sleep-garmin-section"><h4>Søvnrytme</h4><SleepConsistencyChart rows={consistencyRows} avgBed={avgBed} avgWake={avgWake} onSelect={onSelect} /><div className="sleep-range-stat split"><div><strong>{formatSecondsOfDay(avgBed)}</strong><span>Gns. sengetid</span></div><div><strong>{formatSecondsOfDay(avgWake)}</strong><span>Gns. opvågning</span></div></div></article>
+    <article className="sleep-garmin-section"><h4>Søvnvarighed {range === "1y" && <small className="sleep-chart-period">· ugegennemsnit</small>}</h4><SleepDurationBars rows={durationRows} onSelect={onSelect} /><div className="sleep-range-stat"><strong>{duration(avg)}</strong><span>Gns. søvnvarighed</span></div></article>
+    <article className="sleep-garmin-section"><h4>Søvnrytme {range === "1y" && <small className="sleep-chart-period">· ugegennemsnit</small>}</h4><SleepConsistencyChart rows={consistencyRows} avgBed={avgBed} avgWake={avgWake} onSelect={onSelect} /><div className="sleep-range-stat split"><div><strong>{formatSecondsOfDay(avgBed)}</strong><span>Gns. sengetid</span></div><div><strong>{formatSecondsOfDay(avgWake)}</strong><span>Gns. opvågning</span></div></div></article>
     <div className="sleep-night-list">{[...history].reverse().map((row) => <button key={row.date} type="button" onClick={() => onSelect(row.date)}><div><strong>{longDate(row.date)}</strong><span>{shortDate(row.date)}</span></div><strong>{duration(row.sleep_seconds)}</strong><i className="sleep-mini-ring" /></button>)}</div>
   </div>;
 }
@@ -231,6 +254,6 @@ export default function GarminSleepDetail({ initialDate, onClose }: { initialDat
 
     {state === "loading" && <p className="empty-state">Henter søvndata…</p>}
     {state === "error" && <p className="empty-state">Søvndata kunne ikke hentes.</p>}
-    {state === "ready" && selected && (range === "1d" ? <DailyView row={selected} /> : <RangeView history={history} onSelect={selectNight} />)}
+    {state === "ready" && selected && (range === "1d" ? <DailyView row={selected} /> : <RangeView history={history} range={range} onSelect={selectNight} />)}
   </section>;
 }
