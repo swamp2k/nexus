@@ -163,7 +163,7 @@ function MetricContent({ metric, selected, history, range }: { metric: MetricKey
 }
 
 export default function GarminHealthDetail({ metric, initialDate, onClose }: { metric: MetricKey; initialDate: string; onClose: () => void }) {
-  const [range, setRange] = useState<RangeKey>("1d");
+  const [range, setRange] = useState<RangeKey>("4w");
   const [selectedDate, setSelectedDate] = useState(initialDate);
   const [data, setData] = useState<HealthResponse | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
@@ -179,7 +179,7 @@ export default function GarminHealthDetail({ metric, initialDate, onClose }: { m
     } catch { setState("error"); }
   }
 
-  useEffect(() => { void load(initialDate, "1d"); }, [initialDate, metric]);
+  useEffect(() => { setRange("4w"); void load(initialDate, "4w"); }, [initialDate, metric]);
   const history = data?.history ?? [], selected = data?.selected ?? null;
   const rangeLabel = useMemo(() => range === "1d" || !history.length ? longDate(selectedDate) : `${shortDate(history[0].date)} – ${shortDate(history.at(-1)!.date)}`, [history, range, selectedDate]);
   function changeRange(next: RangeKey) { setRange(next); void load(selectedDate, next); }
