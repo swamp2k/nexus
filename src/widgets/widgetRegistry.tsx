@@ -170,19 +170,21 @@ function WellbeingTodayWidget() {
   </div>;
 }
 
+const FLEX_SIZES: WidgetSize[] = ["small", "medium", "wide"];
+
 export const widgetRegistry: WidgetDefinition[] = [
   { id: "garmin.steps.today", title: "Skridt", description: "Skridt og dagens mål", group: "Garmin", page: "Garmin", defaultSize: "small", supportedSizes: ["small", "medium"], component: GarminStepsWidget },
-  { id: "garmin.steps.week", title: "Skridt · 7 dage", description: "Daglige skridt og 7-dages gennemsnit", group: "Garmin", page: "Garmin", defaultSize: "medium", supportedSizes: ["medium", "wide"], component: GarminStepsWeekWidget },
+  { id: "garmin.steps.week", title: "Skridt · 7 dage", description: "Daglige skridt og 7-dages gennemsnit", group: "Garmin", page: "Garmin", defaultSize: "medium", supportedSizes: FLEX_SIZES, component: GarminStepsWeekWidget },
   { id: "garmin.sleep.lastNight", title: "Søvn", description: "Seneste nats søvn", group: "Garmin", page: "Garmin", defaultSize: "small", supportedSizes: ["small", "medium"], component: GarminSleepWidget },
-  { id: "garmin.sleep.week", title: "Søvn · 7 dage", description: "Søvnvarighed de seneste 7 nætter", group: "Garmin", page: "Garmin", defaultSize: "medium", supportedSizes: ["medium", "wide"], component: GarminSleepWeekWidget },
+  { id: "garmin.sleep.week", title: "Søvn · 7 dage", description: "Søvnvarighed de seneste 7 nætter", group: "Garmin", page: "Garmin", defaultSize: "medium", supportedSizes: FLEX_SIZES, component: GarminSleepWeekWidget },
   { id: "garmin.bodyBattery.today", title: "Body Battery", description: "Seneste Body Battery", group: "Garmin", page: "Garmin", defaultSize: "small", supportedSizes: ["small", "medium"], component: GarminBodyBatteryWidget },
   { id: "energy.price.current", title: "Elpris", description: "Samlet pris lige nu", group: "Strøm", page: "Strøm", defaultSize: "small", supportedSizes: ["small", "medium"], component: EnergyCurrentWidget },
-  { id: "energy.price.todayRange", title: "Elpris · i dag", description: "Laveste, gennemsnit og højeste pris i dag", group: "Strøm", page: "Strøm", defaultSize: "small", supportedSizes: ["small", "medium"], component: EnergyTodayRangeWidget },
-  { id: "energy.price.next24h", title: "Elpris · næste døgn", description: "Prisgraf for de næste 24 timer", group: "Strøm", page: "Strøm", defaultSize: "medium", supportedSizes: ["medium", "wide"], component: EnergyPriceChartWidget },
+  { id: "energy.price.todayRange", title: "Elpris · i dag", description: "Laveste, gennemsnit og højeste pris i dag", group: "Strøm", page: "Strøm", defaultSize: "small", supportedSizes: FLEX_SIZES, component: EnergyTodayRangeWidget },
+  { id: "energy.price.next24h", title: "Elpris · næste døgn", description: "Prisgraf for de næste 24 timer", group: "Strøm", page: "Strøm", defaultSize: "medium", supportedSizes: FLEX_SIZES, component: EnergyPriceChartWidget },
   { id: "weather.current", title: "Vejr", description: "Vejret lige nu", group: "Vejr", page: "Vejr", defaultSize: "medium", supportedSizes: ["small", "medium"], component: WeatherCurrentWidget },
-  { id: "weather.nextHours", title: "Vejr · næste timer", description: "Temperatur, vind og nedbør de næste timer", group: "Vejr", page: "Vejr", defaultSize: "medium", supportedSizes: ["medium", "wide"], component: WeatherNextHoursWidget },
-  { id: "weather.week", title: "Vejr · 7 dage", description: "Kort 7-dages vejrudsigt", group: "Vejr", page: "Vejr", defaultSize: "medium", supportedSizes: ["medium", "wide"], component: WeatherWeekWidget },
-  { id: "wellbeing.today", title: "Velbefindende", description: "Dagens check-in og journal", group: "Velbefindende", page: "Velbefindende", defaultSize: "medium", supportedSizes: ["medium", "wide"], component: WellbeingTodayWidget },
+  { id: "weather.nextHours", title: "Vejr · næste timer", description: "Temperatur, vind og nedbør de næste timer", group: "Vejr", page: "Vejr", defaultSize: "medium", supportedSizes: FLEX_SIZES, component: WeatherNextHoursWidget },
+  { id: "weather.week", title: "Vejr · 7 dage", description: "Kort 7-dages vejrudsigt", group: "Vejr", page: "Vejr", defaultSize: "medium", supportedSizes: FLEX_SIZES, component: WeatherWeekWidget },
+  { id: "wellbeing.today", title: "Velbefindende", description: "Dagens check-in og journal", group: "Velbefindende", page: "Velbefindende", defaultSize: "medium", supportedSizes: FLEX_SIZES, component: WellbeingTodayWidget },
 ];
 
 export const widgetById = new Map(widgetRegistry.map((widget) => [widget.id, widget]));
