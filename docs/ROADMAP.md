@@ -107,20 +107,21 @@ With Modular Home v1 in place, the audit is now being applied selectively agains
 
 - Garmin A4: removed the two redundant historical-count cards; day/night counts now live as one compact caption in the overview heading.
 - Garmin B2: detail navigation uses one clear close action, truthful chevrons, and opens on the more useful 4w range by default. Users can still switch to 1d for a specific day/night.
+- Garmin D1: 1-year health charts are aggregated to weekly averages instead of rendering hundreds of daily bars; charts now include readable y-axis labels, series legends, and a clear `Ugegennemsnit · 1 år` marker while summary statistics continue to use the underlying daily data.
 - Motion A5: replaced repeated stat labels with a real aligned activity table, one sticky header, month grouping, tabular numbers, and progressive `Vis flere` in 30-row chunks.
 - Motion scanability follow-up: month/year dividers use normal foreground text plus a subtle accent marker/background so long histories are easier to skim without increasing font size.
 - Velbefindende A3: today's recorded values and latest journal note appear directly on the page instead of only inside the editing dialog.
 - Check-in B4: one clear `Gem` action now saves changed metric values and an optional new journal note; closing or changing date with unsaved edits asks before discarding them.
 - Check-ins now have explicit value semantics via migration `0016_wellbeing_metric_types.sql`: `scale` values use 1–5, `boolean` values use 0/1, and a missing database row means not registered / not relevant. Any chosen value can be cleared again.
+- Miyagi typed-check-in follow-up: analysis context now carries each metric's `valueType`. Scale metrics expose a 1–5 average; boolean metrics expose yes-rate plus yes/no counts. Miyagi's analysis/chat instructions explicitly treat missing boolean entries as unregistered rather than `Nej` and never interpret a yes-rate as a 1–5 score.
 - Strøm B5: the current-price breakdown is one hierarchy with `I alt` visually separated as the total; the 15-minute strip gets a right-edge scroll affordance. The chart remains deliberately fixed at 0–6 kr/kWh.
 - Vejr B6: wide 7-day rows use tighter fixed information columns rather than stretching across the whole card, and the hourly strip visually indicates horizontal overflow.
 
 ### Next candidates
 
-- Garmin D1: improve long-range chart labelling/aggregation where useful.
 - Velbefindende follow-up: add short trend views where the history endpoint supports it cleanly and the visual adds real value.
-- Typed-check-in follow-up: ensure Miyagi summaries explicitly distinguish boolean yes-rate from 1–5 averages before using boolean metrics analytically.
 - Mobile C3: revisit which destinations belong in the mobile nav once placeholder/roadmap modules are actually useful.
+- Re-read the remaining Air Audit after these changes and close Phase C when the remaining items are either implemented, intentionally rejected, or belong to not-yet-built modules.
 
 Items for modules that are not implemented yet should not create placeholder work merely to satisfy the audit.
 
