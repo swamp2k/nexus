@@ -8,6 +8,8 @@ type EnergyPoint = {
 };
 
 type EnergyResponse = { data: { intervals: EnergyPoint[] } };
+type EnergySettingsResponse = { settings: { energyLowPriceDkk: number | null; energyHighPriceDkk: number | null } };
+type PriceBands = { low: number; high: number };
 
 type GarminHealthRow = {
   date: string;
@@ -48,6 +50,7 @@ type WeatherResponse = {
 };
 
 const ENERGY_MAX = 6;
+const DEFAULT_BANDS: PriceBands = { low: 1, high: 2 };
 const TZ = "Europe/Copenhagen";
 
 function WidgetState({ label }: { label: string }) {
@@ -62,6 +65,18 @@ function localDate(): string {
 
 function price(point: EnergyPoint): number {
   return point.totalDkkPerKwh ?? point.approxDkkPerKwh;
+}
+
+function priceBands(settings: EnergySettingsResponse | null): PriceBands {
+  const low = Number(settings?.settings.energyLowPriceDkk ?? DEFAULT_BANDS.low);
+  const high = Number(settings?.settings.energyHighPriceDkk ?? DEFAULT_BANDS.high);
+  return Number.isFinite(low) && Number.isFinite(high) && low >= 0 && high > low ? { low, high } : DEFAULT_BANDS;
+}
+
+function bandClass(value: number, bands: PriceBands): "low" | "medium" | "high" {
+  if (value <= bands.low) return "low";
+  if (value >= bands.high) return "high";
+  return "medium";
 }
 
 function localHourKey(value: string): string {
@@ -125,6 +140,8 @@ function hours(seconds: number | null): string {
 
 export function EnergyPriceChartWidget() {
   const { data, loading, error } = useCachedJson<EnergyResponse>("/api/sources/energy/prices", 10 * 60_000);
+  const { data: settings } = useCachedJson<EnergySettingsResponse>("/api/settings", 10 * 60_000);
+  const bands = priceBands(settings);
   const bars = useMemo(() => {
     if (!data) return [];
     const now = Date.now();
@@ -167,7 +184,8 @@ export function EnergyPriceChartWidget() {
       {bars.map((bar, index) => {
         const x = left + index * slot + (slot - barWidth) / 2;
         const yy = y(bar.value);
-        return <g key={bar.time} className="home-energy-bar"><rect x={x} y={yy} width={barWidth} height={Math.max(2, height-bottom-yy)} rx="3"><title>{formatHour(bar.time)} · {bar.value.toFixed(2)} kr/kWh</title></rect>{index % labelEvery === 0 && <text x={x+barWidth/2} y={height-8} textAnchor="middle" className="home-mini-axis">{formatHour(bar.time)}</text>}</g>;
+        const band = bandClass(bar.value, bands);
+        return <g key={bar.time} className={`home-energy-bar home-energy-bar--${band}`}><rect x={x} y={yy} width={barWidth} height={Math.max(2, height-bottom-yy)} rx="3"><title>{formatHour(bar.time)} · {bar.value.toFixed(2)} kr/kWh · {band === "low" ? "lav" : band === "high" ? "høj" : "middel"}</title></rect>{index % labelEvery === 0 && <text x={x+barWidth/2} y={height-8} textAnchor="middle" className="home-mini-axis">{formatHour(bar.time)}</text>}</g>;
       })}
     </svg>
   </div>;
