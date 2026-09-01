@@ -3,6 +3,7 @@ import { handleGarminAgentRoute } from "./garmin/agent-routes";
 import { handleGarminCredentialRoute } from "./garmin/credential-routes";
 import { handleGarminProcessRoute } from "./garmin/process-routes";
 import { handleGarminRoute } from "./garmin/routes";
+import { queueScheduledGarminSyncs, shouldRunScheduledGarminSync } from "./garmin/scheduled-sync";
 import { handleHomeLayoutRoute } from "./settings/home-layout";
 import { handleSettingsRoute } from "./settings/routes";
 import { handleSourceRoute } from "./sources/routes";
@@ -110,5 +111,22 @@ export default {
         { status: 500, headers: { "Cache-Control": "no-store" } },
       );
     }
+  },
+
+  async scheduled(_event, env, ctx) {
+    const now = new Date();
+    if (!shouldRunScheduledGarminSync(now)) return;
+    ctx.waitUntil((async () => {
+      try {
+        const result = await queueScheduledGarminSyncs(env);
+        console.log(JSON.stringify({ event: "garmin_scheduled_sync", at: now.toISOString(), ...result }));
+      } catch (error) {
+        console.error(JSON.stringify({
+          event: "garmin_scheduled_sync_failed",
+          at: now.toISOString(),
+          error: error instanceof Error ? error.message : "unknown_error",
+        }));
+      }
+    })());
   },
 } satisfies ExportedHandler<Env>;
