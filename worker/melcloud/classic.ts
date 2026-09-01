@@ -113,3 +113,56 @@ export function normalizeClassicDevices(buildings: unknown[]): MelCloudDevice[] 
   }
   return result;
 }
+
+const SENSITIVE_FIELD = /(password|email|context|token|secret|credential|session|cookie)/i;
+const ATW_FIELD = /(temperature|flow|return|tank|zone|operation|power|mode|holiday|heat|cool|dhw|water|weather|compressor|energy|signal|offline|communication|prohibit|demand|pump|legionella|boost)/i;
+
+function diagnosticValue(value: unknown): string | number | boolean | null {
+  if (value === null || value === undefined) return null;
+  if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") return value;
+  if (Array.isArray(value)) return `[${value.length} items]`;
+  const row = object(value);
+  return row ? `{${Object.keys(row).length} fields}` : String(value);
+}
+
+export type MelCloudDiagnosticDevice = {
+  id: number;
+  name: string;
+  deviceType: number | null;
+  atwFields: Record<string, string | number | boolean | null>;
+  allPrimitiveFields: Record<string, string | number | boolean | null>;
+};
+
+export function inspectClassicDevices(buildings: unknown[]): MelCloudDiagnosticDevice[] {
+  const rows: JsonObject[] = [];
+  collectDevices(buildings, rows);
+  const seen = new Set<number>();
+  const output: MelCloudDiagnosticDevice[] = [];
+
+  for (const row of rows) {
+    const id = numberValue(row.DeviceID);
+    if (id === null || seen.has(id)) continue;
+    seen.add(id);
+    const device = object(row.Device) ?? row;
+    const merged: Record<string, unknown> = { ...row, ...device };
+    const primitive: Record<string, string | number | boolean | null> = {};
+    const atw: Record<string, string | number | boolean | null> = {};
+
+    for (const key of Object.keys(merged).sort((a, b) => a.localeCompare(b))) {
+      if (SENSITIVE_FIELD.test(key)) continue;
+      const value = merged[key];
+      if (typeof value === "object" && value !== null) continue;
+      primitive[key] = diagnosticValue(value);
+      if (ATW_FIELD.test(key)) atw[key] = diagnosticValue(value);
+    }
+
+    output.push({
+      id,
+      name: stringValue(row.DeviceName) ?? `MELCloud ${id}`,
+      deviceType: numberValue(row.DeviceType),
+      atwFields: atw,
+      allPrimitiveFields: primitive,
+    });
+  }
+  return output;
+}
