@@ -1,10 +1,10 @@
-import { useCachedJson } from "../data/queryCache";
+import { useDashboardJson } from "../data/dashboardRefresh";
 import { heatPumpState, temp, type MelCloudDevice } from "../MelCloudPage";
 
 type DeviceResponse = { devices: MelCloudDevice[] };
 
 export default function MelCloudWidget() {
-  const { data, loading, error } = useCachedJson<DeviceResponse>("/api/melcloud/devices", 5 * 60_000);
+  const { data, loading, error } = useDashboardJson<DeviceResponse>("/api/melcloud/devices");
   if (loading) return <div className="home-widget-state">Henter varmepumpe…</div>;
   const device = data?.devices?.[0] ?? null;
   if (error || !device) return <div className="home-widget-state">Varmepumpen kunne ikke hentes</div>;
