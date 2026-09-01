@@ -2,13 +2,16 @@ import { useEffect, useMemo, useState } from "react";
 import MiyagiWorkspace from "./MiyagiWorkspace";
 import WellbeingHistory from "./WellbeingHistory";
 
+type MetricValueType = "scale" | "boolean";
 type Metric = {
   id: string;
   name: string;
   emoji: string;
   direction: "high_good" | "high_bad";
+  valueType: MetricValueType;
 };
 
+type MetricValue = number | null;
 type Entry = { metricId: string; value: number };
 type Followup = {
   id: string;
@@ -34,6 +37,12 @@ function displayDate(value: string): string {
   return new Intl.DateTimeFormat("da-DK", { weekday: "long", day: "numeric", month: "long" }).format(new Date(`${value}T12:00:00`));
 }
 
+function metricValueLabel(metric: Metric, value: MetricValue): string {
+  if (value === null || value === undefined) return "—";
+  if (metric.valueType === "boolean") return value === 1 ? "Ja" : "Nej";
+  return `${value}/5`;
+}
+
 async function errorText(response: Response): Promise<string> {
   try {
     const body = await response.json() as { error?: string; detail?: string };
@@ -48,12 +57,12 @@ export default function WellbeingPage() {
   const today = localDate();
   const [date, setDate] = useState(today);
   const [metrics, setMetrics] = useState<Metric[]>([]);
-  const [values, setValues] = useState<Record<string, number>>({});
+  const [values, setValues] = useState<Record<string, MetricValue>>({});
+  const [savedValues, setSavedValues] = useState<Record<string, MetricValue>>({});
   const [journals, setJournals] = useState<Journal[]>([]);
   const [journalText, setJournalText] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [journalBusy, setJournalBusy] = useState(false);
   const [journalAiBusy, setJournalAiBusy] = useState<string | null>(null);
   const [followupAnswers, setFollowupAnswers] = useState<Record<string, string>>({});
   const [checkInOpen, setCheckInOpen] = useState(false);
@@ -88,9 +97,13 @@ export default function WellbeingPage() {
         const followupBody = await followupResponse.json() as { followups: Followup[] };
         dayJournals = mergeFollowups(body.journals, followupBody.followups ?? []);
       }
+      const nextValues: Record<string, MetricValue> = Object.fromEntries(body.metrics.map((metric) => [metric.id, null]));
+      for (const entry of body.entries) nextValues[entry.metricId] = entry.value;
       setMetrics(body.metrics);
-      setValues(Object.fromEntries(body.entries.map((entry) => [entry.metricId, entry.value])));
+      setValues(nextValues);
+      setSavedValues({ ...nextValues });
       setJournals(dayJournals);
+      setJournalText("");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Kunne ikke hente dagens check-in.");
     } finally { setLoading(false); }
@@ -98,9 +111,25 @@ export default function WellbeingPage() {
 
   useEffect(() => { void load(date); }, [date]);
 
+  const valuesDirty = useMemo(() => metrics.some((metric) => (values[metric.id] ?? null) !== (savedValues[metric.id] ?? null)), [metrics, values, savedValues]);
+  const hasUnsaved = valuesDirty || Boolean(journalText.trim());
+
+  function confirmDiscard(): boolean {
+    return !hasUnsaved || window.confirm("Du har ændringer, der ikke er gemt. Vil du kassere dem?");
+  }
+
   function closeCheckIn() {
+    if (!confirmDiscard()) return;
     setCheckInOpen(false);
+    setJournalText("");
+    setValues({ ...savedValues });
     if (date !== today) setDate(today);
+  }
+
+  function changeDate(nextDate: string) {
+    if (!nextDate || nextDate === date) return;
+    if (!confirmDiscard()) return;
+    setDate(nextDate);
   }
 
   useEffect(() => {
@@ -108,27 +137,15 @@ export default function WellbeingPage() {
     const close = (event: KeyboardEvent) => { if (event.key === "Escape") closeCheckIn(); };
     window.addEventListener("keydown", close);
     return () => window.removeEventListener("keydown", close);
-  }, [checkInOpen, date, today]);
+  }, [checkInOpen, date, today, hasUnsaved, savedValues]);
 
-  const completed = useMemo(() => metrics.filter((metric) => values[metric.id]).length, [metrics, values]);
+  const completed = useMemo(() => metrics.filter((metric) => values[metric.id] !== null && values[metric.id] !== undefined).length, [metrics, values]);
   const completeToday = date === today && metrics.length > 0 && completed === metrics.length;
   const hasTodayData = date === today && completed > 0;
   const todayJournal = date === today ? journals[0] ?? null : null;
 
-  async function saveCheckIn() {
-    setSaving(true); setMessage(null);
-    try {
-      const response = await fetch("/api/wellbeing/day", {
-        method: "PUT",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ date, values }),
-      });
-      if (!response.ok) throw new Error(await errorText(response));
-      setMessage("Dagens check-in er gemt.");
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Check-in kunne ikke gemmes.");
-    } finally { setSaving(false); }
+  function setMetricValue(metricId: string, next: number) {
+    setValues((current) => ({ ...current, [metricId]: current[metricId] === next ? null : next }));
   }
 
   function updateJournalFollowup(journalId: string, followup: Followup | null) {
@@ -157,28 +174,38 @@ export default function WellbeingPage() {
     }
   }
 
-  async function addJournal() {
-    if (!journalText.trim()) return;
-    setJournalBusy(true); setMessage(null);
+  async function saveAll() {
+    setSaving(true); setMessage(null);
     try {
-      const response = await fetch("/api/wellbeing/journal", {
-        method: "POST",
+      const dayResponse = await fetch("/api/wellbeing/day", {
+        method: "PUT",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ date, body: journalText.trim() }),
+        body: JSON.stringify({ date, values }),
       });
-      if (!response.ok) throw new Error(await errorText(response));
-      const body = await response.json() as { journal: Journal };
-      const journal = { ...body.journal, followups: [] };
-      setJournals((current) => [journal, ...current]);
-      setJournalText("");
-      setMessage("Journalnotatet er gemt.");
-      setJournalBusy(false);
-      void generateJournalFollowup(journal.id);
-      return;
+      if (!dayResponse.ok) throw new Error(await errorText(dayResponse));
+      setSavedValues({ ...values });
+
+      const text = journalText.trim();
+      if (text) {
+        const journalResponse = await fetch("/api/wellbeing/journal", {
+          method: "POST",
+          credentials: "same-origin",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ date, body: text }),
+        });
+        if (!journalResponse.ok) throw new Error(await errorText(journalResponse));
+        const body = await journalResponse.json() as { journal: Journal };
+        const journal = { ...body.journal, followups: [] };
+        setJournals((current) => [journal, ...current]);
+        setJournalText("");
+        void generateJournalFollowup(journal.id);
+      }
+
+      setMessage("Check-in er gemt.");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Journalnotatet kunne ikke gemmes.");
-    } finally { setJournalBusy(false); }
+      setMessage(error instanceof Error ? error.message : "Check-in kunne ikke gemmes.");
+    } finally { setSaving(false); }
   }
 
   async function answerFollowup(journalId: string, followupId: string) {
@@ -248,7 +275,7 @@ export default function WellbeingPage() {
 
     {!loading && date === today && (hasTodayData || todayJournal) && <section className="wellbeing-today-summary" aria-label="Dagens velbefindende">
       <div className="wellbeing-today-heading"><div><p className="section-label">I dag</p><h2>Dagens status</h2></div><button className="secondary-action" type="button" onClick={() => setCheckInOpen(true)}>Rediger</button></div>
-      {hasTodayData && <div className="wellbeing-today-metrics">{metrics.filter((metric) => values[metric.id]).map((metric) => <div key={metric.id}><span>{metric.emoji} {metric.name}</span><strong>{values[metric.id]}/5</strong></div>)}</div>}
+      {hasTodayData && <div className="wellbeing-today-metrics">{metrics.filter((metric) => values[metric.id] !== null && values[metric.id] !== undefined).map((metric) => <div key={metric.id}><span>{metric.emoji} {metric.name}</span><strong>{metricValueLabel(metric, values[metric.id])}</strong></div>)}</div>}
       <div className="wellbeing-today-journal"><span>Journal</span>{todayJournal ? <p>{todayJournal.body}</p> : <p className="is-empty">Ingen journalnote i dag.</p>}</div>
     </section>}
 
@@ -263,30 +290,40 @@ export default function WellbeingPage() {
         </header>
 
         <div className="wellbeing-checkin-toolbar">
-          <label><span>Dato</span><input type="date" value={date} onChange={(event) => setDate(event.target.value)} /></label>
-          {date !== today && <button className="secondary-action" type="button" onClick={() => setDate(today)}>Gå til i dag</button>}
+          <label><span>Dato</span><input type="date" value={date} onChange={(event) => changeDate(event.target.value)} /></label>
+          {date !== today && <button className="secondary-action" type="button" onClick={() => changeDate(today)}>Gå til i dag</button>}
         </div>
 
         {loading ? <p className="empty-state">Henter check-in…</p> : metrics.length === 0 ? <section className="wellbeing-empty"><strong>Ingen målepunkter endnu</strong><p>Gå til Indstillinger → Velbefindende og opret de ting du vil følge dagligt.</p></section> : <section className="wellbeing-checkin">
           {metrics.map((metric) => {
+            const currentValue = values[metric.id] ?? null;
+            if (metric.valueType === "boolean") {
+              return <article className="wellbeing-metric" key={metric.id}>
+                <div className="wellbeing-metric-name"><span>{metric.emoji}</span><strong>{metric.name}</strong></div>
+                <div className="wellbeing-boolean-row" role="radiogroup" aria-label={metric.name}>
+                  <button type="button" className={currentValue === 0 ? "active" : ""} onClick={() => setMetricValue(metric.id, 0)} aria-pressed={currentValue === 0}>Nej</button>
+                  <button type="button" className={currentValue === 1 ? "active" : ""} onClick={() => setMetricValue(metric.id, 1)} aria-pressed={currentValue === 1}>Ja</button>
+                  {currentValue !== null && <button className="wellbeing-clear-value" type="button" onClick={() => setValues((current) => ({ ...current, [metric.id]: null }))}>Ryd</button>}
+                </div>
+              </article>;
+            }
             const faces = metric.direction === "high_bad" ? badFaces : goodFaces;
             return <article className="wellbeing-metric" key={metric.id}>
               <div className="wellbeing-metric-name"><span>{metric.emoji}</span><strong>{metric.name}</strong></div>
               <div className="wellbeing-score-row" role="radiogroup" aria-label={metric.name}>
                 {faces.map((face, index) => {
                   const value = index + 1;
-                  return <button key={value} type="button" className={values[metric.id] === value ? "active" : ""} onClick={() => setValues((current) => ({ ...current, [metric.id]: value }))} aria-label={`${metric.name}: ${value} af 5`} aria-pressed={values[metric.id] === value}><span>{face}</span><small>{value}</small></button>;
+                  return <button key={value} type="button" className={currentValue === value ? "active" : ""} onClick={() => setMetricValue(metric.id, value)} aria-label={`${metric.name}: ${value} af 5`} aria-pressed={currentValue === value}><span>{face}</span><small>{value}</small></button>;
                 })}
               </div>
+              {currentValue !== null && <button className="wellbeing-clear-value" type="button" onClick={() => setValues((current) => ({ ...current, [metric.id]: null }))}>Ryd værdi</button>}
             </article>;
           })}
-          <button className="primary-action wellbeing-save" type="button" disabled={saving || completed === 0} onClick={() => void saveCheckIn()}>{saving ? "Gemmer…" : "Gem målepunkter"}</button>
         </section>}
 
         <section className="wellbeing-journal wellbeing-journal-inline">
-          <div><p className="section-label">Journal</p><h3>Noter fra dagen</h3><p>Skriv frit. Når notatet er gemt, kan Nexus stille et kort opfølgende spørgsmål med dagens sundhed, målepunkter og relevant journalhistorik som kontekst.</p></div>
+          <div><p className="section-label">Journal</p><h3>Noter fra dagen</h3><p>Skriv frit. Når check-in gemmes, kan Nexus stille et kort opfølgende spørgsmål med dagens sundhed, målepunkter og relevant journalhistorik som kontekst.</p></div>
           <textarea value={journalText} onChange={(event) => setJournalText(event.target.value)} rows={4} maxLength={20_000} placeholder="Hvad fyldte i dag? Hvad gik godt eller skidt?" />
-          <div className="wellbeing-journal-actions"><button className="secondary-action" type="button" disabled={journalBusy || !journalText.trim()} onClick={() => void addJournal()}>{journalBusy ? "Gemmer…" : "Tilføj journalnotat"}</button></div>
 
           {journals.length > 0 && <div className="wellbeing-journal-list">{journals.map((journal) => <article key={journal.id}>
             <p>{journal.body}</p>
@@ -303,6 +340,11 @@ export default function WellbeingPage() {
             </section>)}
           </article>)}</div>}
         </section>
+
+        <div className="wellbeing-dialog-actions">
+          <button className="secondary-action" type="button" onClick={closeCheckIn}>Annuller</button>
+          <button className="primary-action" type="button" disabled={saving || !hasUnsaved} onClick={() => void saveAll()}>{saving ? "Gemmer…" : "Gem"}</button>
+        </div>
 
         {message && <p className={`settings-feedback ${message.includes("gemt") ? "success" : "error"}`}>{message}</p>}
       </section>
