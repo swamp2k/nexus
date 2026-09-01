@@ -98,16 +98,22 @@ export default function WellbeingPage() {
 
   useEffect(() => { void load(date); }, [date]);
 
+  function closeCheckIn() {
+    setCheckInOpen(false);
+    if (date !== today) setDate(today);
+  }
+
   useEffect(() => {
     if (!checkInOpen) return;
-    const close = (event: KeyboardEvent) => { if (event.key === "Escape") setCheckInOpen(false); };
+    const close = (event: KeyboardEvent) => { if (event.key === "Escape") closeCheckIn(); };
     window.addEventListener("keydown", close);
     return () => window.removeEventListener("keydown", close);
-  }, [checkInOpen]);
+  }, [checkInOpen, date, today]);
 
   const completed = useMemo(() => metrics.filter((metric) => values[metric.id]).length, [metrics, values]);
   const completeToday = date === today && metrics.length > 0 && completed === metrics.length;
   const hasTodayData = date === today && completed > 0;
+  const todayJournal = date === today ? journals[0] ?? null : null;
 
   async function saveCheckIn() {
     setSaving(true); setMessage(null);
@@ -240,14 +246,20 @@ export default function WellbeingPage() {
       </article>
     </div>
 
+    {!loading && date === today && (hasTodayData || todayJournal) && <section className="wellbeing-today-summary" aria-label="Dagens velbefindende">
+      <div className="wellbeing-today-heading"><div><p className="section-label">I dag</p><h2>Dagens status</h2></div><button className="secondary-action" type="button" onClick={() => setCheckInOpen(true)}>Rediger</button></div>
+      {hasTodayData && <div className="wellbeing-today-metrics">{metrics.filter((metric) => values[metric.id]).map((metric) => <div key={metric.id}><span>{metric.emoji} {metric.name}</span><strong>{values[metric.id]}/5</strong></div>)}</div>}
+      <div className="wellbeing-today-journal"><span>Journal</span>{todayJournal ? <p>{todayJournal.body}</p> : <p className="is-empty">Ingen journalnote i dag.</p>}</div>
+    </section>}
+
     {miyagiOpen && <MiyagiWorkspace />}
     {historyOpen && <WellbeingHistory onClose={() => setHistoryOpen(false)} />}
 
-    {checkInOpen && <div className="wellbeing-checkin-overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setCheckInOpen(false); }}>
+    {checkInOpen && <div className="wellbeing-checkin-overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeCheckIn(); }}>
       <section className="wellbeing-checkin-dialog" role="dialog" aria-modal="true" aria-labelledby="wellbeing-checkin-title">
         <header className="wellbeing-checkin-dialog-heading">
           <div><p className="section-label">Dagligt check-in</p><h2 id="wellbeing-checkin-title">{displayDate(date)}</h2><p>{metrics.length ? `${completed} af ${metrics.length} målepunkter udfyldt` : "Opret dine målepunkter under Indstillinger."}</p></div>
-          <button className="icon-action" type="button" onClick={() => setCheckInOpen(false)} aria-label="Luk check-in">×</button>
+          <button className="icon-action" type="button" onClick={closeCheckIn} aria-label="Luk check-in">×</button>
         </header>
 
         <div className="wellbeing-checkin-toolbar">
