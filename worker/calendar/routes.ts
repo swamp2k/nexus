@@ -294,6 +294,26 @@ async function deleteSource(request: Request, env: Env, id: string): Promise<Res
   return json({ ok: true });
 }
 
+async function readPreferences(request: Request, env: Env): Promise<Response> {
+  const user = await requireUser(request, env);
+  if (!user) return json({ error: "unauthorized" }, { status: 401 });
+  const row = await env.DB.prepare(`SELECT waste_warning_days AS wasteWarningDays, updated_at AS updatedAt FROM calendar_preferences WHERE user_id=?`).bind(user.id).first<{ wasteWarningDays: number; updatedAt: string }>();
+  return json({ preferences: { wasteWarningDays: row?.wasteWarningDays ?? 1, updatedAt: row?.updatedAt ?? null } });
+}
+
+async function updatePreferences(request: Request, env: Env): Promise<Response> {
+  const user = await requireUser(request, env);
+  if (!user) return json({ error: "unauthorized" }, { status: 401 });
+  if (user.role === "viewer") return json({ error: "forbidden" }, { status: 403 });
+  let body: { wasteWarningDays?: unknown } = {};
+  try { body = await request.json(); } catch { return json({ error: "invalid_json" }, { status: 400 }); }
+  const parsed = typeof body.wasteWarningDays === "number" ? body.wasteWarningDays : Number(body.wasteWarningDays);
+  if (!Number.isInteger(parsed) || parsed < 0 || parsed > 7) return json({ error: "invalid_calendar_preferences" }, { status: 400 });
+  const now = new Date().toISOString();
+  await env.DB.prepare(`INSERT INTO calendar_preferences (user_id,waste_warning_days,updated_at) VALUES (?,?,?) ON CONFLICT(user_id) DO UPDATE SET waste_warning_days=excluded.waste_warning_days,updated_at=excluded.updated_at`).bind(user.id, parsed, now).run();
+  return json({ preferences: { wasteWarningDays: parsed, updatedAt: now } });
+}
+
 async function events(request: Request, env: Env): Promise<Response> {
   const user = await requireUser(request, env);
   if (!user) return json({ error: "unauthorized" }, { status: 401 });
@@ -344,6 +364,8 @@ export async function handleCalendarRoute(request: Request, env: Env): Promise<R
   const match = pathname.match(/^\/api\/calendar\/sources\/([^/]+)$/);
   if (match && request.method === "PUT") return updateSource(request, env, decodeURIComponent(match[1]));
   if (match && request.method === "DELETE") return deleteSource(request, env, decodeURIComponent(match[1]));
+  if (pathname === "/api/calendar/preferences" && request.method === "GET") return readPreferences(request, env);
+  if (pathname === "/api/calendar/preferences" && request.method === "PUT") return updatePreferences(request, env);
   if (pathname === "/api/calendar/events" && request.method === "GET") return events(request, env);
   return null;
 }
