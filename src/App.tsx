@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import type { FormEvent, MouseEvent } from "react";
+import type { DragEvent, FormEvent, MouseEvent } from "react";
 import HomePage from "./HomePage";
 import GarminPage from "./GarminPage";
 import MotionPage from "./MotionPage";
@@ -14,17 +14,28 @@ import DisplayGate from "./DisplayGate";
 
 type User = { id: string; email: string; displayName: string | null; role: "admin" | "member" | "viewer" };
 type SessionResponse = { authenticated: boolean; user: User | null };
-type Page = "Hjem" | "Garmin" | "Motion" | "Velbefindende" | "Vejr" | "Strøm" | "Kalender" | "Varmepumpe" | "Displays" | "DBA" | "Unraid" | "PC Watch" | "Indstillinger";
-type PrimaryPage = Exclude<Page, "Indstillinger">;
+type NavPage = "Hjem" | "Garmin" | "Motion" | "Velbefindende" | "Vejr" | "Strøm" | "Kalender" | "Varmepumpe" | "DBA" | "Unraid" | "PC Watch" | "Notifikationer" | "Displays";
+type Page = NavPage | "Indstillinger";
 
-const primaryNav: PrimaryPage[] = ["Hjem", "Garmin", "Motion", "Velbefindende", "Vejr", "Strøm", "Kalender", "Varmepumpe", "Displays", "DBA", "Unraid", "PC Watch"];
-const secondaryNav = ["Overblik", "Notifikationer", "Indstillinger"] as const;
-const navIcons = ["⌂", "⌖", "↗", "♥", "☁", "ϟ", "▦", "♨", "▣", "◇", "▤", "▣"];
-const mobileNav: Array<{ page: Page; icon: string; label: string }> = [
+type NavDefinition = { page: NavPage; icon: string; label: string };
+const NAV_DEFINITIONS: NavDefinition[] = [
   { page: "Hjem", icon: "⌂", label: "Hjem" }, { page: "Garmin", icon: "⌖", label: "Garmin" }, { page: "Motion", icon: "↗", label: "Motion" },
   { page: "Velbefindende", icon: "♥", label: "Velbefindende" }, { page: "Vejr", icon: "☁", label: "Vejr" }, { page: "Strøm", icon: "ϟ", label: "Strøm" },
-  { page: "Kalender", icon: "▦", label: "Kalender" }, { page: "Varmepumpe", icon: "♨", label: "Varmepumpe" }, { page: "Displays", icon: "▣", label: "Displays" }, { page: "Indstillinger", icon: "⚙", label: "Indstillinger" },
+  { page: "Kalender", icon: "▦", label: "Kalender" }, { page: "Varmepumpe", icon: "♨", label: "Varmepumpe" }, { page: "DBA", icon: "◇", label: "DBA" },
+  { page: "Unraid", icon: "▤", label: "Unraid" }, { page: "PC Watch", icon: "▣", label: "PC Watch" }, { page: "Notifikationer", icon: "♧", label: "Notifikationer" },
+  { page: "Displays", icon: "▣", label: "Displays" },
 ];
+const DEFAULT_NAV_ORDER = NAV_DEFINITIONS.map((item) => item.page);
+const NAV_BY_PAGE = new Map(NAV_DEFINITIONS.map((item) => [item.page, item]));
+const MOBILE_ALLOWED = new Set<NavPage>(["Hjem", "Garmin", "Motion", "Velbefindende", "Vejr", "Strøm", "Kalender", "Varmepumpe", "Displays"]);
+
+function normalizeNavOrder(order: unknown): NavPage[] {
+  const source = Array.isArray(order) ? order : [];
+  const next: NavPage[] = [];
+  for (const item of source) if (typeof item === "string" && NAV_BY_PAGE.has(item as NavPage) && !next.includes(item as NavPage)) next.push(item as NavPage);
+  for (const item of DEFAULT_NAV_ORDER) if (!next.includes(item)) next.push(item);
+  return next;
+}
 
 function initials(user: User | null): string {
   if (!user) return "N";
@@ -37,6 +48,10 @@ function App() {
   const [email, setEmail] = useState("");
   const [loginState, setLoginState] = useState<"idle" | "sending" | "sent" | "error">("idle");
   const [page, setPage] = useState<Page>("Hjem");
+  const [navOrder, setNavOrder] = useState<NavPage[]>(DEFAULT_NAV_ORDER);
+  const [editingNav, setEditingNav] = useState(false);
+  const [draggedNav, setDraggedNav] = useState<NavPage | null>(null);
+  const [navSaveState, setNavSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [theme, setTheme] = useState<"light" | "dark">(() => {
     const saved = localStorage.getItem("nexus-theme");
     if (saved === "light" || saved === "dark") return saved;
@@ -57,11 +72,20 @@ function App() {
       .catch(() => setSession({ authenticated: false, user: null }));
   }, []);
 
+  useEffect(() => {
+    if (!session?.authenticated) return;
+    void fetch("/api/navigation", { credentials: "same-origin", cache: "no-store" })
+      .then(async (response) => response.ok ? response.json() as Promise<{ order: NavPage[] }> : Promise.reject())
+      .then((body) => setNavOrder(normalizeNavOrder(body.order)))
+      .catch(() => setNavOrder(DEFAULT_NAV_ORDER));
+  }, [session?.authenticated]);
+
   const displayName = useMemo(() => {
     const user = session?.user;
     if (!user) return "Nexus";
     return user.displayName?.trim() || user.email.split("@")[0];
   }, [session]);
+  const mobileNav = navOrder.filter((item) => MOBILE_ALLOWED.has(item));
 
   async function requestLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setLoginState("sending");
@@ -75,6 +99,35 @@ function App() {
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST", credentials: "same-origin" });
     setSession({ authenticated: false, user: null });
+  }
+
+  async function saveNavOrder(order: NavPage[]) {
+    setNavSaveState("saving");
+    try {
+      const response = await fetch("/api/navigation", { method: "PUT", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ order }) });
+      if (!response.ok) throw new Error("save_failed");
+      const body = await response.json() as { order: NavPage[] };
+      setNavOrder(normalizeNavOrder(body.order));
+      setNavSaveState("saved");
+      window.setTimeout(() => setNavSaveState("idle"), 1200);
+    } catch { setNavSaveState("error"); }
+  }
+
+  function moveNav(source: NavPage, target: NavPage) {
+    if (source === target) return;
+    const next = [...navOrder];
+    const from = next.indexOf(source), to = next.indexOf(target);
+    if (from < 0 || to < 0) return;
+    next.splice(from, 1);
+    next.splice(to, 0, source);
+    setNavOrder(next);
+    void saveNavOrder(next);
+  }
+
+  function navDrop(event: DragEvent<HTMLButtonElement>, target: NavPage) {
+    event.preventDefault();
+    if (draggedNav) moveNav(draggedNav, target);
+    setDraggedNav(null);
   }
 
   function closeUserMenu(event: MouseEvent<HTMLButtonElement>) { event.currentTarget.closest("details")?.removeAttribute("open"); }
@@ -106,15 +159,20 @@ function App() {
     : page === "Displays" ? "Byg og par dashboards til iPads og andre faste skærme." : "";
 
   return <div className="app-frame">
-    <aside className="sidebar">
+    <aside className={`sidebar${editingNav ? " sidebar--editing" : ""}`}>
       <div className="sidebar-brand"><div className="brand-mark">N</div><span className="brand-word">NEXUS</span></div>
-      <nav className="sidebar-nav" aria-label="Primær navigation">{primaryNav.map((item, index) => <button className={`nav-item ${page === item ? "active" : ""}`} key={item} type="button" onClick={() => setPage(item)}><span className="nav-icon">{navIcons[index]}</span><span>{item}</span></button>)}</nav>
-      <div className="sidebar-divider" />
-      <nav className="sidebar-nav sidebar-nav--secondary" aria-label="Sekundær navigation">{secondaryNav.map((item, index) => {
-        const active = item === "Indstillinger" && page === "Indstillinger";
-        return <button className={`nav-item ${active ? "active" : ""}`} key={item} type="button" onClick={() => { if (item === "Overblik") setPage("Hjem"); if (item === "Indstillinger") setPage("Indstillinger"); }}><span className="nav-icon">{["▦", "♧", "⚙"][index]}</span><span>{item}</span></button>;
+      <nav className="sidebar-nav" aria-label="Primær navigation">{navOrder.map((item) => {
+        const definition = NAV_BY_PAGE.get(item)!;
+        return <button className={`nav-item ${page === item ? "active" : ""}`} key={item} type="button" draggable={editingNav}
+          onDragStart={() => setDraggedNav(item)} onDragOver={(event) => editingNav && event.preventDefault()} onDrop={(event) => editingNav && navDrop(event, item)}
+          onClick={() => { if (!editingNav) setPage(item); }}>
+          {editingNav && <span className="nav-drag-handle" aria-hidden="true">⋮⋮</span>}<span className="nav-icon">{definition.icon}</span><span>{definition.label}</span>
+        </button>;
       })}</nav>
-      <nav className="mobile-nav" aria-label="Mobil navigation">{mobileNav.map((item) => <button className={page === item.page ? "active" : ""} key={item.page} type="button" onClick={() => setPage(item.page)} aria-current={page === item.page ? "page" : undefined}><span>{item.icon}</span><strong>{item.label}</strong></button>)}</nav>
+      <div className="sidebar-nav-edit-row"><button type="button" className="sidebar-nav-edit" onClick={() => setEditingNav((current) => !current)}>{editingNav ? "Færdig" : "Tilpas menu"}</button>{editingNav && navSaveState !== "idle" && <small>{navSaveState === "saving" ? "Gemmer…" : navSaveState === "saved" ? "Gemt" : "Kunne ikke gemme"}</small>}</div>
+      <div className="sidebar-divider" />
+      <nav className="sidebar-nav sidebar-nav--secondary" aria-label="Sekundær navigation"><button className={`nav-item ${page === "Indstillinger" ? "active" : ""}`} type="button" onClick={() => setPage("Indstillinger")}><span className="nav-icon">⚙</span><span>Indstillinger</span></button></nav>
+      <nav className="mobile-nav" aria-label="Mobil navigation">{mobileNav.map((item) => { const definition = NAV_BY_PAGE.get(item)!; return <button className={page === item ? "active" : ""} key={item} type="button" onClick={() => setPage(item)} aria-current={page === item ? "page" : undefined}><span>{definition.icon}</span><strong>{definition.label}</strong></button>; })}<button className={page === "Indstillinger" ? "active" : ""} type="button" onClick={() => setPage("Indstillinger")}><span>⚙</span><strong>Indstillinger</strong></button></nav>
       <div className="system-status"><span className="status-dot" /><div><small>Systemstatus</small><strong>Alt kører</strong></div></div>
     </aside>
 
