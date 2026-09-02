@@ -81,11 +81,16 @@ export async function handleUnraidRoute(request: Request, env: UnraidEnv): Promi
     try { body = await request.json(); } catch { return json({ error: "invalid_json" }, { status: 400 }); }
     const label = typeof body.label === "string" && body.label.trim() ? body.label.trim().slice(0, 80) : "Tower";
     const url = normalizeUrl(body.url);
-    const apiKey = typeof body.apiKey === "string" ? body.apiKey.trim() : "";
-    if (!url || !apiKey || apiKey.length > 1000) return json({ error: "invalid_unraid_server" }, { status: 400 });
+    const suppliedKey = typeof body.apiKey === "string" ? body.apiKey.trim() : "";
+    if (!url || suppliedKey.length > 1000) return json({ error: "invalid_unraid_server" }, { status: 400 });
     try {
+      const existing = await readServer(env, user.id);
+      const apiKey = suppliedKey || (existing ? await decryptUnraidValue(env, existing.apiKeyCiphertext, existing.apiKeyIv) : "");
+      if (!apiKey) return json({ error: "invalid_unraid_server" }, { status: 400 });
       await getStats(url, apiKey);
-      const encrypted = await encryptUnraidValue(env, apiKey);
+      const encrypted = suppliedKey ? await encryptUnraidValue(env, apiKey) : existing
+        ? { ciphertext: existing.apiKeyCiphertext, iv: existing.apiKeyIv }
+        : await encryptUnraidValue(env, apiKey);
       const now = new Date().toISOString();
       await env.DB.prepare(
         `INSERT INTO unraid_servers (user_id,label,url,api_key_ciphertext,api_key_iv,verified_at,created_at,updated_at)
