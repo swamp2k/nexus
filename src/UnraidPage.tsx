@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import UnraidSettings from "./UnraidSettings";
 
 type UnraidStats = { cpuPct: number; ramPct: number; ramUsedGb: number; ramTotalGb: number; uptimeS: number; tempAvg: number | null };
 type UnraidDisk = { slot: string; name: string; temp: number | null; health: string; usedGb: number; totalGb: number };
@@ -12,7 +13,7 @@ type Overview = {
   containers: UnraidContainer[]; vms: UnraidVM[]; shares: UnraidShare[]; ups: UnraidUPS | null;
 };
 
-type Tab = "Overblik" | "Docker" | "VM'er" | "Shares" | "UPS";
+type Tab = "Overblik" | "Docker" | "VM'er" | "Shares" | "UPS" | "Forbindelse";
 
 function uptime(seconds: number): string {
   const days = Math.floor(seconds / 86400);
@@ -41,24 +42,24 @@ export default function UnraidPage() {
       setData(body); setState("ready"); setLastError(null);
     } catch (error) {
       setLastError(error instanceof Error ? error.message : "unraid_fetch_failed");
-      if (showLoading || !data) setState("error");
+      if (showLoading) setState("error");
     }
   }
 
   useEffect(() => {
     void refresh(true);
-    const timer = window.setInterval(() => { if (document.visibilityState === "visible") void refresh(false); }, 10_000);
-    const visible = () => { if (document.visibilityState === "visible") void refresh(false); };
+    const timer = window.setInterval(() => { if (document.visibilityState === "visible" && tab !== "Forbindelse") void refresh(false); }, 10_000);
+    const visible = () => { if (document.visibilityState === "visible" && tab !== "Forbindelse") void refresh(false); };
     document.addEventListener("visibilitychange", visible);
     return () => { window.clearInterval(timer); document.removeEventListener("visibilitychange", visible); };
-  }, []);
+  }, [tab]);
 
   const runningContainers = useMemo(() => data?.containers.filter((item) => statusTone(item.status) === "ok").length ?? 0, [data]);
   const runningVMs = useMemo(() => data?.vms.filter((item) => statusTone(item.status) === "ok").length ?? 0, [data]);
 
   if (state === "loading") return <section className="unraid-page"><div className="screen-state">Henter Unraid…</div></section>;
-  if (state === "unconfigured") return <section className="unraid-page"><div className="placeholder-card"><p className="section-label">Unraid Watch</p><h2>Forbind din Unraid-server</h2><p>Åbn Indstillinger → Unraid, og gem server-URL samt API-nøgle. Derefter bliver dette din nye UnraidWatch-visning i Nexus.</p></div></section>;
-  if (state === "error" || !data) return <section className="unraid-page"><div className="placeholder-card"><p className="section-label">Unraid Watch</p><h2>Serveren kunne ikke hentes</h2><p>{lastError ?? "Ukendt fejl"}</p><button className="primary-action" type="button" onClick={() => void refresh(true)}>Prøv igen</button></div></section>;
+  if (state === "unconfigured") return <section className="unraid-page"><div className="unraid-toolbar"><div><p className="section-label">Unraid Watch</p><h2>Forbind din Unraid-server</h2><p>Konfigurationen ligger nu direkte her i Nexus.</p></div></div><section className="settings-card"><UnraidSettings /></section><p className="settings-help">Når forbindelsen er gemt, genindlæs Unraid-fanen. Nexus tester forbindelsen før API-nøglen gemmes.</p></section>;
+  if (state === "error" || !data) return <section className="unraid-page"><div className="placeholder-card"><p className="section-label">Unraid Watch</p><h2>Serveren kunne ikke hentes</h2><p>{lastError ?? "Ukendt fejl"}</p><div className="settings-location-actions"><button className="primary-action" type="button" onClick={() => void refresh(true)}>Prøv igen</button><button className="secondary-action" type="button" onClick={() => setTab("Forbindelse")}>Forbindelse</button></div></div>{tab === "Forbindelse" && <section className="settings-card"><UnraidSettings /></section>}</section>;
 
   return <section className="unraid-page">
     <div className="unraid-toolbar">
@@ -66,7 +67,7 @@ export default function UnraidPage() {
       <div className="unraid-toolbar-actions"><span className="freshness">{new Date(data.fetchedAt).toLocaleTimeString("da-DK", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</span><button className="secondary-action" type="button" onClick={() => void refresh(false)}>Opdater</button></div>
     </div>
 
-    <nav className="unraid-tabs" aria-label="Unraid sektioner">{(["Overblik", "Docker", "VM'er", "Shares", "UPS"] as Tab[]).map((item) => <button type="button" className={tab === item ? "active" : ""} key={item} onClick={() => setTab(item)}>{item}</button>)}</nav>
+    <nav className="unraid-tabs" aria-label="Unraid sektioner">{(["Overblik", "Docker", "VM'er", "Shares", "UPS", "Forbindelse"] as Tab[]).map((item) => <button type="button" className={tab === item ? "active" : ""} key={item} onClick={() => setTab(item)}>{item}</button>)}</nav>
 
     {lastError && <p className="home-layout-note home-layout-note--error">Seneste opdatering fejlede: {lastError}. Viser seneste data.</p>}
 
@@ -86,5 +87,6 @@ export default function UnraidPage() {
     {tab === "VM'er" && <section className="unraid-panel"><div className="unraid-panel-heading"><div><p className="section-label">Virtuelle maskiner</p><h3>{runningVMs} af {data.vms.length} kører</h3></div></div><div className="unraid-list">{data.vms.length ? data.vms.map((item) => <div className="unraid-row" key={item.id}><strong>{item.name}</strong><span className={`unraid-status ${statusTone(item.status)}`}>{item.status}</span></div>) : <p className="settings-help">Ingen VM'er fundet.</p>}</div></section>}
     {tab === "Shares" && <section className="unraid-panel"><div className="unraid-panel-heading"><div><p className="section-label">Shares</p><h3>Lagerforbrug</h3></div></div><div className="unraid-share-list">{data.shares.map((share) => <div className="unraid-share" key={share.name}><div><strong>{share.name}</strong><span>{share.usedGb.toLocaleString("da-DK")} / {share.totalGb.toLocaleString("da-DK")} GB</span></div><div className="unraid-progress"><span style={{ width: `${Math.max(0, Math.min(100, share.pct))}%` }} /></div><b>{share.pct}%</b></div>)}</div></section>}
     {tab === "UPS" && <section className="unraid-panel"><div className="unraid-panel-heading"><div><p className="section-label">UPS</p><h3>{data.ups?.model ?? "Ingen UPS fundet"}</h3></div>{data.ups && <span className={`unraid-status ${statusTone(data.ups.status)}`}>{data.ups.status}</span>}</div>{data.ups && <div className="unraid-stat-grid unraid-stat-grid--three"><article className="unraid-stat"><span>Batteri</span><strong>{data.ups.batteryPct}%</strong></article><article className="unraid-stat"><span>Runtime</span><strong>{Math.round(data.ups.runtimeMin)} min</strong></article><article className="unraid-stat"><span>Load</span><strong>{data.ups.loadPct}%</strong></article></div>}</section>}
+    {tab === "Forbindelse" && <section className="settings-card"><UnraidSettings /></section>}
   </section>;
 }
