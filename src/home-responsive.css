@@ -20,6 +20,7 @@
   width: 100%;
   height: auto;
   max-height: 220px;
+  overflow: hidden;
 }
 
 .home-mini-chart-summary {
@@ -370,15 +371,15 @@
   }
 }
 
-/* Wide cards earn their space: show the complete forecast/journal and give
-   charts more vertical resolution. */
+/* Wide cards keep the same chart height as medium cards. Extra width improves
+   horizontal resolution without making the SVG spill into the next grid row. */
 @container home-widget (min-width: 651px) {
   .home-widget-content {
-    align-items: stretch;
+    align-items: center;
   }
 
   .home-mini-chart {
-    max-height: 250px;
+    max-height: 185px;
   }
 
   .home-wellbeing-journal p {
