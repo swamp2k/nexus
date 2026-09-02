@@ -45,22 +45,18 @@ function Metric({ value, label, detail }: { value: string; label: string; detail
   return <div className="home-metric"><strong>{value}</strong><span>{label}</span>{detail && <small>{detail}</small>}</div>;
 }
 
-function ServerWidget() {
-  const { data, loading, error } = useOverview();
-  if (loading) return <State>Henter serverstatus…</State>;
-  if (error || !data) return <State>Unraid kunne ikke hentes</State>;
-  return <Metric value={data.server.online ? "ONLINE" : "OFFLINE"} label={data.server.label} detail={`Uptime ${uptime(data.stats.uptimeS)}`} />;
-}
-
 function SystemWidget() {
   const { data, loading, error } = useOverview();
-  if (loading) return <State>Henter systemressourcer…</State>;
+  if (loading) return <State>Henter serverstatus…</State>;
   if (error || !data) return <State>Systemdata kunne ikke hentes</State>;
-  return <div className="home-wellbeing-metrics">
-    <span>CPU <strong>{data.stats.cpuPct.toFixed(1)}%</strong></span>
-    <span>RAM <strong>{data.stats.ramPct.toFixed(1)}%</strong></span>
-    <span>Temp <strong>{data.stats.tempAvg === null ? "—" : `${data.stats.tempAvg}°C`}</strong></span>
-    <span>Uptime <strong>{uptime(data.stats.uptimeS)}</strong></span>
+  return <div className="unraid-home-system">
+    <div className="unraid-home-server"><strong>{data.server.online ? "ONLINE" : "OFFLINE"}</strong><span>{data.server.label}</span></div>
+    <div className="home-wellbeing-metrics">
+      <span>CPU <strong>{data.stats.cpuPct.toFixed(1)}%</strong></span>
+      <span>RAM <strong>{data.stats.ramPct.toFixed(1)}%</strong></span>
+      <span>Temp <strong>{data.stats.tempAvg === null ? "—" : `${data.stats.tempAvg}°C`}</strong></span>
+      <span>Uptime <strong>{uptime(data.stats.uptimeS)}</strong></span>
+    </div>
   </div>;
 }
 
@@ -144,13 +140,12 @@ function entityWidget(kind: "container" | "vm", id: string) {
     if (unavailable) return <State>Status utilgængelig</State>;
     const item = kind === "container" ? data.containers.find((candidate) => candidate.id === id) : data.vms.find((candidate) => candidate.id === id);
     if (!item) return <State>{kind === "container" ? "Container" : "VM"} ikke fundet</State>;
-    return <Metric value={statusOk(item.status) ? "KØRER" : item.status.toUpperCase()} label={item.name} detail={kind === "container" ? "Docker container" : "Virtuel maskine"} />;
+    return <div className={`unraid-entity-status ${statusOk(item.status) ? "ok" : "warn"}`}><span className="unraid-entity-dot" aria-hidden="true" /><strong>{statusOk(item.status) ? "Kører" : item.status}</strong><small>{kind === "container" ? "Docker" : "VM"}</small></div>;
   };
 }
 
 export const unraidWidgetDefinitions: WidgetDefinition[] = [
-  { id: "unraid.server.status", title: "Serverstatus", description: "Online-status og uptime", group: "Unraid", page: "Unraid", defaultSize: "small", supportedSizes: ["small", "medium"], component: ServerWidget },
-  { id: "unraid.system.overview", title: "System-overblik", description: "CPU, RAM, temperatur og uptime", group: "Unraid", page: "Unraid", defaultSize: "medium", supportedSizes: [...FLEX], component: SystemWidget },
+  { id: "unraid.system.overview", title: "Server & system", description: "Online-status, CPU, RAM, temperatur og uptime", group: "Unraid", page: "Unraid", defaultSize: "medium", supportedSizes: [...FLEX], component: SystemWidget },
   { id: "unraid.system.cpu", title: "CPU", description: "Aktuel CPU-belastning", group: "Unraid", page: "Unraid", defaultSize: "small", supportedSizes: ["small", "medium"], component: CpuWidget },
   { id: "unraid.system.ram", title: "RAM", description: "RAM-forbrug", group: "Unraid", page: "Unraid", defaultSize: "small", supportedSizes: ["small", "medium"], component: RamWidget },
   { id: "unraid.system.temperature", title: "Temperatur", description: "Gennemsnitlig systemtemperatur", group: "Unraid", page: "Unraid", defaultSize: "small", supportedSizes: ["small", "medium"], component: TemperatureWidget },
@@ -168,8 +163,6 @@ const VM_PREFIX = "unraid.vm.";
 function dynamicDefinition(kind: "container" | "vm", id: string, name: string): WidgetDefinition {
   const prefix = kind === "container" ? CONTAINER_PREFIX : VM_PREFIX;
   return {
-    // Store the friendly name alongside the stable entity id so a saved layout
-    // can render a useful title before Unraid discovery has completed.
     id: `${prefix}${encodeURIComponent(id)}:${encodeURIComponent(name)}`,
     title: name,
     description: kind === "container" ? "Status for denne Docker-container" : "Status for denne virtuelle maskine",
