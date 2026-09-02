@@ -155,6 +155,18 @@ response cannot replace existing sleep data.
 
 The agent deliberately processes jobs sequentially. This keeps GarminDB state isolated and avoids multiple concurrent syncs competing for CPU, network, Garmin rate limits, or local files.
 
+## Automatic schedule
+
+Cloudflare wakes the Nexus scheduler once per hour. Each Garmin user controls
+their own automatic schedule under **Settings -> Garmin**. The default is
+09:00, 12:00, 18:00, and 22:00 in `Europe/Copenhagen`; the timezone therefore
+follows Danish daylight-saving time automatically.
+
+Schedules support one to six unique whole-hour times with at least three hours
+between them. Automatic sync can be disabled without deleting the saved times.
+Active jobs and recently completed jobs are still skipped, so a manual sync does
+not create a duplicate scheduled job.
+
 ## First start / health
 
 Check:

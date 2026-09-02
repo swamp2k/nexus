@@ -13,6 +13,24 @@ type SyncJob = {
   queueAhead?: number | null;
 };
 type CredentialState = { configured: boolean; username: string | null; updatedAt: string | null };
+type SyncSchedule = { enabled: boolean; syncHours: number[]; timeZone: string };
+
+const DEFAULT_SYNC_HOURS = [9, 12, 18, 22];
+const MAX_SYNCS_PER_DAY = 6;
+
+function hourLabel(hour: number): string {
+  return `${String(hour).padStart(2, "0")}:00`;
+}
+
+function hasValidScheduleSpacing(hours: number[]): boolean {
+  for (let left = 0; left < hours.length; left += 1) {
+    for (let right = left + 1; right < hours.length; right += 1) {
+      const difference = Math.abs(hours[left] - hours[right]);
+      if (Math.min(difference, 24 - difference) < 3) return false;
+    }
+  }
+  return true;
+}
 
 function age(value: string | null): string {
   if (!value) return "aldrig";
@@ -92,6 +110,10 @@ export default function GarminAgentSettings() {
   const [credentialBusy, setCredentialBusy] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [credentialMessage, setCredentialMessage] = useState<string | null>(null);
+  const [schedule, setSchedule] = useState<SyncSchedule>({ enabled: true, syncHours: DEFAULT_SYNC_HOURS, timeZone: "Europe/Copenhagen" });
+  const [scheduleState, setScheduleState] = useState<"loading" | "ready" | "error">("loading");
+  const [scheduleBusy, setScheduleBusy] = useState(false);
+  const [scheduleMessage, setScheduleMessage] = useState<string | null>(null);
 
   async function refresh() {
     try {
@@ -118,11 +140,75 @@ export default function GarminAgentSettings() {
     }
   }
 
+  async function loadSchedule() {
+    try {
+      const response = await fetch("/api/garmin/schedule", { credentials: "same-origin", cache: "no-store" });
+      if (!response.ok) throw new Error(await errorText(response));
+      const body = await response.json() as { schedule: SyncSchedule };
+      setSchedule(body.schedule);
+      setScheduleState("ready");
+    } catch (error) {
+      setScheduleMessage(error instanceof Error ? error.message : "garmin_schedule_load_failed");
+      setScheduleState("error");
+    }
+  }
+
   useEffect(() => {
     void refresh();
+    void loadSchedule();
     const timer = window.setInterval(() => void refresh(), 10_000);
     return () => window.clearInterval(timer);
   }, []);
+
+  function updateSyncHour(index: number, hour: number) {
+    setSchedule((current) => ({
+      ...current,
+      syncHours: current.syncHours.map((value, position) => position === index ? hour : value).sort((left, right) => left - right),
+    }));
+    setScheduleMessage(null);
+  }
+
+  function addSyncHour() {
+    const preferred = [...DEFAULT_SYNC_HOURS, ...Array.from({ length: 24 }, (_, hour) => hour)];
+    const hour = preferred.find((candidate) => (
+      !schedule.syncHours.includes(candidate)
+      && hasValidScheduleSpacing([...schedule.syncHours, candidate])
+    ));
+    if (hour === undefined) {
+      setScheduleMessage("Der er ikke plads til flere tidspunkter med mindst tre timers mellemrum.");
+      return;
+    }
+    setSchedule((current) => ({ ...current, syncHours: [...current.syncHours, hour].sort((left, right) => left - right) }));
+    setScheduleMessage(null);
+  }
+
+  function removeSyncHour(index: number) {
+    if (schedule.syncHours.length === 1) return;
+    setSchedule((current) => ({ ...current, syncHours: current.syncHours.filter((_, position) => position !== index) }));
+    setScheduleMessage(null);
+  }
+
+  async function saveSchedule() {
+    if (!hasValidScheduleSpacing(schedule.syncHours) || new Set(schedule.syncHours).size !== schedule.syncHours.length) {
+      setScheduleMessage("Tidspunkterne skal være forskellige og have mindst tre timers mellemrum.");
+      return;
+    }
+    setScheduleBusy(true); setScheduleMessage(null);
+    try {
+      const response = await fetch("/api/garmin/schedule", {
+        method: "PUT",
+        credentials: "same-origin",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ enabled: schedule.enabled, syncHours: schedule.syncHours }),
+      });
+      if (!response.ok) throw new Error(await errorText(response));
+      const body = await response.json() as { schedule: SyncSchedule };
+      setSchedule(body.schedule);
+      setScheduleMessage("Synkroniseringstiderne er gemt.");
+    } catch (error) {
+      setScheduleMessage(error instanceof Error ? error.message : "garmin_schedule_save_failed");
+    } finally { setScheduleBusy(false); }
+  }
 
   async function saveCredentials() {
     if (!username.trim() || !password) {
@@ -234,6 +320,59 @@ export default function GarminAgentSettings() {
     <div className="garmin-agent-heading garmin-agent-heading--service">
       <div><p className="section-label">Automatisk synkronisering</p><h3>Fælles GarminDB-agent</h3><p>Én persistent container kan servicere alle Nexus-brugere. GarminDB-state og data holdes isoleret pr. bruger inde i agenten.</p></div>
       <span className={`garmin-agent-status ${online ? "online" : ""}`}><i />{statusLabel}</span>
+    </div>
+
+    <div className="garmin-schedule-panel">
+      <div className="garmin-schedule-heading">
+        <div>
+          <strong>Planlagte synkroniseringer</strong>
+          <span>{schedule.enabled ? `${schedule.syncHours.length} gange dagligt · dansk tid` : "Automatisk synkronisering er slået fra"}</span>
+        </div>
+        <label className="garmin-schedule-toggle">
+          <input
+            type="checkbox"
+            checked={schedule.enabled}
+            disabled={scheduleState === "loading" || scheduleBusy}
+            onChange={(event) => {
+              setSchedule((current) => ({ ...current, enabled: event.target.checked }));
+              setScheduleMessage(null);
+            }}
+          />
+          <span>Automatisk</span>
+        </label>
+      </div>
+
+      {scheduleState === "loading" && <p className="settings-help">Henter synkroniseringstider…</p>}
+      {scheduleState !== "loading" && <div className={`garmin-schedule-times ${schedule.enabled ? "" : "is-disabled"}`}>
+        {schedule.syncHours.map((hour, index) => (
+          <div className="garmin-schedule-time" key={`${index}-${hour}`}>
+            <label>
+              <span className="visually-hidden">Synkronisering {index + 1}</span>
+              <select
+                value={hour}
+                disabled={!schedule.enabled || scheduleBusy}
+                onChange={(event) => updateSyncHour(index, Number(event.target.value))}
+              >
+                {Array.from({ length: 24 }, (_, value) => <option value={value} key={value}>{hourLabel(value)}</option>)}
+              </select>
+            </label>
+            <button
+              className="garmin-schedule-remove"
+              type="button"
+              aria-label={`Fjern synkronisering kl. ${hourLabel(hour)}`}
+              disabled={!schedule.enabled || scheduleBusy || schedule.syncHours.length === 1}
+              onClick={() => removeSyncHour(index)}
+            >×</button>
+          </div>
+        ))}
+      </div>}
+
+      {scheduleState !== "loading" && <div className="garmin-agent-actions">
+        <button className="secondary-action" type="button" disabled={!schedule.enabled || scheduleBusy || schedule.syncHours.length >= MAX_SYNCS_PER_DAY} onClick={addSyncHour}>Tilføj tidspunkt</button>
+        <button className="primary-action" type="button" disabled={scheduleBusy || !hasValidScheduleSpacing(schedule.syncHours)} onClick={() => void saveSchedule()}>{scheduleBusy ? "Gemmer…" : "Gem tider"}</button>
+        <span>Mindst tre timer mellem hvert tidspunkt. Maksimalt seks pr. dag.</span>
+      </div>}
+      {scheduleMessage && <p className={`settings-feedback ${scheduleMessage.includes("gemt") ? "success" : "error"}`}>{scheduleMessage}</p>}
     </div>
 
     {state === "error" && <p className="settings-feedback error">Garmin-status kunne ikke hentes: {message}</p>}
