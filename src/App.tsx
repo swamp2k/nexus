@@ -11,18 +11,8 @@ import MelCloudPage from "./MelCloudPage";
 import SettingsPage from "./SettingsPage";
 import DisplayGate from "./DisplayGate";
 
-type User = {
-  id: string;
-  email: string;
-  displayName: string | null;
-  role: "admin" | "member" | "viewer";
-};
-
-type SessionResponse = {
-  authenticated: boolean;
-  user: User | null;
-};
-
+type User = { id: string; email: string; displayName: string | null; role: "admin" | "member" | "viewer" };
+type SessionResponse = { authenticated: boolean; user: User | null };
 type Page = "Hjem" | "Garmin" | "Motion" | "Velbefindende" | "Vejr" | "Strøm" | "Kalender" | "Varmepumpe" | "DBA" | "Unraid" | "PC Watch" | "Indstillinger";
 type PrimaryPage = Exclude<Page, "Indstillinger">;
 
@@ -30,15 +20,9 @@ const primaryNav: PrimaryPage[] = ["Hjem", "Garmin", "Motion", "Velbefindende", 
 const secondaryNav = ["Overblik", "Notifikationer", "Indstillinger"] as const;
 const navIcons = ["⌂", "⌖", "↗", "♥", "☁", "ϟ", "▦", "♨", "◇", "▤", "▣"];
 const mobileNav: Array<{ page: Page; icon: string; label: string }> = [
-  { page: "Hjem", icon: "⌂", label: "Hjem" },
-  { page: "Garmin", icon: "⌖", label: "Garmin" },
-  { page: "Motion", icon: "↗", label: "Motion" },
-  { page: "Velbefindende", icon: "♥", label: "Velbefindende" },
-  { page: "Vejr", icon: "☁", label: "Vejr" },
-  { page: "Strøm", icon: "ϟ", label: "Strøm" },
-  { page: "Kalender", icon: "▦", label: "Kalender" },
-  { page: "Varmepumpe", icon: "♨", label: "Varmepumpe" },
-  { page: "Indstillinger", icon: "⚙", label: "Indstillinger" },
+  { page: "Hjem", icon: "⌂", label: "Hjem" }, { page: "Garmin", icon: "⌖", label: "Garmin" }, { page: "Motion", icon: "↗", label: "Motion" },
+  { page: "Velbefindende", icon: "♥", label: "Velbefindende" }, { page: "Vejr", icon: "☁", label: "Vejr" }, { page: "Strøm", icon: "ϟ", label: "Strøm" },
+  { page: "Kalender", icon: "▦", label: "Kalender" }, { page: "Varmepumpe", icon: "♨", label: "Varmepumpe" }, { page: "Indstillinger", icon: "⚙", label: "Indstillinger" },
 ];
 
 function initials(user: User | null): string {
@@ -57,7 +41,6 @@ function App() {
     if (saved === "light" || saved === "dark") return saved;
     return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
   });
-
   const isKitchenDisplay = window.location.pathname === "/display/kitchen";
 
   useEffect(() => {
@@ -79,19 +62,12 @@ function App() {
   }, [session]);
 
   async function requestLogin(event: FormEvent<HTMLFormElement>) {
-    event.preventDefault();
-    setLoginState("sending");
+    event.preventDefault(); setLoginState("sending");
     try {
-      const response = await fetch("/api/auth/request", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
-      });
+      const response = await fetch("/api/auth/request", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email }) });
       if (!response.ok) throw new Error("request_failed");
       setLoginState("sent");
-    } catch {
-      setLoginState("error");
-    }
+    } catch { setLoginState("error"); }
   }
 
   async function logout() {
@@ -99,124 +75,55 @@ function App() {
     setSession({ authenticated: false, user: null });
   }
 
-  function closeUserMenu(event: MouseEvent<HTMLButtonElement>) {
-    event.currentTarget.closest("details")?.removeAttribute("open");
-  }
+  function closeUserMenu(event: MouseEvent<HTMLButtonElement>) { event.currentTarget.closest("details")?.removeAttribute("open"); }
+  function toggleTheme() { setTheme((current) => current === "light" ? "dark" : "light"); }
 
-  if (isKitchenDisplay) return <DisplayGate />;
-
+  if (isKitchenDisplay) return <DisplayGate theme={theme} onToggleTheme={toggleTheme} />;
   if (!session) return <div className="screen-state">Indlæser Nexus…</div>;
 
   if (!session.authenticated) {
-    return (
-      <div className="login-shell">
-        <button className="theme-toggle login-theme-toggle" onClick={() => setTheme(theme === "light" ? "dark" : "light")} aria-label="Skift tema">{theme === "light" ? "☾" : "☀"}</button>
-        <section className="login-card">
-          <div className="brand-mark">N</div>
-          <p className="brand-word">NEXUS</p>
-          <h1>Velkommen tilbage.</h1>
-          <p className="login-copy">Skriv din mailadresse, så sender Nexus dig et sikkert login-link.</p>
-          <form onSubmit={requestLogin} className="login-form">
-            <label htmlFor="email">Mailadresse</label>
-            <input id="email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="dig@example.com" autoComplete="email" required />
-            <button type="submit" disabled={loginState === "sending"}>{loginState === "sending" ? "Sender…" : "Send login-link"}</button>
-          </form>
-          {loginState === "sent" && <p className="login-feedback success">Tjek din indbakke. Linket virker i 15 minutter.</p>}
-          {loginState === "error" && <p className="login-feedback error">Det lykkedes ikke at sende linket. Prøv igen.</p>}
-        </section>
-      </div>
-    );
+    return <div className="login-shell">
+      <button className="theme-toggle login-theme-toggle" onClick={toggleTheme} aria-label="Skift tema">{theme === "light" ? "☾" : "☀"}</button>
+      <section className="login-card"><div className="brand-mark">N</div><p className="brand-word">NEXUS</p><h1>Velkommen tilbage.</h1><p className="login-copy">Skriv din mailadresse, så sender Nexus dig et sikkert login-link.</p>
+        <form onSubmit={requestLogin} className="login-form"><label htmlFor="email">Mailadresse</label><input id="email" type="email" value={email} onChange={(event) => setEmail(event.target.value)} placeholder="dig@example.com" autoComplete="email" required /><button type="submit" disabled={loginState === "sending"}>{loginState === "sending" ? "Sender…" : "Send login-link"}</button></form>
+        {loginState === "sent" && <p className="login-feedback success">Tjek din indbakke. Linket virker i 15 minutter.</p>}{loginState === "error" && <p className="login-feedback error">Det lykkedes ikke at sende linket. Prøv igen.</p>}
+      </section>
+    </div>;
   }
 
   const isHome = page === "Hjem";
   const heading = isHome ? "Hjem" : page;
-  const subheading = isHome
-    ? "Dit personlige overblik over de data, du faktisk vil se."
-    : page === "Garmin"
-      ? "Din sundhedshistorik samlet, importeret og klar til analyse."
-      : page === "Motion"
-        ? "Aktiviteter, træningshistorik og på sigt dine egne rekorder og træningsdata."
-        : page === "Velbefindende"
-          ? "Daglige målinger og journalnoter om hvordan du faktisk har det."
-          : page === "Indstillinger"
-            ? "Dine personlige Nexus-indstillinger."
-            : page === "Strøm"
-              ? "Spotpriser og de bedste tidspunkter at bruge strøm på."
-              : page === "Kalender"
-                ? "Dine kommende aftaler samlet fra iCal-kalendere."
-                : page === "Varmepumpe"
-                  ? "Luft/vand-varmepumpen samlet fra MELCloud."
-                  : "";
+  const subheading = isHome ? "Dit personlige overblik over de data, du faktisk vil se."
+    : page === "Garmin" ? "Din sundhedshistorik samlet, importeret og klar til analyse."
+    : page === "Motion" ? "Aktiviteter, træningshistorik og på sigt dine egne rekorder og træningsdata."
+    : page === "Velbefindende" ? "Daglige målinger og journalnoter om hvordan du faktisk har det."
+    : page === "Indstillinger" ? "Dine personlige Nexus-indstillinger."
+    : page === "Strøm" ? "Spotpriser og de bedste tidspunkter at bruge strøm på."
+    : page === "Kalender" ? "Dine kommende aftaler samlet fra iCal-kalendere."
+    : page === "Varmepumpe" ? "Luft/vand-varmepumpen samlet fra MELCloud." : "";
 
-  return (
-    <div className="app-frame">
-      <aside className="sidebar">
-        <div className="sidebar-brand"><div className="brand-mark">N</div><span className="brand-word">NEXUS</span></div>
-        <nav className="sidebar-nav" aria-label="Primær navigation">
-          {primaryNav.map((item, index) => (
-            <button className={`nav-item ${page === item ? "active" : ""}`} key={item} type="button" onClick={() => setPage(item)}>
-              <span className="nav-icon">{navIcons[index]}</span><span>{item}</span>
-            </button>
-          ))}
-        </nav>
-        <div className="sidebar-divider" />
-        <nav className="sidebar-nav sidebar-nav--secondary" aria-label="Sekundær navigation">
-          {secondaryNav.map((item, index) => {
-            const active = item === "Indstillinger" && page === "Indstillinger";
-            return (
-              <button className={`nav-item ${active ? "active" : ""}`} key={item} type="button" onClick={() => {
-                if (item === "Overblik") setPage("Hjem");
-                if (item === "Indstillinger") setPage("Indstillinger");
-              }}>
-                <span className="nav-icon">{["▦", "♧", "⚙"][index]}</span><span>{item}</span>
-              </button>
-            );
-          })}
-        </nav>
-        <nav className="mobile-nav" aria-label="Mobil navigation">
-          {mobileNav.map((item) => (
-            <button className={page === item.page ? "active" : ""} key={item.page} type="button" onClick={() => setPage(item.page)} aria-current={page === item.page ? "page" : undefined}>
-              <span>{item.icon}</span><strong>{item.label}</strong>
-            </button>
-          ))}
-        </nav>
-        <div className="system-status"><span className="status-dot" /><div><small>Systemstatus</small><strong>Alt kører</strong></div></div>
-      </aside>
+  return <div className="app-frame">
+    <aside className="sidebar">
+      <div className="sidebar-brand"><div className="brand-mark">N</div><span className="brand-word">NEXUS</span></div>
+      <nav className="sidebar-nav" aria-label="Primær navigation">{primaryNav.map((item, index) => <button className={`nav-item ${page === item ? "active" : ""}`} key={item} type="button" onClick={() => setPage(item)}><span className="nav-icon">{navIcons[index]}</span><span>{item}</span></button>)}</nav>
+      <div className="sidebar-divider" />
+      <nav className="sidebar-nav sidebar-nav--secondary" aria-label="Sekundær navigation">{secondaryNav.map((item, index) => {
+        const active = item === "Indstillinger" && page === "Indstillinger";
+        return <button className={`nav-item ${active ? "active" : ""}`} key={item} type="button" onClick={() => { if (item === "Overblik") setPage("Hjem"); if (item === "Indstillinger") setPage("Indstillinger"); }}><span className="nav-icon">{["▦", "♧", "⚙"][index]}</span><span>{item}</span></button>;
+      })}</nav>
+      <nav className="mobile-nav" aria-label="Mobil navigation">{mobileNav.map((item) => <button className={page === item.page ? "active" : ""} key={item.page} type="button" onClick={() => setPage(item.page)} aria-current={page === item.page ? "page" : undefined}><span>{item.icon}</span><strong>{item.label}</strong></button>)}</nav>
+      <div className="system-status"><span className="status-dot" /><div><small>Systemstatus</small><strong>Alt kører</strong></div></div>
+    </aside>
 
-      <div className="content-shell">
-        <header className="app-header">
-          <div><h1>{heading}</h1>{subheading && <p>{subheading}</p>}</div>
-          <div className="header-actions">
-            <button className="theme-toggle" onClick={() => setTheme(theme === "light" ? "dark" : "light")} aria-label="Skift tema">{theme === "light" ? "☾" : "☀"}</button>
-            <details className="user-menu">
-              <summary className="user-menu-summary" aria-label="Åbn brugermenu">
-                <span className="avatar">{initials(session.user)}</span><span className="user-name">{displayName}</span>
-              </summary>
-              <div className="user-menu-popover">
-                <button type="button" onClick={(event) => { setPage("Indstillinger"); closeUserMenu(event); }}>Indstillinger</button>
-                <button className="logout-button" type="button" onClick={logout}>Log ud</button>
-              </div>
-            </details>
-          </div>
-        </header>
-
-        <main className="main-content">
-          {page === "Hjem" && <HomePage onOpenPage={setPage} />}
-          {page === "Garmin" && <GarminPage />}
-          {page === "Motion" && <MotionPage />}
-          {page === "Velbefindende" && <WellbeingPage />}
-          {page === "Vejr" && <WeatherPage />}
-          {page === "Strøm" && <ElectricityPage />}
-          {page === "Kalender" && <CalendarPage />}
-          {page === "Varmepumpe" && <MelCloudPage />}
-          {page === "Indstillinger" && <SettingsPage />}
-          {!isHome && page !== "Garmin" && page !== "Motion" && page !== "Velbefindende" && page !== "Vejr" && page !== "Strøm" && page !== "Kalender" && page !== "Varmepumpe" && page !== "Indstillinger" && <section className="placeholder-card"><p className="section-label">Planlagt</p><h2>{page}</h2><p>Modulet er på vej ind i Nexus.</p></section>}
-        </main>
-
-        <footer><span>Nexus v0.1</span><span>Simple by design.</span></footer>
-      </div>
+    <div className="content-shell">
+      <header className="app-header"><div><h1>{heading}</h1>{subheading && <p>{subheading}</p>}</div><div className="header-actions"><button className="theme-toggle" onClick={toggleTheme} aria-label="Skift tema">{theme === "light" ? "☾" : "☀"}</button><details className="user-menu"><summary className="user-menu-summary" aria-label="Åbn brugermenu"><span className="avatar">{initials(session.user)}</span><span className="user-name">{displayName}</span></summary><div className="user-menu-popover"><button type="button" onClick={(event) => { setPage("Indstillinger"); closeUserMenu(event); }}>Indstillinger</button><button className="logout-button" type="button" onClick={logout}>Log ud</button></div></details></div></header>
+      <main className="main-content">
+        {page === "Hjem" && <HomePage onOpenPage={setPage} />}{page === "Garmin" && <GarminPage />}{page === "Motion" && <MotionPage />}{page === "Velbefindende" && <WellbeingPage />}{page === "Vejr" && <WeatherPage />}{page === "Strøm" && <ElectricityPage />}{page === "Kalender" && <CalendarPage />}{page === "Varmepumpe" && <MelCloudPage />}{page === "Indstillinger" && <SettingsPage />}
+        {!isHome && page !== "Garmin" && page !== "Motion" && page !== "Velbefindende" && page !== "Vejr" && page !== "Strøm" && page !== "Kalender" && page !== "Varmepumpe" && page !== "Indstillinger" && <section className="placeholder-card"><p className="section-label">Planlagt</p><h2>{page}</h2><p>Modulet er på vej ind i Nexus.</p></section>}
+      </main>
+      <footer><span>Nexus v0.1</span><span>Simple by design.</span></footer>
     </div>
-  );
+  </div>;
 }
 
 export default App;
