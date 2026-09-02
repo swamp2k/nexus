@@ -15,12 +15,14 @@ CREATE INDEX IF NOT EXISTS idx_display_pairing_codes_expiry
 CREATE TABLE IF NOT EXISTS display_devices (
   id TEXT PRIMARY KEY,
   user_id TEXT NOT NULL,
+  pairing_code_id TEXT NOT NULL UNIQUE,
   name TEXT NOT NULL,
   token_hash TEXT NOT NULL UNIQUE,
   created_at TEXT NOT NULL,
   last_seen_at TEXT NOT NULL,
   revoked_at TEXT,
-  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (pairing_code_id) REFERENCES display_pairing_codes(id) ON DELETE CASCADE
 );
 
 CREATE INDEX IF NOT EXISTS idx_display_devices_user
