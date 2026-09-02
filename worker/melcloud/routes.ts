@@ -3,7 +3,6 @@ import { inspectClassicDevices, listClassic, normalizeClassicDevices } from "./c
 import { decryptMelCloudValue, encryptMelCloudValue } from "./credentials";
 
 type MelCloudEnv = Env & { MELCLOUD_CREDENTIALS_KEY?: string; GARMIN_CREDENTIALS_KEY?: string };
-
 type CredentialRow = {
   usernameCiphertext: string;
   usernameIv: string;
@@ -33,9 +32,15 @@ function cleanUsername(value: unknown): string | null {
   const username = value.trim();
   return username && username.length <= 254 ? username : null;
 }
-
 function cleanPassword(value: unknown): string | null {
   return typeof value === "string" && value && value.length <= 512 ? value : null;
+}
+
+export async function melCloudDevicesForUser(env: MelCloudEnv, userId: string) {
+  const credentials = await readCredentials(env, userId);
+  if (!credentials) throw new Error("melcloud_not_configured");
+  const buildings = await listClassic(credentials.username, credentials.password);
+  return { devices: normalizeClassicDevices(buildings), fetchedAt: new Date().toISOString(), provider: "MELCloud Classic" };
 }
 
 async function credentialsRoute(request: Request, env: MelCloudEnv): Promise<Response> {
@@ -58,7 +63,6 @@ async function credentialsRoute(request: Request, env: MelCloudEnv): Promise<Res
     const username = cleanUsername(body.username);
     const password = cleanPassword(body.password);
     if (!username || !password) return json({ error: "invalid_melcloud_credentials" }, { status: 400 });
-
     try {
       const buildings = await listClassic(username, password);
       const devices = normalizeClassicDevices(buildings);
@@ -80,7 +84,6 @@ async function credentialsRoute(request: Request, env: MelCloudEnv): Promise<Res
     await env.DB.prepare(`DELETE FROM melcloud_credentials WHERE user_id=?`).bind(user.id).run();
     return new Response(null, { status: 204 });
   }
-
   return json({ error: "method_not_allowed" }, { status: 405 });
 }
 
@@ -98,20 +101,21 @@ async function withClassicData(request: Request, env: MelCloudEnv): Promise<{ bu
 }
 
 async function devicesRoute(request: Request, env: MelCloudEnv): Promise<Response> {
-  const result = await withClassicData(request, env);
-  if (result instanceof Response) return result;
-  return json({ devices: normalizeClassicDevices(result.buildings), fetchedAt: new Date().toISOString(), provider: "MELCloud Classic" });
+  const user = await getAuthenticatedUser(request, env.DB);
+  if (!user) return json({ error: "unauthorized" }, { status: 401 });
+  try {
+    return json(await melCloudDevicesForUser(env, user.id));
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "melcloud_fetch_failed";
+    const status = message === "melcloud_not_configured" ? 409 : message === "melcloud_invalid_credentials" ? 401 : message === "melcloud_login_throttled" ? 429 : 502;
+    return json({ error: message }, { status });
+  }
 }
 
 async function diagnosticsRoute(request: Request, env: MelCloudEnv): Promise<Response> {
   const result = await withClassicData(request, env);
   if (result instanceof Response) return result;
-  return json({
-    provider: "MELCloud Classic",
-    purpose: "read_only_atw_field_discovery",
-    fetchedAt: new Date().toISOString(),
-    devices: inspectClassicDevices(result.buildings),
-  });
+  return json({ provider: "MELCloud Classic", purpose: "read_only_atw_field_discovery", fetchedAt: new Date().toISOString(), devices: inspectClassicDevices(result.buildings) });
 }
 
 export async function handleMelCloudRoute(request: Request, env: MelCloudEnv): Promise<Response | null> {
