@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import CalendarSourceSettings from "./CalendarSourceSettings";
+import DisplaySettings from "./DisplaySettings";
 import GarminImportSettings from "./GarminImportSettings";
 import MelCloudSettings from "./MelCloudSettings";
 import WellbeingMetricSettings from "./WellbeingMetricSettings";
@@ -183,6 +184,11 @@ export default function SettingsPage() {
             <p className="settings-help"><strong>Live</strong> = 1 min · <strong>Normal</strong> = 5 min · <strong>Langsom</strong> = 30 min · <strong>Ved åbning / event</strong> = ingen periodisk polling.</p>
           </div>
         )}
+      </details>
+
+      <details className="settings-card settings-collapsible">
+        <summary className="settings-card-heading"><div><p className="section-label">Display</p><h2>Displays</h2></div><span className="settings-icon" aria-hidden="true">▣</span></summary>
+        <DisplaySettings />
       </details>
 
       <details className="settings-card settings-collapsible">
