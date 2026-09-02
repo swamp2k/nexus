@@ -24,6 +24,7 @@ import "./melcloud.css";
 import "./audit-polish.css";
 import "./settings.css";
 import "./kitchen-display.css";
+import "./display-pairing.css";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
