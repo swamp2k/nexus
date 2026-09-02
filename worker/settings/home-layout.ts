@@ -19,7 +19,7 @@ function json(body: unknown, init: ResponseInit = {}): Response {
 }
 
 function normalizeLayout(value: unknown): HomeWidgetLayoutItem[] | null {
-  if (!Array.isArray(value) || value.length > 24) return null;
+  if (!Array.isArray(value) || value.length > 64) return null;
   const result: HomeWidgetLayoutItem[] = [];
   const seen = new Set<string>();
 
@@ -28,7 +28,7 @@ function normalizeLayout(value: unknown): HomeWidgetLayoutItem[] | null {
     const candidate = item as { id?: unknown; size?: unknown };
     if (typeof candidate.id !== "string") return null;
     const id = candidate.id.trim();
-    if (!id || id.length > 120 || seen.has(id)) return null;
+    if (!id || id.length > 240 || seen.has(id)) return null;
     const size = candidate.size;
     if (size !== "small" && size !== "medium" && size !== "wide") return null;
     seen.add(id);
