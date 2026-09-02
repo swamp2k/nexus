@@ -14,7 +14,7 @@
     "MIYAGI_MODEL": "claude-sonnet-4-6"
   },
   "triggers": {
-    "crons": ["0 7 * * *", "0 8 * * *"]
+    "crons": ["0 * * * *"]
   },
   "assets": {
     "not_found_handling": "single-page-application",
