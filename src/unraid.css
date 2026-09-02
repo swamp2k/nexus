@@ -10,4 +10,30 @@
    width and the remaining card height. */
 .home-widget[data-widget-id="unraid.containers.selected"]{grid-row:span 3}.home-widget[data-widget-id="unraid.containers.selected"]:has(.unraid-container-group-item:nth-child(7)){grid-row:span 4}.home-widget[data-widget-id="unraid.containers.selected"] .home-widget-content{align-items:stretch}.unraid-container-group{width:100%;height:100%;min-width:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));grid-auto-rows:minmax(0,1fr);align-content:stretch;gap:8px}.unraid-container-group-item{min-width:0;display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;align-content:center;gap:7px;padding:9px 10px;border-radius:10px;background:var(--surface-soft)}.unraid-container-group-item strong{min-width:0;overflow:hidden;font-size:.86rem;text-overflow:ellipsis;white-space:nowrap}.unraid-container-group-item small{color:var(--muted);font-size:.68rem;white-space:nowrap}.unraid-container-group-item.ok .unraid-entity-dot{background:var(--success)}.unraid-container-group-item.warn small{color:#d97706}
 
+/* Main Home density review: most glanceable cards do not need the old four-row
+   height. Keep them at three rows and reserve four rows for charts, lists and
+   other genuinely information-dense widgets. Scope this to Home so display
+   dashboards keep their own sizing policy. */
+@media(min-width:761px){
+  .home-page .home-widget-grid{grid-auto-rows:56px}
+  .home-page .home-widget{grid-row:span 3}
+  .home-page .home-widget--compact{grid-row:span 2}
+  .home-page .home-widget--compact.home-widget--editing{grid-row:span 3}
+  .home-page .home-widget[data-widget-id="energy.price.next24h"],
+  .home-page .home-widget[data-widget-id="garmin.steps.week"],
+  .home-page .home-widget[data-widget-id="garmin.sleep.week"],
+  .home-page .home-widget[data-widget-id="calendar.waste.next"],
+  .home-page .home-widget[data-widget-id="unraid.disks.temperature"]{grid-row:span 4}
+  .home-page .home-widget--medium[data-widget-id="weather.nextHours"],
+  .home-page .home-widget--wide[data-widget-id="weather.nextHours"],
+  .home-page .home-widget--medium[data-widget-id="weather.week"],
+  .home-page .home-widget--wide[data-widget-id="weather.week"],
+  .home-page .home-widget--medium[data-widget-id="wellbeing.today"],
+  .home-page .home-widget--wide[data-widget-id="wellbeing.today"]{grid-row:span 4}
+  .home-page .home-widget--small[data-widget-id="unraid.system.overview"],
+  .home-page .home-widget--small[data-widget-id="melcloud.atw.current"]{grid-row:span 4}
+  .home-page .home-widget[data-widget-id="unraid.containers.selected"]{grid-row:span 3}
+  .home-page .home-widget[data-widget-id="unraid.containers.selected"]:has(.unraid-container-group-item:nth-child(7)){grid-row:span 4}
+}
+
 @media(max-width:850px){.unraid-stat-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.unraid-disk-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.unraid-share{grid-template-columns:minmax(0,1fr) auto}.unraid-share .unraid-progress{grid-column:1/-1;grid-row:2}}@media(max-width:760px){.home-widget-grid{grid-auto-rows:auto}.home-widget,.home-widget--compact,.home-widget--compact.home-widget--editing,.home-widget[data-widget-id="unraid.containers.selected"]{grid-row:auto}.home-widget--compact{min-height:108px}.unraid-container-group{height:auto;grid-template-columns:1fr;grid-auto-rows:auto}}@media(max-width:600px){.unraid-toolbar{flex-direction:column}.unraid-stat-grid,.unraid-stat-grid--three,.unraid-disk-grid{grid-template-columns:1fr}.unraid-toolbar-actions{width:100%;justify-content:space-between}}
