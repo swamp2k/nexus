@@ -1,7 +1,7 @@
 import { getAuthenticatedUser } from "../auth/session";
 import { decryptUnraidValue, encryptUnraidValue } from "./credentials";
 import type { IntegrationErrorCode } from "./contract";
-import { IntegrationFailure, callIntegration, unraidWatch, type UnraidWatchEnv } from "./transport";
+import { IntegrationFailure, assertContractVersion, callIntegration, unraidWatch, type UnraidWatchEnv } from "./transport";
 
 /**
  * Nexus's Unraid module.
@@ -43,6 +43,15 @@ async function readIntegration(env: UnraidWatchEnv, userId: string): Promise<Int
  */
 const NOT_CONNECTED = "unraidwatch_not_connected";
 const BINDING_MISSING = "unraidwatch_binding_missing";
+/** Prefix of the message set by assertContractVersion; carries the two versions. */
+const CONTRACT_MISMATCH = "unraidwatch_contract_mismatch";
+
+/** Verify the contract version on every versioned response before trusting it. */
+async function identify(env: UnraidWatchEnv, token: string) {
+  const identity = await callIntegration(() => unraidWatch(env).identify(token));
+  assertContractVersion(identity.contractVersion);
+  return identity;
+}
 
 /** Decrypt the stored token. The raw value never leaves the Worker. */
 async function tokenFor(env: UnraidWatchEnv, userId: string): Promise<string> {
@@ -63,6 +72,10 @@ function errorResponse(error: unknown): Response {
   if (error instanceof IntegrationFailure) {
     if (error.message === NOT_CONNECTED) return json({ error: NOT_CONNECTED }, { status: 409 });
     if (error.message === BINDING_MISSING) return json({ error: BINDING_MISSING }, { status: 503 });
+    if (error.message.startsWith(CONTRACT_MISMATCH)) {
+      const [, received, expected] = error.message.split(":");
+      return json({ error: CONTRACT_MISMATCH, received, expected }, { status: 502 });
+    }
     const mapped = CONTRACT_RESPONSE[error.code];
     return json({ error: mapped.error }, { status: mapped.status });
   }
@@ -99,8 +112,9 @@ export async function handleUnraidRoute(request: Request, env: UnraidWatchEnv): 
       const token = supplied || (existing ? await decryptUnraidValue(env, existing.tokenCiphertext, existing.tokenIv) : "");
       if (!token) return json({ error: "invalid_integration_token" }, { status: 400 });
 
-      // Prove the token works before persisting it.
-      const identity = await callIntegration(() => unraidWatch(env).identify(token));
+      // Prove the token works, and that both sides speak the same contract
+      // version, before persisting anything.
+      const identity = await identify(env, token);
 
       const encrypted = supplied || !existing
         ? await encryptUnraidValue(env, token)
@@ -131,7 +145,7 @@ export async function handleUnraidRoute(request: Request, env: UnraidWatchEnv): 
   if (pathname === "/api/unraid/test" && request.method === "POST") {
     try {
       const token = await tokenFor(env, user.id);
-      const identity = await callIntegration(() => unraidWatch(env).identify(token));
+      const identity = await identify(env, token);
       const now = new Date().toISOString();
       await env.DB.prepare("UPDATE unraidwatch_integrations SET verified_at = ?, updated_at = ? WHERE user_id = ?")
         .bind(now, now, user.id).run();
@@ -144,7 +158,11 @@ export async function handleUnraidRoute(request: Request, env: UnraidWatchEnv): 
       const token = await tokenFor(env, user.id);
       const uw = unraidWatch(env);
       const at = () => new Date().toISOString();
-      if (pathname === "/api/unraid/overview") return json(await callIntegration(() => uw.getOverview(token)));
+      if (pathname === "/api/unraid/overview") {
+        const overview = await callIntegration(() => uw.getOverview(token));
+        assertContractVersion(overview.contractVersion);
+        return json(overview);
+      }
       if (pathname === "/api/unraid/stats") return json({ data: await callIntegration(() => uw.getStats(token)), fetchedAt: at() });
       if (pathname === "/api/unraid/array") return json({ data: await callIntegration(() => uw.getArray(token)), fetchedAt: at() });
       if (pathname === "/api/unraid/docker") return json({ data: await callIntegration(() => uw.getDocker(token)), fetchedAt: at() });

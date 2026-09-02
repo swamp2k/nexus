@@ -166,6 +166,8 @@ Domains differ, so do not force every service onto identical endpoints. Do keep 
 - camelCase field names
 - JSON-serializable values only
 - explicit `null` for "not available"; no magic sentinels
+- never fabricate a plausible-looking value for data that could not be read — a zeroed record is indistinguishable from a real one
+- where a partial response is possible, report *which* sections failed in their own field rather than overloading `null` or an empty list, which already carry domain meaning
 - read-only by default; write operations added deliberately and narrowly
 - no platform-specific objects in DTOs (no `Request`/`Response`, no D1, no `Env`)
 - a stable error model: a small set of machine-readable codes that survive any transport

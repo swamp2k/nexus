@@ -60,21 +60,44 @@ export type UnraidUPS = {
   loadPct: number;
 };
 
+export type UnraidServer = {
+  label: string;
+  /** Reachable at `fetchedAt` — proven by the read itself in a successful overview. */
+  online: boolean;
+  /**
+   * UnraidWatch's availability monitor's view, or null when it considers the
+   * server up. Separate from `online` and can lag it: the monitor runs once a
+   * minute, so a reachable server may still be flagged during recovery.
+   */
+  monitorOfflineSince: string | null;
+};
+
+/**
+ * Sections that can independently report failure. UPS is absent by design —
+ * see the note on `UnraidOverview.ups`.
+ */
+export type OverviewSection = "array" | "containers" | "vms" | "shares";
+
 export type UnraidOverview = {
   contractVersion: number;
   fetchedAt: string;
-  server: { label: string; online: boolean };
+  server: UnraidServer;
   stats: UnraidStats;
-  array: UnraidArray;
+  /** Null only when `unavailable` includes "array". */
+  array: UnraidArray | null;
   containers: UnraidContainer[];
   vms: UnraidVM[];
   shares: UnraidShare[];
+  /** Null for "no UPS configured" — in v1 also null if the UPS query failed. */
   ups: UnraidUPS | null;
+  /** Sections that could not be read this cycle. Empty on a clean read. */
+  unavailable: OverviewSection[];
 };
 
 export type IntegrationIdentity = {
   contractVersion: number;
-  serverLabel: string;
+  /** Null when the UnraidWatch account has no Unraid server saved yet. */
+  serverLabel: string | null;
   serverConfigured: boolean;
   scope: 'read';
 };

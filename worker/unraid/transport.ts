@@ -1,4 +1,4 @@
-import type { IntegrationErrorCode, UnraidWatchIntegration } from "./contract";
+import { CONTRACT_VERSION, type IntegrationErrorCode, type UnraidWatchIntegration } from "./contract";
 
 /**
  * Transport for the UnraidWatch integration contract.
@@ -35,6 +35,28 @@ export class IntegrationFailure extends Error {
     super(message ?? code);
     this.name = "IntegrationFailure";
     this.code = code;
+  }
+}
+
+/**
+ * Verify that UnraidWatch speaks the contract version Nexus was built against.
+ *
+ * A mismatch means the two sides were deployed out of step. Failing loudly is
+ * the point: silently rendering a payload whose field meanings may have changed
+ * is worse than showing an error that names the fix.
+ *
+ * Only responses that actually carry a version can be checked — `identify()`
+ * and `getOverview()`. Both are on the live path (every save, test and page
+ * refresh), so a mismatch surfaces immediately. The granular per-section
+ * methods return bare DTOs with no version field; they are reached only after
+ * an overview has already validated the version.
+ */
+export function assertContractVersion(received: number | undefined): void {
+  if (received !== CONTRACT_VERSION) {
+    throw new IntegrationFailure(
+      "internal",
+      `unraidwatch_contract_mismatch:${received ?? "unknown"}:${CONTRACT_VERSION}`,
+    );
   }
 }
 

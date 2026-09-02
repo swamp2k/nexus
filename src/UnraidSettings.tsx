@@ -5,10 +5,18 @@ type IntegrationResponse = {
   integration: { label: string; verifiedAt: string | null; updatedAt: string } | null;
 };
 
-type ServerInfo = { label: string; configured: boolean };
+// label is null when UnraidWatch has no Unraid server saved yet.
+type ServerInfo = { label: string | null; configured: boolean };
 type State = "loading" | "idle" | "saving" | "saved" | "testing" | "error";
 
-function messageFor(error: string): string {
+/** Error payloads may carry extra detail; contract mismatches carry versions. */
+type ErrorBody = { error?: string; received?: string; expected?: string };
+
+function messageFor(body: ErrorBody, fallback: string): string {
+  const error = body.error ?? fallback;
+  if (error === "unraidwatch_contract_mismatch") {
+    return `Nexus og UnraidWatch kører forskellige versioner af integrationskontrakten (UnraidWatch: ${body.received ?? "ukendt"}, Nexus forventer: ${body.expected ?? "?"}). Udrul begge sider igen.`;
+  }
   if (error === "unraidwatch_unauthorized") return "Tokenet blev afvist af UnraidWatch. Det kan være tilbagekaldt — opret et nyt under Settings → Integrations.";
   if (error === "unraidwatch_not_connected") return "Nexus har endnu ikke et UnraidWatch-token.";
   if (error === "unraidwatch_server_not_configured") return "UnraidWatch-kontoen har ingen Unraid-server gemt endnu.";
@@ -50,22 +58,22 @@ export default function UnraidSettings() {
         method: "PUT", credentials: "same-origin", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ label, token }),
       });
-      const body = await response.json().catch(() => ({})) as { error?: string; integration?: IntegrationResponse["integration"]; server?: ServerInfo };
-      if (!response.ok) throw new Error(body.error ?? `HTTP ${response.status}`);
+      const body = await response.json().catch(() => ({})) as ErrorBody & { integration?: IntegrationResponse["integration"]; server?: ServerInfo };
+      if (!response.ok) { setState("error"); setError(messageFor(body, `HTTP ${response.status}`)); return; }
       setConfigured(true); setToken(""); setServer(body.server ?? null);
       setVerifiedAt(body.integration?.verifiedAt ?? new Date().toISOString()); setState("saved");
-    } catch (cause) { setState("error"); setError(messageFor(cause instanceof Error ? cause.message : "save_failed")); }
+    } catch { setState("error"); setError(messageFor({}, "save_failed")); }
   }
 
   async function test() {
     setState("testing"); setError(null);
     try {
       const response = await fetch("/api/unraid/test", { method: "POST", credentials: "same-origin" });
-      const body = await response.json().catch(() => ({})) as { error?: string; verifiedAt?: string; server?: ServerInfo };
-      if (!response.ok) throw new Error(body.error ?? `HTTP ${response.status}`);
+      const body = await response.json().catch(() => ({})) as ErrorBody & { verifiedAt?: string; server?: ServerInfo };
+      if (!response.ok) { setState("error"); setError(messageFor(body, `HTTP ${response.status}`)); return; }
       setServer(body.server ?? null);
       setVerifiedAt(body.verifiedAt ?? new Date().toISOString()); setState("saved");
-    } catch (cause) { setState("error"); setError(messageFor(cause instanceof Error ? cause.message : "test_failed")); }
+    } catch { setState("error"); setError(messageFor({}, "test_failed")); }
   }
 
   async function remove() {
