@@ -37,7 +37,7 @@ export default function UnraidSettings() {
   useEffect(() => { void load(); }, []);
 
   async function save() {
-    if (!url.trim() || !apiKey.trim()) { setError("URL og API-nøgle skal udfyldes."); return; }
+    if (!url.trim() || (!configured && !apiKey.trim())) { setError("URL og API-nøgle skal udfyldes."); return; }
     setState("saving"); setError(null);
     try {
       const response = await fetch("/api/unraid/server", {
@@ -76,7 +76,7 @@ export default function UnraidSettings() {
     {verifiedAt && <p className="settings-feedback success">Forbindelse bekræftet {new Date(verifiedAt).toLocaleString("da-DK")}.</p>}
     {error && <p className="settings-feedback error">{error}</p>}
     <div className="settings-location-actions">
-      <button className="primary-action" type="button" disabled={state === "saving" || !url.trim() || !apiKey.trim()} onClick={() => void save()}>{state === "saving" ? "Gemmer…" : configured ? "Gem ny forbindelse" : "Gem og test"}</button>
+      <button className="primary-action" type="button" disabled={state === "saving" || !url.trim() || (!configured && !apiKey.trim())} onClick={() => void save()}>{state === "saving" ? "Gemmer…" : configured ? "Gem forbindelse" : "Gem og test"}</button>
       {configured && <button className="secondary-action" type="button" disabled={state === "testing"} onClick={() => void test()}>{state === "testing" ? "Tester…" : "Test forbindelse"}</button>}
       {configured && <button className="secondary-action" type="button" onClick={() => void remove()}>Fjern</button>}
     </div>
