@@ -8,6 +8,8 @@
 }
 
 .display-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 24px; margin: 0 auto 22px; width: min(1460px, 100%); }
+.display-header-right { display: flex; align-items: flex-start; gap: 14px; }
+.display-theme-toggle { flex: 0 0 auto; margin-top: 2px; }
 .display-brand { display: block; margin-bottom: 4px; color: var(--accent); font-size: 0.74rem; font-weight: 900; letter-spacing: 0.18em; }
 .display-header h1 { margin: 0; font-size: clamp(2.2rem, 4.5vw, 4.2rem); line-height: 0.95; letter-spacing: -0.05em; }
 .display-clock { display: grid; justify-items: end; gap: 2px; }
@@ -61,6 +63,7 @@
 @media (max-width: 700px) {
   .kitchen-display { padding: 16px; }
   .display-header { align-items: end; }
+  .display-header-right { align-items: center; }
   .display-clock span { display: none; }
   .display-card, .display-card--compact { grid-column: span 12; padding: 18px; }
   .display-metric-row { grid-template-columns: 1fr; }
