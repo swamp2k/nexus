@@ -1,3 +1,4 @@
+import type { ReactNode } from "react";
 import { useDashboardJson } from "../data/dashboardRefresh";
 import type { WidgetDefinition } from "./widgetRegistry";
 
@@ -36,7 +37,7 @@ function useOverview() {
   return useDashboardJson<UnraidOverview>("/api/unraid/overview");
 }
 
-function State({ children }: { children: string }) {
+function State({ children }: { children: ReactNode }) {
   return <div className="home-widget-state">{children}</div>;
 }
 
