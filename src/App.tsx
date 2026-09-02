@@ -8,6 +8,7 @@ import WeatherPage from "./WeatherPage";
 import ElectricityPage from "./ElectricityPage";
 import CalendarPage from "./CalendarPage";
 import MelCloudPage from "./MelCloudPage";
+import UnraidPage from "./UnraidPage";
 import DisplaysPage from "./DisplaysPage";
 import SettingsPage from "./SettingsPage";
 import DisplayGate from "./DisplayGate";
@@ -27,7 +28,7 @@ const NAV_DEFINITIONS: NavDefinition[] = [
 ];
 const DEFAULT_NAV_ORDER = NAV_DEFINITIONS.map((item) => item.page);
 const NAV_BY_PAGE = new Map(NAV_DEFINITIONS.map((item) => [item.page, item]));
-const MOBILE_ALLOWED = new Set<NavPage>(["Hjem", "Garmin", "Motion", "Velbefindende", "Vejr", "Strøm", "Kalender", "Varmepumpe", "Displays"]);
+const MOBILE_ALLOWED = new Set<NavPage>(["Hjem", "Garmin", "Motion", "Velbefindende", "Vejr", "Strøm", "Kalender", "Varmepumpe", "Unraid", "Displays"]);
 
 function normalizeNavOrder(order: unknown): NavPage[] {
   const source = Array.isArray(order) ? order : [];
@@ -156,6 +157,7 @@ function App() {
     : page === "Strøm" ? "Spotpriser og de bedste tidspunkter at bruge strøm på."
     : page === "Kalender" ? "Dine kommende aftaler samlet fra iCal-kalendere."
     : page === "Varmepumpe" ? "Luft/vand-varmepumpen samlet fra MELCloud."
+    : page === "Unraid" ? "Serverstatus, array, Docker, VM'er, shares og UPS fra UnraidWatch."
     : page === "Displays" ? "Byg og par dashboards til iPads og andre faste skærme." : "";
 
   return <div className="app-frame">
@@ -179,8 +181,8 @@ function App() {
     <div className="content-shell">
       <header className="app-header"><div><h1>{heading}</h1>{subheading && <p>{subheading}</p>}</div><div className="header-actions"><button className="theme-toggle" onClick={toggleTheme} aria-label="Skift tema">{theme === "light" ? "☾" : "☀"}</button><details className="user-menu"><summary className="user-menu-summary" aria-label="Åbn brugermenu"><span className="avatar">{initials(session.user)}</span><span className="user-name">{displayName}</span></summary><div className="user-menu-popover"><button type="button" onClick={(event) => { setPage("Indstillinger"); closeUserMenu(event); }}>Indstillinger</button><button className="logout-button" type="button" onClick={logout}>Log ud</button></div></details></div></header>
       <main className="main-content">
-        {page === "Hjem" && <HomePage onOpenPage={setPage} />}{page === "Garmin" && <GarminPage />}{page === "Motion" && <MotionPage />}{page === "Velbefindende" && <WellbeingPage />}{page === "Vejr" && <WeatherPage />}{page === "Strøm" && <ElectricityPage />}{page === "Kalender" && <CalendarPage />}{page === "Varmepumpe" && <MelCloudPage />}{page === "Displays" && <DisplaysPage />}{page === "Indstillinger" && <SettingsPage />}
-        {!isHome && page !== "Garmin" && page !== "Motion" && page !== "Velbefindende" && page !== "Vejr" && page !== "Strøm" && page !== "Kalender" && page !== "Varmepumpe" && page !== "Displays" && page !== "Indstillinger" && <section className="placeholder-card"><p className="section-label">Planlagt</p><h2>{page}</h2><p>Modulet er på vej ind i Nexus.</p></section>}
+        {page === "Hjem" && <HomePage onOpenPage={setPage} />}{page === "Garmin" && <GarminPage />}{page === "Motion" && <MotionPage />}{page === "Velbefindende" && <WellbeingPage />}{page === "Vejr" && <WeatherPage />}{page === "Strøm" && <ElectricityPage />}{page === "Kalender" && <CalendarPage />}{page === "Varmepumpe" && <MelCloudPage />}{page === "Unraid" && <UnraidPage />}{page === "Displays" && <DisplaysPage />}{page === "Indstillinger" && <SettingsPage />}
+        {!isHome && page !== "Garmin" && page !== "Motion" && page !== "Velbefindende" && page !== "Vejr" && page !== "Strøm" && page !== "Kalender" && page !== "Varmepumpe" && page !== "Unraid" && page !== "Displays" && page !== "Indstillinger" && <section className="placeholder-card"><p className="section-label">Planlagt</p><h2>{page}</h2><p>Modulet er på vej ind i Nexus.</p></section>}
       </main>
       <footer><span>Nexus v0.1</span><span>Simple by design.</span></footer>
     </div>
