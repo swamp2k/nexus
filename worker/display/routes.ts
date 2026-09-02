@@ -1,5 +1,7 @@
 import { getAuthenticatedUser } from "../auth/session";
 import { createOpaqueToken, hashToken } from "../auth/tokens";
+import { calendarEventsForUser } from "../calendar/routes";
+import { melCloudDevicesForUser } from "../melcloud/routes";
 import { getElectricityUsage } from "../sources/eloverblik";
 import { getEnergyPrices, resolveEnergySettings } from "../sources/energy-prices";
 import { getWeatherForecast, resolveWeatherLocation } from "../sources/weather";
@@ -18,6 +20,8 @@ type DisplayEnv = Env & {
   WEATHER_LAT?: string;
   WEATHER_LON?: string;
   WEATHER_LABEL?: string;
+  MELCLOUD_CREDENTIALS_KEY?: string;
+  GARMIN_CREDENTIALS_KEY?: string;
 };
 
 type DisplayDevice = {
@@ -87,8 +91,7 @@ async function authenticateDisplay(request: Request, env: DisplayEnv): Promise<D
   const lastSeen = Date.parse(row.lastSeenAt);
   if (!Number.isFinite(lastSeen) || Date.now() - lastSeen > 5 * 60_000) {
     const now = new Date().toISOString();
-    await env.DB.prepare("UPDATE display_devices SET last_seen_at = ? WHERE id = ?")
-      .bind(now, row.id).run();
+    await env.DB.prepare("UPDATE display_devices SET last_seen_at = ? WHERE id = ?").bind(now, row.id).run();
     row.lastSeenAt = now;
   }
   return row;
@@ -150,17 +153,14 @@ export async function handleDisplayRoute(request: Request, env: DisplayEnv): Pro
       return json({ error: "pairing_code_already_used" }, { status: 409 });
     }
 
-    return json({ paired: true, device: { id: deviceId, name: deviceName } }, {
-      headers: { "Set-Cookie": displayCookie(token) },
-    });
+    return json({ paired: true, device: { id: deviceId, name: deviceName } }, { headers: { "Set-Cookie": displayCookie(token) } });
   }
 
   if (pathname === "/api/display/unpair" && request.method === "POST") {
     const token = readCookie(request, DISPLAY_COOKIE);
     if (token) {
       const tokenHash = await hashToken(token);
-      await env.DB.prepare("UPDATE display_devices SET revoked_at = ? WHERE token_hash = ? AND revoked_at IS NULL")
-        .bind(new Date().toISOString(), tokenHash).run();
+      await env.DB.prepare("UPDATE display_devices SET revoked_at = ? WHERE token_hash = ? AND revoked_at IS NULL").bind(new Date().toISOString(), tokenHash).run();
     }
     return json({ ok: true }, { headers: { "Set-Cookie": clearDisplayCookie() } });
   }
@@ -196,9 +196,7 @@ export async function handleDisplayRoute(request: Request, env: DisplayEnv): Pro
 
   if (pathname.startsWith("/api/display/devices/") && request.method === "DELETE") {
     const id = pathname.slice("/api/display/devices/".length);
-    await env.DB.prepare(
-      "UPDATE display_devices SET revoked_at = ? WHERE id = ? AND user_id = ? AND revoked_at IS NULL",
-    ).bind(new Date().toISOString(), id, user.id).run();
+    await env.DB.prepare("UPDATE display_devices SET revoked_at = ? WHERE id = ? AND user_id = ? AND revoked_at IS NULL").bind(new Date().toISOString(), id, user.id).run();
     return json({ ok: true });
   }
 
@@ -207,8 +205,12 @@ export async function handleDisplayRoute(request: Request, env: DisplayEnv): Pro
 
 export async function handleDisplayDataAlias(request: Request, env: DisplayEnv): Promise<Response | null> {
   if (request.method !== "GET") return null;
-  const pathname = new URL(request.url).pathname;
-  const allowed = pathname === "/api/settings" || pathname.startsWith("/api/sources/");
+  const url = new URL(request.url);
+  const pathname = url.pathname;
+  const allowed = pathname === "/api/settings"
+    || pathname.startsWith("/api/sources/")
+    || pathname === "/api/calendar/events"
+    || pathname === "/api/melcloud/devices";
   if (!allowed) return null;
 
   const regularUser = await getAuthenticatedUser(request, env.DB);
@@ -217,24 +219,32 @@ export async function handleDisplayDataAlias(request: Request, env: DisplayEnv):
   const device = await authenticateDisplay(request, env);
   if (!device) return null;
 
-  if (pathname === "/api/settings") {
-    return json({ settings: await readDisplaySettings(env, device.userId) });
+  if (pathname === "/api/settings") return json({ settings: await readDisplaySettings(env, device.userId) });
+
+  if (pathname === "/api/calendar/events") {
+    const days = Math.max(1, Math.min(90, Number(url.searchParams.get("days")) || 90));
+    return json(await calendarEventsForUser(env, device.userId, days));
+  }
+
+  if (pathname === "/api/melcloud/devices") {
+    try {
+      return json(await melCloudDevicesForUser(env, device.userId));
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "melcloud_fetch_failed";
+      const status = message === "melcloud_not_configured" ? 409 : message === "melcloud_login_throttled" ? 429 : 502;
+      return json({ error: message }, { status });
+    }
   }
 
   if (pathname === "/api/sources/weather") {
     const result = await getWeatherForecast(env, device.userId);
     return result ? json(result) : json({ error: "source_not_configured" }, { status: 503 });
   }
-
-  if (pathname === "/api/sources/energy/prices") {
-    return json(await getEnergyPrices(env, device.userId));
-  }
-
+  if (pathname === "/api/sources/energy/prices") return json(await getEnergyPrices(env, device.userId));
   if (pathname === "/api/sources/energy/usage") {
     const result = await getElectricityUsage(env);
     return result ? json(result) : json({ error: "source_not_configured" }, { status: 503 });
   }
-
   if (pathname === "/api/sources/status") {
     const [weatherLocation, energySettings] = await Promise.all([
       resolveWeatherLocation(env, device.userId),
@@ -244,9 +254,8 @@ export async function handleDisplayDataAlias(request: Request, env: DisplayEnv):
       weather: { configured: Boolean(weatherLocation), provider: "MET Norway", label: weatherLocation?.label ?? "Hjem" },
       energyPrices: { configured: Boolean(energySettings.gridProvider), area: energySettings.area, gridProvider: energySettings.gridProvider, supplierMarkupOere: energySettings.supplierMarkupOere },
       electricityUsage: { configured: Boolean(env.ELOVERBLIK_REFRESH_TOKEN && env.ELOVERBLIK_METERING_POINT) },
-      wasteCalendar: { configured: Boolean(env.WASTE_CALENDAR_ICS_URL), implementation: "calendar_adapter_pending" },
+      wasteCalendar: { configured: true, implementation: "ical" },
     } });
   }
-
   return json({ error: "not_found" }, { status: 404 });
 }
