@@ -2,8 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { useCachedJson } from "./data/queryCache";
 import { DashboardRefreshScope, resolveDashboardRefreshClass } from "./data/dashboardRefresh";
 import type { DashboardRefreshSettingsResponse } from "./data/dashboardRefresh";
-import { widgetById, widgetRegistry } from "./widgets/widgetRegistry";
-import type { WidgetSize, WidgetTargetPage } from "./widgets/widgetRegistry";
+import { discoverUnraidWidgets, widgetCatalog, widgetDefinitionById } from "./widgets/widgetCatalog";
+import type { UnraidOverview } from "./widgets/widgetCatalog";
+import type { WidgetDefinition, WidgetSize, WidgetTargetPage } from "./widgets/widgetRegistry";
 
 type HomeLayoutItem = { id: string; size: WidgetSize };
 type HomeLayoutResponse = { layout: HomeLayoutItem[]; updatedAt: string | null; isDefault: boolean };
@@ -17,8 +18,8 @@ const FALLBACK_LAYOUT: HomeLayoutItem[] = [
 ];
 
 function normalizeLayout(layout: HomeLayoutItem[]): HomeLayoutItem[] {
-  return layout.filter((item, index, all) => widgetById.has(item.id) && all.findIndex((candidate) => candidate.id === item.id) === index).map((item) => {
-    const widget = widgetById.get(item.id)!;
+  return layout.filter((item, index, all) => widgetDefinitionById(item.id) && all.findIndex((candidate) => candidate.id === item.id) === index).map((item) => {
+    const widget = widgetDefinitionById(item.id)!;
     return { id: item.id, size: widget.supportedSizes.includes(item.size) ? item.size : widget.defaultSize };
   });
 }
@@ -30,6 +31,8 @@ export default function HomePage({ onOpenPage }: { onOpenPage: (page: WidgetTarg
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [unraidCatalog, setUnraidCatalog] = useState<UnraidOverview | null>(null);
+  const [unraidCatalogLoading, setUnraidCatalogLoading] = useState(false);
   const { data: refreshSettings } = useCachedJson<DashboardRefreshSettingsResponse>("/api/settings", 1_000);
 
   useEffect(() => {
@@ -52,24 +55,49 @@ export default function HomePage({ onOpenPage }: { onOpenPage: (page: WidgetTarg
   }, []);
 
   const selectedIds = useMemo(() => new Set(draft.map((item) => item.id)), [draft]);
+  const availableWidgets = useMemo(() => {
+    const result: WidgetDefinition[] = [...widgetCatalog, ...discoverUnraidWidgets(unraidCatalog)];
+    const seen = new Set(result.map((widget) => widget.id));
+    for (const item of draft) {
+      if (seen.has(item.id)) continue;
+      const widget = widgetDefinitionById(item.id);
+      if (widget) { result.push(widget); seen.add(item.id); }
+    }
+    return result;
+  }, [draft, unraidCatalog]);
+  const availableById = useMemo(() => new Map(availableWidgets.map((widget) => [widget.id, widget])), [availableWidgets]);
   const grouped = useMemo(() => {
-    const groups = new Map<string, typeof widgetRegistry>();
-    for (const widget of widgetRegistry) {
+    const groups = new Map<string, WidgetDefinition[]>();
+    for (const widget of availableWidgets) {
       const list = groups.get(widget.group) ?? [];
       list.push(widget);
       groups.set(widget.group, list);
     }
     return [...groups.entries()];
-  }, []);
+  }, [availableWidgets]);
+
+  async function loadUnraidCatalog() {
+    setUnraidCatalogLoading(true);
+    try {
+      const response = await fetch("/api/unraid/overview", { credentials: "same-origin", cache: "no-store" });
+      if (!response.ok) return;
+      setUnraidCatalog(await response.json() as UnraidOverview);
+    } catch {
+      // Static Unraid widgets still remain available; only dynamic discovery is skipped.
+    } finally {
+      setUnraidCatalogLoading(false);
+    }
+  }
 
   function beginEdit() {
     setDraft(layout);
     setMessage(null);
     setEditing(true);
+    void loadUnraidCatalog();
   }
 
   function toggleWidget(id: string) {
-    const widget = widgetById.get(id);
+    const widget = availableById.get(id) ?? widgetDefinitionById(id);
     if (!widget) return;
     setDraft((current) => current.some((item) => item.id === id)
       ? current.filter((item) => item.id !== id)
@@ -77,13 +105,13 @@ export default function HomePage({ onOpenPage }: { onOpenPage: (page: WidgetTarg
   }
 
   function changeSize(id: string, size: WidgetSize) {
-    const widget = widgetById.get(id);
+    const widget = availableById.get(id) ?? widgetDefinitionById(id);
     if (!widget?.supportedSizes.includes(size)) return;
     setDraft((current) => current.map((item) => item.id === id ? { ...item, size } : item));
   }
 
   function stepSize(id: string, direction: -1 | 1) {
-    const widget = widgetById.get(id);
+    const widget = availableById.get(id) ?? widgetDefinitionById(id);
     if (!widget) return;
     setDraft((current) => current.map((item) => {
       if (item.id !== id) return item;
@@ -143,6 +171,7 @@ export default function HomePage({ onOpenPage }: { onOpenPage: (page: WidgetTarg
 
       {editing && <aside className="home-editor" aria-label="Rediger Hjem">
         <div className="home-editor-copy"><strong>Vælg moduler</strong><span>Tilføj og fjern widgets her. Rækkefølge og størrelse kan også ændres direkte på dashboardet nedenunder.</span></div>
+        {unraidCatalogLoading && <p className="home-layout-note">Henter containere og VM'er fra UnraidWatch…</p>}
         <div className="home-editor-groups">
           {grouped.map(([group, widgets]) => <fieldset key={group}><legend>{group}</legend>{widgets.map((widget) => {
             const selected = selectedIds.has(widget.id);
@@ -163,11 +192,11 @@ export default function HomePage({ onOpenPage }: { onOpenPage: (page: WidgetTarg
       {renderedLayout.length === 0
         ? <div className="home-empty"><strong>Hjem er tomt.</strong><span>Tryk Rediger Hjem og vælg de data du vil have her.</span></div>
         : <div className="home-widget-grid">{renderedLayout.map((item, index) => {
-          const widget = widgetById.get(item.id);
+          const widget = availableById.get(item.id) ?? widgetDefinitionById(item.id);
           if (!widget) return null;
           const Widget = widget.component;
           const sizeIndex = widget.supportedSizes.indexOf(item.size);
-          const refreshClass = resolveDashboardRefreshClass(widget.group, refreshSettings);
+          const refreshClass = resolveDashboardRefreshClass(widget.group.startsWith("Unraid") ? "Unraid" : widget.group, refreshSettings);
           return <article className={`home-widget home-widget--${item.size}${editing ? " home-widget--editing" : ""}`} data-widget-id={item.id} data-refresh-class={refreshClass} key={item.id}>
             <header><div><span>{widget.group}</span><h3>{widget.title}</h3></div>{editing
               ? <div className="home-widget-direct-controls">
