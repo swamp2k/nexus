@@ -8,7 +8,7 @@ type SourceRow = {
   updatedAt: string;
 };
 
-type CalendarEvent = {
+export type CalendarEvent = {
   id: string;
   uid: string;
   sourceId: string;
@@ -314,15 +314,12 @@ async function updatePreferences(request: Request, env: Env): Promise<Response> 
   return json({ preferences: { wasteWarningDays: parsed, updatedAt: now } });
 }
 
-async function events(request: Request, env: Env): Promise<Response> {
-  const user = await requireUser(request, env);
-  if (!user) return json({ error: "unauthorized" }, { status: 401 });
-  const url = new URL(request.url);
-  const days = Math.max(1, Math.min(90, Number(url.searchParams.get("days")) || 30));
+export async function calendarEventsForUser(env: Env, userId: string, days = 30): Promise<{ events: CalendarEvent[]; failures: Array<{ sourceId: string; sourceName: string; error: string }>; range: { from: string; to: string } }> {
+  const safeDays = Math.max(1, Math.min(90, Number(days) || 30));
   const from = new Date();
   from.setHours(0, 0, 0, 0);
-  const to = new Date(from.getTime() + days * DAY);
-  const rows = await env.DB.prepare(`SELECT id,name,url,enabled,updated_at AS updatedAt FROM calendar_sources WHERE user_id=? AND enabled=1 ORDER BY name`).bind(user.id).all<SourceRow>();
+  const to = new Date(from.getTime() + safeDays * DAY);
+  const rows = await env.DB.prepare(`SELECT id,name,url,enabled,updated_at AS updatedAt FROM calendar_sources WHERE user_id=? AND enabled=1 ORDER BY name`).bind(userId).all<SourceRow>();
   const failures: Array<{ sourceId: string; sourceName: string; error: string }> = [];
   const chunks = await Promise.all(rows.results.map(async (source): Promise<CalendarEvent[]> => {
     try {
@@ -354,7 +351,14 @@ async function events(request: Request, env: Env): Promise<Response> {
     }
   }));
   const all = chunks.flat().sort((a, b) => Date.parse(a.start) - Date.parse(b.start)).slice(0, 500);
-  return json({ events: all, failures, range: { from: from.toISOString(), to: to.toISOString() } });
+  return { events: all, failures, range: { from: from.toISOString(), to: to.toISOString() } };
+}
+
+async function events(request: Request, env: Env): Promise<Response> {
+  const user = await requireUser(request, env);
+  if (!user) return json({ error: "unauthorized" }, { status: 401 });
+  const days = Math.max(1, Math.min(90, Number(new URL(request.url).searchParams.get("days")) || 30));
+  return json(await calendarEventsForUser(env, user.id, days));
 }
 
 export async function handleCalendarRoute(request: Request, env: Env): Promise<Response | null> {
