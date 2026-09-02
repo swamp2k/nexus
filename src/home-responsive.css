@@ -378,6 +378,10 @@
     align-items: center;
   }
 
+  .home-mini-chart-block {
+    align-self: flex-start;
+  }
+
   .home-mini-chart {
     max-height: 185px;
   }
