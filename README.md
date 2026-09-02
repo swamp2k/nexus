@@ -106,7 +106,7 @@ Electricity-price module using Danish day-ahead prices plus configurable grid/pr
 - Mitsubishi/MELCloud
 - additional cross-module insights and notifications
 
-Existing services remain authoritative for their own domains.
+These are reusable domain components, not systems Nexus keeps at arm's length. Each stays the source of truth for its own domain, and Nexus reuses it rather than reimplementing it.
 
 ## Kitchen display
 
@@ -135,7 +135,7 @@ Use R2 for larger source artifacts that are useful to retain or reprocess.
 
 Examples include Garmin import archives and other source blobs.
 
-Do not couple Nexus directly to internal databases belonging to external projects when a small API/integration contract will do.
+When reading from an external project, pick the boundary that keeps one source of truth with the least duplicated code and operational complexity — an HTTP contract, a Service Binding, a shared read model, or a directly shared Cloudflare resource. Prefer a stable contract over reaching into a schema that may churn, but do not add a service hop purely for the sake of independence.
 
 ## Development
 

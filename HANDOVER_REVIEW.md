@@ -9,8 +9,8 @@
 
 The handover document is architecturally correct. It aligns with Nexus's own AGENTS.md rules:
 
-> **3.** Existing services stay independent by default. DBA Gold, **Unraid Watch**, PC Watch, Home Assistant, etc. remain authoritative for their own domains.  
-> **4.** Use explicit integration contracts. Prefer small APIs/events over direct coupling to another project's internal database.
+> **3.** Reuse mature domain logic; keep one source of truth. … **Unraid Watch**, DBA Gold, PC Watch, Home Assistant and similar are reusable domain components … Do not reimplement domain logic that already exists and works elsewhere — reuse that implementation and let it stay the SSOT for its domain.  
+> **4.** Integration boundaries are pragmatic, not dogmatic. An HTTP API is right when it buys a useful stable boundary — **Unraid Watch owning all Unraid API access is the standing example.**
 
 The plan—UnraidWatch as SSOT, hashed integration token, Nexus worker as thin proxy, read-only phase 1—is sound. However, the document leaves 4 **execution blockers** and 5 **open decisions** unresolved.
 

@@ -4,7 +4,7 @@
 
 Nexus is an aggregation and presentation platform for personal and family data. It provides one PWA, one identity layer, one dashboard, and a set of independent modules/integrations.
 
-Nexus should not absorb every existing project into one codebase. Existing systems remain authoritative for their own domain unless there is a specific reason to migrate responsibility.
+Nexus should not absorb every existing project into one codebase. Existing systems are reusable domain components that stay the source of truth for their own domain — Nexus depends on them deliberately rather than reimplementing what they already do well.
 
 ## High-level model
 
@@ -114,7 +114,7 @@ See `docs/ROADMAP.md` for the implementation sequence.
 
 ## External integrations
 
-Existing projects stay independent by default.
+Existing projects remain the source of truth for their own domain, and Nexus is expected to depend on them.
 
 Nexus should consume the narrowest useful contract, for example:
 
@@ -126,7 +126,7 @@ GET /api/events?since=<timestamp>
 
 or receive pushed events where that is a better fit.
 
-Do not couple Nexus directly to internal database schemas of external projects unless there is a compelling reason and the coupling is explicitly documented.
+Other mechanisms — Service Bindings, shared read models, a directly shared Cloudflare resource — are equally acceptable when they reduce maintenance and coupling in practice. Prefer a stable contract over an internal schema that may churn, and document the coupling either way; but choose by what actually minimises duplication and operational complexity, not by service independence as a principle.
 
 ## Data strategy
 
@@ -246,7 +246,7 @@ Avoid adding infrastructure until a concrete requirement demands it.
 
 ## Architectural rules
 
-1. Existing projects remain independent unless intentionally migrated.
+1. Existing projects stay the source of truth for their domain; reuse them instead of duplicating their logic.
 2. Core stays domain-agnostic.
 3. Modules communicate through explicit contracts.
 4. Raw imports are retained when valuable for later reprocessing.
