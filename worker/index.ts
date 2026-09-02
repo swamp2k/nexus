@@ -5,7 +5,7 @@ import { handleGarminAgentRoute } from "./garmin/agent-routes";
 import { handleGarminCredentialRoute } from "./garmin/credential-routes";
 import { handleGarminProcessRoute } from "./garmin/process-routes";
 import { handleGarminRoute } from "./garmin/routes";
-import { queueScheduledGarminSyncs, shouldRunScheduledGarminSync } from "./garmin/scheduled-sync";
+import { handleGarminScheduleRoute, queueScheduledGarminSyncs } from "./garmin/scheduled-sync";
 import { handleMelCloudRoute } from "./melcloud/routes";
 import { handleHomeLayoutRoute } from "./settings/home-layout";
 import { handleNavigationRoute } from "./settings/navigation";
@@ -37,6 +37,7 @@ export default {
       if (url.pathname.startsWith("/api/calendar/")) { const response = await handleCalendarRoute(request, env); if (response) return response; }
       if (url.pathname.startsWith("/api/garmin/")) {
         const credentialResponse = await handleGarminCredentialRoute(request, env); if (credentialResponse) return credentialResponse;
+        const scheduleResponse = await handleGarminScheduleRoute(request, env); if (scheduleResponse) return scheduleResponse;
         const agentResponse = await handleGarminAgentRoute(request, env); if (agentResponse) return agentResponse;
         const processResponse = await handleGarminProcessRoute(request, env); if (processResponse) return processResponse;
         const garminResponse = await handleGarminRoute(request, env); if (garminResponse) return garminResponse;
@@ -61,7 +62,6 @@ export default {
   },
   async scheduled(_event, env, ctx) {
     const now = new Date();
-    if (!shouldRunScheduledGarminSync(now)) return;
     ctx.waitUntil((async () => {
       try {
         const result = await queueScheduledGarminSyncs(env);
