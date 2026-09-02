@@ -24,6 +24,7 @@ export const DEFAULT_WIDGET_REFRESH_CLASSES: Record<string, RefreshClass> = {
   Vejr: "standard",
   Kalender: "slow",
   MELCloud: "live",
+  Unraid: "live",
   Velbefindende: "event",
 };
 
