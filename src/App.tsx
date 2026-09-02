@@ -9,7 +9,7 @@ import ElectricityPage from "./ElectricityPage";
 import CalendarPage from "./CalendarPage";
 import MelCloudPage from "./MelCloudPage";
 import SettingsPage from "./SettingsPage";
-import KitchenDisplay from "./KitchenDisplay";
+import DisplayGate from "./DisplayGate";
 
 type User = {
   id: string;
@@ -103,6 +103,8 @@ function App() {
     event.currentTarget.closest("details")?.removeAttribute("open");
   }
 
+  if (isKitchenDisplay) return <DisplayGate />;
+
   if (!session) return <div className="screen-state">Indlæser Nexus…</div>;
 
   if (!session.authenticated) {
@@ -125,8 +127,6 @@ function App() {
       </div>
     );
   }
-
-  if (isKitchenDisplay) return <KitchenDisplay />;
 
   const isHome = page === "Hjem";
   const heading = isHome ? "Hjem" : page;
