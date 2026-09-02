@@ -167,7 +167,9 @@ const VM_PREFIX = "unraid.vm.";
 function dynamicDefinition(kind: "container" | "vm", id: string, name: string): WidgetDefinition {
   const prefix = kind === "container" ? CONTAINER_PREFIX : VM_PREFIX;
   return {
-    id: `${prefix}${encodeURIComponent(id)}`,
+    // Store the friendly name alongside the stable entity id so a saved layout
+    // can render a useful title before Unraid discovery has completed.
+    id: `${prefix}${encodeURIComponent(id)}:${encodeURIComponent(name)}`,
     title: name,
     description: kind === "container" ? "Status for denne Docker-container" : "Status for denne virtuelle maskine",
     group: kind === "container" ? "Unraid · Containere" : "Unraid · VM'er",
@@ -186,13 +188,18 @@ export function dynamicUnraidWidgetDefinitions(data: UnraidOverview | null): Wid
   ];
 }
 
-export function resolveDynamicUnraidWidget(id: string): WidgetDefinition | undefined {
-  const kind = id.startsWith(CONTAINER_PREFIX) ? "container" : id.startsWith(VM_PREFIX) ? "vm" : null;
+export function resolveDynamicUnraidWidget(widgetId: string): WidgetDefinition | undefined {
+  const kind = widgetId.startsWith(CONTAINER_PREFIX) ? "container" : widgetId.startsWith(VM_PREFIX) ? "vm" : null;
   if (!kind) return undefined;
   const prefix = kind === "container" ? CONTAINER_PREFIX : VM_PREFIX;
-  const encoded = id.slice(prefix.length);
-  if (!encoded) return undefined;
-  let entityId: string;
-  try { entityId = decodeURIComponent(encoded); } catch { return undefined; }
-  return dynamicDefinition(kind, entityId, kind === "container" ? "Container" : "VM");
+  const payload = widgetId.slice(prefix.length);
+  const separator = payload.indexOf(":");
+  if (separator <= 0) return undefined;
+  try {
+    const entityId = decodeURIComponent(payload.slice(0, separator));
+    const name = decodeURIComponent(payload.slice(separator + 1)) || (kind === "container" ? "Container" : "VM");
+    return dynamicDefinition(kind, entityId, name);
+  } catch {
+    return undefined;
+  }
 }
