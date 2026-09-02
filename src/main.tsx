@@ -25,6 +25,7 @@ import "./audit-polish.css";
 import "./settings.css";
 import "./kitchen-display.css";
 import "./display-pairing.css";
+import "./displays.css";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
