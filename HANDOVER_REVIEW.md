@@ -1,7 +1,27 @@
 # Nexus ↔ UnraidWatch Integration Handover — Review
 
 **Date:** 2026-09-02  
-**Status:** Architecture sound, **not good to go as written** — 4 blockers + 5 open decisions must be resolved first.
+**Status:** Superseded in part — see the update below. Original review retained for the reasoning.
+
+---
+
+## Update — architecture revised to contract + transport
+
+The integration was rebuilt around a **platform-neutral integration contract** with a **Cloudflare Service Binding** as its current transport, replacing the planned HTTPS + bearer-token design. That changes some findings and removes others. The reasoning below is kept because it still applies if an HTTP transport is added later.
+
+| # | Finding | Now |
+|---|---|---|
+| 1 | Cloudflare token has no D1 permission | **Still blocking.** Re-confirmed: `wrangler d1 migrations list nexus --remote` → `code: 7403 — not authorized to access this service`. Two migrations are written but unapplied. |
+| 2 | "UnraidWatch URL" ambiguous (Worker vs Pages) | **Obsolete for the active transport.** A Service Binding needs no URL. Still relevant if HTTP is added — the API origin is `unraidwatch-api`, not `unraidwatch.pages.dev`. |
+| 3 | Migration 0025 leaves the Unraid API key in Nexus D1 | **Resolved.** `0026_unraidwatch_integration.sql` drops `unraid_servers`. |
+| 4 | `UNRAID_CREDENTIALS_KEY` does not exist | **Resolved.** The key chain is `UNRAIDWATCH_CREDENTIALS_KEY` → `UNRAID_CREDENTIALS_KEY` → `GARMIN_CREDENTIALS_KEY`, matching the Garmin and MelCloud modules. No new secret needed. |
+| 5 | DTO casing and nullability | **Resolved as recommended.** Contract emits camelCase; the Nexus UI is unchanged. UnraidWatch's `0` no-sensor sentinel is normalized to `null` at the contract boundary. |
+| 6 | Polling and caching load | **Addressed.** Nexus polls every 30 s instead of 10 s, and the integration service holds a 10 s per-isolate overview cache. No new infrastructure. |
+| 7 | CORS boundary | **Obsolete for the active transport** — a Service Binding never touches CORS. Still relevant for a future HTTP transport. |
+| 8 | Who may configure it in Nexus | **Resolved as recommended.** Per-user config row; `viewer` cannot write. |
+| 9 | Criterion 13 needs a merge | **Still true,** and now with a required order: UnraidWatch must deploy before Nexus, because Nexus's binding targets `unraidwatch-api#NexusIntegration`. |
+
+Unchanged and still in force: UnraidWatch is the SSOT; Nexus carries no Unraid GraphQL client and no Unraid API key; no generic GraphQL passthrough; phase 1 is read-only; server-side only; Nexus and UnraidWatch user IDs are never assumed to match.
 
 ---
 

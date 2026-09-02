@@ -8,9 +8,11 @@ type UnraidContainer = { id: string; name: string; status: string };
 type UnraidVM = { id: string; name: string; status: string };
 type UnraidShare = { name: string; usedGb: number; totalGb: number; pct: number };
 type UnraidUPS = { model: string; status: string; batteryPct: number; runtimeMin: number; loadPct: number };
+// Mirrors the UnraidWatch integration contract v1. Nexus renders these as-is;
+// all Unraid-specific normalization happens in UnraidWatch.
 type Overview = {
-  provider: string; fetchedAt: string; server: { label: string }; stats: UnraidStats; array: UnraidArray;
-  containers: UnraidContainer[]; vms: UnraidVM[]; shares: UnraidShare[]; ups: UnraidUPS | null;
+  contractVersion: number; fetchedAt: string; server: { label: string; online: boolean }; stats: UnraidStats;
+  array: UnraidArray; containers: UnraidContainer[]; vms: UnraidVM[]; shares: UnraidShare[]; ups: UnraidUPS | null;
 };
 
 type Tab = "Overblik" | "Docker" | "VM'er" | "Shares" | "UPS" | "Forbindelse";
@@ -31,12 +33,16 @@ export default function UnraidPage() {
   const [state, setState] = useState<"loading" | "ready" | "unconfigured" | "error">("loading");
   const [tab, setTab] = useState<Tab>("Overblik");
   const [lastError, setLastError] = useState<string | null>(null);
+  const [setupReason, setSetupReason] = useState<string | null>(null);
 
   async function refresh(showLoading = false) {
     if (showLoading) setState("loading");
     try {
       const response = await fetch("/api/unraid/overview", { credentials: "same-origin", cache: "no-store" });
-      if (response.status === 409) { setState("unconfigured"); return; }
+      if (response.status === 409) {
+        const reason = await response.json().catch(() => ({})) as { error?: string };
+        setSetupReason(reason.error ?? null); setState("unconfigured"); return;
+      }
       const body = await response.json().catch(() => ({})) as Overview & { error?: string };
       if (!response.ok) throw new Error(body.error ?? `HTTP ${response.status}`);
       setData(body); setState("ready"); setLastError(null);
@@ -48,7 +54,7 @@ export default function UnraidPage() {
 
   useEffect(() => {
     void refresh(true);
-    const timer = window.setInterval(() => { if (document.visibilityState === "visible" && tab !== "Forbindelse") void refresh(false); }, 10_000);
+    const timer = window.setInterval(() => { if (document.visibilityState === "visible" && tab !== "Forbindelse") void refresh(false); }, 30_000);
     const visible = () => { if (document.visibilityState === "visible" && tab !== "Forbindelse") void refresh(false); };
     document.addEventListener("visibilitychange", visible);
     return () => { window.clearInterval(timer); document.removeEventListener("visibilitychange", visible); };
@@ -58,12 +64,12 @@ export default function UnraidPage() {
   const runningVMs = useMemo(() => data?.vms.filter((item) => statusTone(item.status) === "ok").length ?? 0, [data]);
 
   if (state === "loading") return <section className="unraid-page"><div className="screen-state">Henter Unraid…</div></section>;
-  if (state === "unconfigured") return <section className="unraid-page"><div className="unraid-toolbar"><div><p className="section-label">Unraid Watch</p><h2>Forbind din Unraid-server</h2><p>Konfigurationen ligger nu direkte her i Nexus.</p></div></div><section className="settings-card"><UnraidSettings /></section><p className="settings-help">Når forbindelsen er gemt, genindlæs Unraid-fanen. Nexus tester forbindelsen før API-nøglen gemmes.</p></section>;
-  if (state === "error" || !data) return <section className="unraid-page"><div className="placeholder-card"><p className="section-label">Unraid Watch</p><h2>Serveren kunne ikke hentes</h2><p>{lastError ?? "Ukendt fejl"}</p><div className="settings-location-actions"><button className="primary-action" type="button" onClick={() => void refresh(true)}>Prøv igen</button><button className="secondary-action" type="button" onClick={() => setTab("Forbindelse")}>Forbindelse</button></div></div>{tab === "Forbindelse" && <section className="settings-card"><UnraidSettings /></section>}</section>;
+  if (state === "unconfigured") return <section className="unraid-page"><div className="unraid-toolbar"><div><p className="section-label">Unraid Watch</p><h2>Forbind til UnraidWatch</h2><p>{setupReason === "unraidwatch_server_not_configured" ? "UnraidWatch-kontoen har endnu ingen Unraid-server gemt. Tilføj den i UnraidWatch først." : "Nexus henter Unraid-data fra UnraidWatch. Indsæt et integrations-token for at komme i gang."}</p></div></div><section className="settings-card"><UnraidSettings /></section><p className="settings-help">Når forbindelsen er gemt, genindlæs Unraid-fanen. Nexus tester tokenet mod UnraidWatch før det gemmes.</p></section>;
+  if (state === "error" || !data) return <section className="unraid-page"><div className="placeholder-card"><p className="section-label">Unraid Watch</p><h2>Data kunne ikke hentes fra UnraidWatch</h2><p>{lastError ?? "Ukendt fejl"}</p><div className="settings-location-actions"><button className="primary-action" type="button" onClick={() => void refresh(true)}>Prøv igen</button><button className="secondary-action" type="button" onClick={() => setTab("Forbindelse")}>Forbindelse</button></div></div>{tab === "Forbindelse" && <section className="settings-card"><UnraidSettings /></section>}</section>;
 
   return <section className="unraid-page">
     <div className="unraid-toolbar">
-      <div><p className="section-label">Unraid Watch</p><h2>{data.server.label}</h2><p>Live status via Unraid GraphQL · opdateres hvert 10. sekund mens fanen er synlig.</p></div>
+      <div><p className="section-label">Unraid Watch</p><h2>{data.server.label}</h2><p>Live status via UnraidWatch · opdateres hvert 30. sekund mens fanen er synlig.{data.server.online ? "" : " · UnraidWatch melder serveren offline."}</p></div>
       <div className="unraid-toolbar-actions"><span className="freshness">{new Date(data.fetchedAt).toLocaleTimeString("da-DK", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}</span><button className="secondary-action" type="button" onClick={() => void refresh(false)}>Opdater</button></div>
     </div>
 

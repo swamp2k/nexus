@@ -28,6 +28,13 @@
       "migrations_dir": "migrations"
     }
   ],
+  "services": [
+    {
+      "binding": "UNRAIDWATCH",
+      "service": "unraidwatch-api",
+      "entrypoint": "NexusIntegration"
+    }
+  ],
   "r2_buckets": [
     {
       "binding": "DATA",

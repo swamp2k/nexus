@@ -17,13 +17,13 @@ The product should feel simple enough for non-technical family members even when
 1. **KISS.** Prefer the smallest clear solution that solves the actual problem.
 2. **Modular monolith over microservices.** Code boundaries matter; separate deployments usually do not.
 3. **Reuse mature domain logic; keep one source of truth.** Nexus is deliberately an aggregation layer over our specialist projects. Unraid Watch, DBA Gold, PC Watch, Home Assistant and similar are **reusable domain components**, not isolated systems Nexus should avoid depending on. Do not reimplement domain logic that already exists and works elsewhere — reuse that implementation and let it stay the SSOT for its domain.
-4. **Integration boundaries are pragmatic, not dogmatic.** An HTTP API is right when it buys a useful stable boundary — Unraid Watch owning all Unraid API access is the standing example. Service Bindings, shared read models, direct Cloudflare resources and other simpler mechanisms are equally acceptable where they reduce maintenance and coupling in practice. Choose per case, optimizing in this order:
+4. **Separate the integration contract from its transport.** A specialist service exposes a stable, platform-neutral **contract**; Nexus depends on that contract, never on the mechanism carrying it. Platform-specific mechanisms — a Cloudflare Service Binding today, HTTP or something else later — are transport optimizations chosen per case, and must not define the domain contract. The test to apply: *if this transport disappeared tomorrow, could a small adapter in front of the same service keep the DTOs and the Nexus UI unchanged?* The answer must be yes. Within that constraint be pragmatic rather than dogmatic, and optimize in this order:
    1. one source of truth
    2. least duplicated code
    3. least operational complexity
    4. easiest maintenance
 
-   Do not optimize for theoretical service independence.
+   Do not optimize for theoretical service independence, and do not build a second transport before it is needed. See `docs/ARCHITECTURE.md` for the contract conventions and the Unraid Watch reference implementation.
 5. **Multi-user from day one.** User-owned data must always be scoped by `user_id` unless explicitly shared.
 6. **Raw and normalized data serve different jobs.** Normalize data Nexus needs to query/chart/correlate; retain useful source artifacts separately.
 7. **Do not add infrastructure speculatively.** No Kafka, Kubernetes, extra queues, services, or databases without a concrete requirement.

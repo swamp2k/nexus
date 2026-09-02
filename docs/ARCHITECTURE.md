@@ -128,6 +128,75 @@ or receive pushed events where that is a better fit.
 
 Other mechanisms — Service Bindings, shared read models, a directly shared Cloudflare resource — are equally acceptable when they reduce maintenance and coupling in practice. Prefer a stable contract over an internal schema that may churn, and document the coupling either way; but choose by what actually minimises duplication and operational complexity, not by service independence as a principle.
 
+### Contract and transport are separate layers
+
+Every specialist service Nexus consumes is described in two layers, and they must not be conflated.
+
+```text
+        specialist service domain logic
+                     |
+             integration contract          <- what Nexus depends on
+          versioned DTOs + method set
+                     |
+            -------------------
+            |                 |
+     Service Binding      HTTP adapter
+      (today)              (possible later)
+```
+
+Nexus depends on the **contract**. The **transport** is an implementation detail chosen per integration for whatever is simplest — and it may differ between integrations:
+
+```text
+Nexus
+  +-- Service Binding  -> Unraid Watch
+  +-- HTTP             -> some external service
+  +-- shared read model-> another internal project
+```
+
+The design test is: *if the current transport disappeared tomorrow, could a small adapter in front of the same integration service keep the DTOs and the Nexus UI essentially unchanged?* If not, transport has leaked into the contract.
+
+This is explicitly **not** a mandate to build two transports. Build one. Keep the contract independent of it.
+
+### Contract conventions
+
+Domains differ, so do not force every service onto identical endpoints. Do keep these properties common:
+
+- versioned contract, with the version carried in responses
+- explicit DTOs — never internal database rows
+- camelCase field names
+- JSON-serializable values only
+- explicit `null` for "not available"; no magic sentinels
+- read-only by default; write operations added deliberately and narrowly
+- no platform-specific objects in DTOs (no `Request`/`Response`, no D1, no `Env`)
+- a stable error model: a small set of machine-readable codes that survive any transport
+- auth and transport concerns kept out of the DTOs
+
+Implementation shape, on the providing side:
+
+```text
+integration service (plain functions)   <- all behaviour lives here
+              |
+      transport adapter                 <- WorkerEntrypoint, HTTP controller, …
+```
+
+The adapter must be delegation only. Integration logic implemented directly inside a `WorkerEntrypoint` method is the anti-pattern this convention exists to prevent.
+
+### Reference implementation: Unraid Watch
+
+The Unraid Watch integration is the first implementation of this convention and the pattern to copy.
+
+| Layer | Where |
+|---|---|
+| Contract (authoritative) | `worker/src/integration/contract.ts` in `unraidwatch` |
+| Integration service | `worker/src/integration/nexusIntegration.ts` in `unraidwatch` |
+| Transport adapter | `NexusIntegration extends WorkerEntrypoint` in `unraidwatch` `worker/src/index.ts` |
+| Contract (consumer copy) | `worker/unraid/contract.ts` in Nexus |
+| Transport | `worker/unraid/transport.ts` in Nexus — the only Nexus file that knows about Service Bindings |
+
+Authorization is a per-consumer integration token minted in Unraid Watch, hashed at rest there and encrypted at rest in Nexus. It is passed as a contract argument rather than as a transport header, so the same signature is meaningful over RPC and over HTTP.
+
+Multi-user note: the token alone decides which Unraid Watch account a consumer may read. Nexus user IDs are never matched against Unraid Watch user IDs, and the two systems are never joined on email or ID.
+
 ## Data strategy
 
 ### Normalized data
