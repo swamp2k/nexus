@@ -4,6 +4,7 @@ import { DashboardRefreshScope, resolveDashboardRefreshClass } from "./data/dash
 import type { DashboardRefreshSettingsResponse } from "./data/dashboardRefresh";
 import { discoverUnraidWidgets, widgetCatalog, widgetDefinitionById } from "./widgets/widgetCatalog";
 import type { UnraidOverview } from "./widgets/widgetCatalog";
+import { isUnraidContainerWidgetId, SelectedContainersWidget } from "./widgets/unraidWidgets";
 import type { WidgetDefinition, WidgetSize, WidgetTargetPage } from "./widgets/widgetRegistry";
 
 type HomeLayoutItem = { id: string; size: WidgetSize };
@@ -25,7 +26,11 @@ function normalizeLayout(layout: HomeLayoutItem[]): HomeLayoutItem[] {
 }
 
 function isCompactEntityWidget(id: string): boolean {
-  return id.startsWith("unraid.container.") || id.startsWith("unraid.vm.");
+  return id.startsWith("unraid.vm.");
+}
+
+function containerGroupSize(items: HomeLayoutItem[]): WidgetSize {
+  return items.some((item) => item.size === "wide") ? "wide" : "medium";
 }
 
 export default function HomePage({ onOpenPage }: { onOpenPage: (page: WidgetTargetPage) => void }) {
@@ -125,6 +130,17 @@ export default function HomePage({ onOpenPage }: { onOpenPage: (page: WidgetTarg
     }));
   }
 
+  function stepContainerGroupSize(direction: -1 | 1) {
+    setDraft((current) => {
+      const selected = current.filter((item) => isUnraidContainerWidgetId(item.id));
+      if (selected.length === 0) return current;
+      const size = containerGroupSize(selected);
+      const nextSize: WidgetSize = direction < 0 ? "medium" : "wide";
+      if (size === nextSize) return current;
+      return current.map((item) => isUnraidContainerWidgetId(item.id) ? { ...item, size: nextSize } : item);
+    });
+  }
+
   function move(id: string, direction: -1 | 1) {
     setDraft((current) => {
       const index = current.findIndex((item) => item.id === id);
@@ -134,6 +150,25 @@ export default function HomePage({ onOpenPage }: { onOpenPage: (page: WidgetTarg
       [copy[index], copy[nextIndex]] = [copy[nextIndex], copy[index]];
       return copy;
     });
+  }
+
+  function moveContainerGroup(direction: -1 | 1) {
+    setDraft((current) => {
+      const containers = current.filter((item) => isUnraidContainerWidgetId(item.id));
+      const firstContainerIndex = current.findIndex((item) => isUnraidContainerWidgetId(item.id));
+      if (containers.length === 0 || firstContainerIndex < 0) return current;
+      const others = current.filter((item) => !isUnraidContainerWidgetId(item.id));
+      const visualIndex = current.slice(0, firstContainerIndex).filter((item) => !isUnraidContainerWidgetId(item.id)).length;
+      const target = Math.max(0, Math.min(others.length, visualIndex + direction));
+      if (target === visualIndex) return current;
+      const next = [...others];
+      next.splice(target, 0, ...containers);
+      return next;
+    });
+  }
+
+  function removeContainerGroup() {
+    setDraft((current) => current.filter((item) => !isUnraidContainerWidgetId(item.id)));
   }
 
   async function save() {
@@ -160,6 +195,12 @@ export default function HomePage({ onOpenPage }: { onOpenPage: (page: WidgetTarg
   }
 
   const renderedLayout = editing ? draft : layout;
+  const selectedContainers = renderedLayout.filter((item) => isUnraidContainerWidgetId(item.id));
+  const firstContainerIndex = renderedLayout.findIndex((item) => isUnraidContainerWidgetId(item.id));
+  const selectedContainerIds = selectedContainers.map((item) => item.id);
+  const selectedContainerSize = containerGroupSize(selectedContainers);
+  const containerVisualIndex = firstContainerIndex < 0 ? -1 : renderedLayout.slice(0, firstContainerIndex).filter((item) => !isUnraidContainerWidgetId(item.id)).length;
+  const visualItemCount = renderedLayout.filter((item) => !isUnraidContainerWidgetId(item.id)).length + (selectedContainers.length > 0 ? 1 : 0);
 
   return (
     <section className={`home-page${editing ? " home-page--editing" : ""}`} aria-label="Hjem">
@@ -181,9 +222,10 @@ export default function HomePage({ onOpenPage }: { onOpenPage: (page: WidgetTarg
             const selected = selectedIds.has(widget.id);
             const item = draft.find((candidate) => candidate.id === widget.id);
             const index = draft.findIndex((candidate) => candidate.id === widget.id);
+            const groupedContainer = isUnraidContainerWidgetId(widget.id);
             return <div className="home-editor-row" key={widget.id}>
               <label><input type="checkbox" checked={selected} onChange={() => toggleWidget(widget.id)} /><span><strong>{widget.title}</strong><small>{widget.description}</small></span></label>
-              {selected && item && <div className="home-editor-controls">
+              {selected && item && !groupedContainer && <div className="home-editor-controls">
                 {widget.supportedSizes.length > 1 && <select aria-label={`Størrelse for ${widget.title}`} value={item.size} onChange={(event) => changeSize(widget.id, event.target.value as WidgetSize)}>{widget.supportedSizes.map((size) => <option value={size} key={size}>{size === "small" ? "Lille" : size === "medium" ? "Mellem" : "Bred"}</option>)}</select>}
                 <button type="button" aria-label={`Flyt ${widget.title} op`} disabled={index <= 0} onClick={() => move(widget.id, -1)}>↑</button>
                 <button type="button" aria-label={`Flyt ${widget.title} ned`} disabled={index < 0 || index >= draft.length - 1} onClick={() => move(widget.id, 1)}>↓</button>
@@ -196,6 +238,24 @@ export default function HomePage({ onOpenPage }: { onOpenPage: (page: WidgetTarg
       {renderedLayout.length === 0
         ? <div className="home-empty"><strong>Hjem er tomt.</strong><span>Tryk Rediger Hjem og vælg de data du vil have her.</span></div>
         : <div className="home-widget-grid">{renderedLayout.map((item, index) => {
+          if (isUnraidContainerWidgetId(item.id)) {
+            if (index !== firstContainerIndex) return null;
+            const containerSizeIndex = selectedContainerSize === "wide" ? 1 : 0;
+            const refreshClass = resolveDashboardRefreshClass("Unraid", refreshSettings);
+            return <article className={`home-widget home-widget--${selectedContainerSize}${editing ? " home-widget--editing" : ""}`} data-widget-id="unraid.containers.selected" data-refresh-class={refreshClass} key="unraid.containers.selected">
+              <header><div><span>Unraid · Containere</span><h3>Containere · {selectedContainers.length}</h3></div>{editing
+                ? <div className="home-widget-direct-controls">
+                    <button type="button" title="Mindre" aria-label="Gør container-widget mindre" disabled={containerSizeIndex <= 0} onClick={() => stepContainerGroupSize(-1)}>−</button>
+                    <button type="button" title="Større" aria-label="Gør container-widget større" disabled={containerSizeIndex >= 1} onClick={() => stepContainerGroupSize(1)}>+</button>
+                    <button type="button" className="home-widget-order-button" title="Flyt tidligere" aria-label="Flyt container-widget tidligere" disabled={containerVisualIndex <= 0} onClick={() => moveContainerGroup(-1)}>←</button>
+                    <button type="button" className="home-widget-order-button" title="Flyt senere" aria-label="Flyt container-widget senere" disabled={containerVisualIndex < 0 || containerVisualIndex >= visualItemCount - 1} onClick={() => moveContainerGroup(1)}>→</button>
+                    <button type="button" className="home-widget-remove" title="Fjern" aria-label="Fjern alle valgte containere" onClick={removeContainerGroup}>×</button>
+                  </div>
+                : <button type="button" onClick={() => onOpenPage("Unraid")}>Unraid ›</button>}</header>
+              <div className="home-widget-content"><DashboardRefreshScope refreshClass={refreshClass}><SelectedContainersWidget widgetIds={selectedContainerIds} /></DashboardRefreshScope></div>
+            </article>;
+          }
+
           const widget = availableById.get(item.id) ?? widgetDefinitionById(item.id);
           if (!widget) return null;
           const Widget = widget.component;
