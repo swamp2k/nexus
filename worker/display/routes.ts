@@ -138,13 +138,17 @@ export async function handleDisplayRoute(request: Request, env: DisplayEnv): Pro
     const requestedName = typeof body.name === "string" ? body.name.trim().slice(0, 80) : "";
     const deviceName = requestedName || pairing.deviceName || "Køkken-display";
 
-    await env.DB.batch([
-      env.DB.prepare("UPDATE display_pairing_codes SET used_at = ? WHERE id = ? AND used_at IS NULL").bind(now, pairing.id),
-      env.DB.prepare(
-        `INSERT INTO display_devices (id, user_id, name, token_hash, created_at, last_seen_at)
-         VALUES (?, ?, ?, ?, ?, ?)`,
-      ).bind(deviceId, pairing.userId, deviceName, tokenHash, now, now),
-    ]);
+    try {
+      await env.DB.batch([
+        env.DB.prepare("UPDATE display_pairing_codes SET used_at = ? WHERE id = ? AND used_at IS NULL").bind(now, pairing.id),
+        env.DB.prepare(
+          `INSERT INTO display_devices (id, user_id, pairing_code_id, name, token_hash, created_at, last_seen_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`,
+        ).bind(deviceId, pairing.userId, pairing.id, deviceName, tokenHash, now, now),
+      ]);
+    } catch {
+      return json({ error: "pairing_code_already_used" }, { status: 409 });
+    }
 
     return json({ paired: true, device: { id: deviceId, name: deviceName } }, {
       headers: { "Set-Cookie": displayCookie(token) },
@@ -206,6 +210,9 @@ export async function handleDisplayDataAlias(request: Request, env: DisplayEnv):
   const pathname = new URL(request.url).pathname;
   const allowed = pathname === "/api/settings" || pathname.startsWith("/api/sources/");
   if (!allowed) return null;
+
+  const regularUser = await getAuthenticatedUser(request, env.DB);
+  if (regularUser) return null;
 
   const device = await authenticateDisplay(request, env);
   if (!device) return null;
