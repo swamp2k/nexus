@@ -141,11 +141,17 @@ shared Unraid agent claims oldest job
           +-> fetches credentials for that job only
           +-> HOME=/state/users/<user-id>
           +-> detects source capability/availability
+          +-> fetches today's finalized sleep directly
           +-> GarminDB data=/data/users/<user-id>
           +-> garmindb_cli.py --all --download --import --analyze --latest
           +-> uploads changed Nexus-relevant JSON to Nexus
           +-> Nexus inventories and parses it into that same user's D1 records
 ```
+
+The direct current-day sleep request compensates for GarminDB `--latest`
+stopping at yesterday. Nexus only writes the file when Garmin returns a
+positive sleep duration for the requested date, so an empty or unfinished
+response cannot replace existing sleep data.
 
 The agent deliberately processes jobs sequentially. This keeps GarminDB state isolated and avoids multiple concurrent syncs competing for CPU, network, Garmin rate limits, or local files.
 
