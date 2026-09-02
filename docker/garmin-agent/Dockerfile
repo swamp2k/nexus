@@ -12,7 +12,7 @@ RUN apt-get update \
     && apt-get install -y --no-install-recommends ca-certificates tzdata tini \
     && rm -rf /var/lib/apt/lists/* \
     && pip install --no-cache-dir --upgrade pip \
-    && pip install --no-cache-dir garmindb
+    && pip install --no-cache-dir garmindb==3.9.0
 
 RUN mkdir -p /state/users /data/users /opt/nexus
 

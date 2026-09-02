@@ -460,6 +460,42 @@ def fetch_direct_daily_summaries(garmin, data_dir: Path, capabilities: dict) -> 
     return saw_heart_rate
 
 
+def fetch_current_day_sleep(garmin, data_dir: Path, capabilities: dict) -> bool:
+    """Fetch today's finalized sleep directly because GarminDB --latest stops at yesterday."""
+    today = datetime.date.today()
+    display_name = getattr(garmin, "display_name", None)
+    if not display_name:
+        print("[nexus] Current-day sleep skipped: Garmin login has no display name", file=sys.stderr, flush=True)
+        return False
+
+    try:
+        value = garmin.connectapi(
+            f"/wellness-service/wellness/dailySleepData/{display_name}",
+            params={"date": today.isoformat(), "nonSleepBufferMinutes": 60},
+        )
+    except Exception as error:
+        print(f"[nexus] Current-day sleep fetch failed for {today}: {error}", file=sys.stderr, flush=True)
+        return False
+
+    daily = value.get("dailySleepDTO") if isinstance(value, dict) else None
+    sleep_date = parse_date(daily.get("calendarDate")) if isinstance(daily, dict) else None
+    sleep_seconds = daily.get("sleepTimeSeconds") if isinstance(daily, dict) else None
+    if sleep_date != today or not isinstance(sleep_seconds, (int, float)) or sleep_seconds <= 0:
+        print(f"[nexus] Current-day sleep is not ready for {today}; keeping existing data", flush=True)
+        return False
+
+    sleep_path = data_dir / "Sleep" / f"sleep_{today.isoformat()}.json"
+    if read_json(sleep_path) == value:
+        print(f"[nexus] Current-day sleep for {today} is unchanged", flush=True)
+        apply_observed_source(capabilities, "sleep", today, stale_days=STALE_DAYS["sleep"], evidence_source="direct-current-day")
+        return False
+
+    write_json_atomic(sleep_path, value)
+    apply_observed_source(capabilities, "sleep", today, stale_days=STALE_DAYS["sleep"], evidence_source="direct-current-day")
+    print(f"[nexus] Saved current-day sleep for {today}", flush=True)
+    return True
+
+
 def source_enabled(capabilities: dict, name: str, *, default: bool = True) -> bool:
     state = source_entry(capabilities, name).get("state", "unknown")
     if name == "hrv":
@@ -674,6 +710,13 @@ def process_job(job_id: str, user_id: str, job_status: str) -> None:
                 print("[nexus] Wrist HR data returned; normal GarminDB monitoring re-enabled", flush=True)
             else:
                 print("[nexus] Wrist HR remains inactive; using direct daily summaries and skipping raw monitoring sync", flush=True)
+        if garmin is None:
+            try:
+                garmin = garmin_login(config_dir)
+            except Exception as error:
+                print(f"[nexus] Current-day sleep login failed: {error}", file=sys.stderr, flush=True)
+        if garmin is not None:
+            fetch_current_day_sleep(garmin, data_dir, capabilities)
         config_path = write_config(config_dir, data_dir, username, password, capabilities=capabilities, monitoring_enabled=not direct_monitoring)
         save_capabilities(home, capabilities)
         print(f"[nexus] Syncing isolated Garmin profile {user_id[:8]} · {capability_summary(capabilities)}", flush=True)
