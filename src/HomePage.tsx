@@ -24,6 +24,10 @@ function normalizeLayout(layout: HomeLayoutItem[]): HomeLayoutItem[] {
   });
 }
 
+function isCompactEntityWidget(id: string): boolean {
+  return id.startsWith("unraid.container.") || id.startsWith("unraid.vm.");
+}
+
 export default function HomePage({ onOpenPage }: { onOpenPage: (page: WidgetTargetPage) => void }) {
   const [layout, setLayout] = useState<HomeLayoutItem[]>(FALLBACK_LAYOUT);
   const [draft, setDraft] = useState<HomeLayoutItem[]>(FALLBACK_LAYOUT);
@@ -197,7 +201,8 @@ export default function HomePage({ onOpenPage }: { onOpenPage: (page: WidgetTarg
           const Widget = widget.component;
           const sizeIndex = widget.supportedSizes.indexOf(item.size);
           const refreshClass = resolveDashboardRefreshClass(widget.group.startsWith("Unraid") ? "Unraid" : widget.group, refreshSettings);
-          return <article className={`home-widget home-widget--${item.size}${editing ? " home-widget--editing" : ""}`} data-widget-id={item.id} data-refresh-class={refreshClass} key={item.id}>
+          const compact = isCompactEntityWidget(item.id);
+          return <article className={`home-widget home-widget--${item.size}${compact ? " home-widget--compact" : ""}${editing ? " home-widget--editing" : ""}`} data-widget-id={item.id} data-refresh-class={refreshClass} key={item.id}>
             <header><div><span>{widget.group}</span><h3>{widget.title}</h3></div>{editing
               ? <div className="home-widget-direct-controls">
                   <button type="button" title="Mindre" aria-label={`Gør ${widget.title} mindre`} disabled={sizeIndex <= 0} onClick={() => stepSize(item.id, -1)}>−</button>
