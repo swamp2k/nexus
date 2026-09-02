@@ -11,6 +11,7 @@ import { handleHomeLayoutRoute } from "./settings/home-layout";
 import { handleNavigationRoute } from "./settings/navigation";
 import { handleSettingsRoute } from "./settings/routes";
 import { handleSourceRoute } from "./sources/routes";
+import { handleUnraidRoute } from "./unraid/routes";
 import { handleJournalAiRoute } from "./wellbeing/journal-ai";
 import { handleMiyagiHistoryRoute } from "./wellbeing/miyagi-history";
 import { handleMiyagiRoute } from "./wellbeing/miyagi";
@@ -41,6 +42,7 @@ export default {
         const garminResponse = await handleGarminRoute(request, env); if (garminResponse) return garminResponse;
       }
       if (url.pathname.startsWith("/api/melcloud/")) { const response = await handleMelCloudRoute(request, env); if (response) return response; }
+      if (url.pathname.startsWith("/api/unraid/")) { const response = await handleUnraidRoute(request, env); if (response) return response; }
       if (url.pathname.startsWith("/api/wellbeing/miyagi/history")) { const response = await handleMiyagiHistoryRoute(request, env); if (response) return response; }
       if (url.pathname.startsWith("/api/wellbeing/miyagi/")) { const response = await handleMiyagiRoute(request, env); if (response) return response; }
       if (url.pathname.startsWith("/api/wellbeing/journal-ai/")) { const response = await handleJournalAiRoute(request, env); if (response) return response; }
