@@ -1,5 +1,6 @@
 import { handleAuthRoute } from "./auth/routes";
 import { handleCalendarRoute } from "./calendar/routes";
+import { handleDisplayDataAlias, handleDisplayRoute } from "./display/routes";
 import { handleGarminAgentRoute } from "./garmin/agent-routes";
 import { handleGarminCredentialRoute } from "./garmin/credential-routes";
 import { handleGarminProcessRoute } from "./garmin/process-routes";
@@ -39,6 +40,14 @@ export default {
           },
         });
       }
+
+      if (url.pathname.startsWith("/api/display/")) {
+        const displayResponse = await handleDisplayRoute(request, env);
+        if (displayResponse) return displayResponse;
+      }
+
+      const displayDataResponse = await handleDisplayDataAlias(request, env);
+      if (displayDataResponse) return displayDataResponse;
 
       if (url.pathname.startsWith("/api/auth/")) {
         const authResponse = await handleAuthRoute(request, env);
