@@ -8,21 +8,22 @@ import WeatherPage from "./WeatherPage";
 import ElectricityPage from "./ElectricityPage";
 import CalendarPage from "./CalendarPage";
 import MelCloudPage from "./MelCloudPage";
+import DisplaysPage from "./DisplaysPage";
 import SettingsPage from "./SettingsPage";
 import DisplayGate from "./DisplayGate";
 
 type User = { id: string; email: string; displayName: string | null; role: "admin" | "member" | "viewer" };
 type SessionResponse = { authenticated: boolean; user: User | null };
-type Page = "Hjem" | "Garmin" | "Motion" | "Velbefindende" | "Vejr" | "Strøm" | "Kalender" | "Varmepumpe" | "DBA" | "Unraid" | "PC Watch" | "Indstillinger";
+type Page = "Hjem" | "Garmin" | "Motion" | "Velbefindende" | "Vejr" | "Strøm" | "Kalender" | "Varmepumpe" | "Displays" | "DBA" | "Unraid" | "PC Watch" | "Indstillinger";
 type PrimaryPage = Exclude<Page, "Indstillinger">;
 
-const primaryNav: PrimaryPage[] = ["Hjem", "Garmin", "Motion", "Velbefindende", "Vejr", "Strøm", "Kalender", "Varmepumpe", "DBA", "Unraid", "PC Watch"];
+const primaryNav: PrimaryPage[] = ["Hjem", "Garmin", "Motion", "Velbefindende", "Vejr", "Strøm", "Kalender", "Varmepumpe", "Displays", "DBA", "Unraid", "PC Watch"];
 const secondaryNav = ["Overblik", "Notifikationer", "Indstillinger"] as const;
-const navIcons = ["⌂", "⌖", "↗", "♥", "☁", "ϟ", "▦", "♨", "◇", "▤", "▣"];
+const navIcons = ["⌂", "⌖", "↗", "♥", "☁", "ϟ", "▦", "♨", "▣", "◇", "▤", "▣"];
 const mobileNav: Array<{ page: Page; icon: string; label: string }> = [
   { page: "Hjem", icon: "⌂", label: "Hjem" }, { page: "Garmin", icon: "⌖", label: "Garmin" }, { page: "Motion", icon: "↗", label: "Motion" },
   { page: "Velbefindende", icon: "♥", label: "Velbefindende" }, { page: "Vejr", icon: "☁", label: "Vejr" }, { page: "Strøm", icon: "ϟ", label: "Strøm" },
-  { page: "Kalender", icon: "▦", label: "Kalender" }, { page: "Varmepumpe", icon: "♨", label: "Varmepumpe" }, { page: "Indstillinger", icon: "⚙", label: "Indstillinger" },
+  { page: "Kalender", icon: "▦", label: "Kalender" }, { page: "Varmepumpe", icon: "♨", label: "Varmepumpe" }, { page: "Displays", icon: "▣", label: "Displays" }, { page: "Indstillinger", icon: "⚙", label: "Indstillinger" },
 ];
 
 function initials(user: User | null): string {
@@ -41,7 +42,7 @@ function App() {
     if (saved === "light" || saved === "dark") return saved;
     return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
   });
-  const isKitchenDisplay = window.location.pathname === "/display/kitchen";
+  const isDisplay = window.location.pathname === "/display" || window.location.pathname === "/display/kitchen";
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -49,6 +50,7 @@ function App() {
   }, [theme]);
 
   useEffect(() => {
+    if (isDisplay) { setSession({ authenticated: false, user: null }); return; }
     void fetch("/api/auth/me", { credentials: "same-origin" })
       .then((response) => response.json() as Promise<SessionResponse>)
       .then(setSession)
@@ -78,7 +80,7 @@ function App() {
   function closeUserMenu(event: MouseEvent<HTMLButtonElement>) { event.currentTarget.closest("details")?.removeAttribute("open"); }
   function toggleTheme() { setTheme((current) => current === "light" ? "dark" : "light"); }
 
-  if (isKitchenDisplay) return <DisplayGate theme={theme} onToggleTheme={toggleTheme} />;
+  if (isDisplay) return <DisplayGate theme={theme} onThemeChange={setTheme} />;
   if (!session) return <div className="screen-state">Indlæser Nexus…</div>;
 
   if (!session.authenticated) {
@@ -100,7 +102,8 @@ function App() {
     : page === "Indstillinger" ? "Dine personlige Nexus-indstillinger."
     : page === "Strøm" ? "Spotpriser og de bedste tidspunkter at bruge strøm på."
     : page === "Kalender" ? "Dine kommende aftaler samlet fra iCal-kalendere."
-    : page === "Varmepumpe" ? "Luft/vand-varmepumpen samlet fra MELCloud." : "";
+    : page === "Varmepumpe" ? "Luft/vand-varmepumpen samlet fra MELCloud."
+    : page === "Displays" ? "Byg og par dashboards til iPads og andre faste skærme." : "";
 
   return <div className="app-frame">
     <aside className="sidebar">
@@ -118,8 +121,8 @@ function App() {
     <div className="content-shell">
       <header className="app-header"><div><h1>{heading}</h1>{subheading && <p>{subheading}</p>}</div><div className="header-actions"><button className="theme-toggle" onClick={toggleTheme} aria-label="Skift tema">{theme === "light" ? "☾" : "☀"}</button><details className="user-menu"><summary className="user-menu-summary" aria-label="Åbn brugermenu"><span className="avatar">{initials(session.user)}</span><span className="user-name">{displayName}</span></summary><div className="user-menu-popover"><button type="button" onClick={(event) => { setPage("Indstillinger"); closeUserMenu(event); }}>Indstillinger</button><button className="logout-button" type="button" onClick={logout}>Log ud</button></div></details></div></header>
       <main className="main-content">
-        {page === "Hjem" && <HomePage onOpenPage={setPage} />}{page === "Garmin" && <GarminPage />}{page === "Motion" && <MotionPage />}{page === "Velbefindende" && <WellbeingPage />}{page === "Vejr" && <WeatherPage />}{page === "Strøm" && <ElectricityPage />}{page === "Kalender" && <CalendarPage />}{page === "Varmepumpe" && <MelCloudPage />}{page === "Indstillinger" && <SettingsPage />}
-        {!isHome && page !== "Garmin" && page !== "Motion" && page !== "Velbefindende" && page !== "Vejr" && page !== "Strøm" && page !== "Kalender" && page !== "Varmepumpe" && page !== "Indstillinger" && <section className="placeholder-card"><p className="section-label">Planlagt</p><h2>{page}</h2><p>Modulet er på vej ind i Nexus.</p></section>}
+        {page === "Hjem" && <HomePage onOpenPage={setPage} />}{page === "Garmin" && <GarminPage />}{page === "Motion" && <MotionPage />}{page === "Velbefindende" && <WellbeingPage />}{page === "Vejr" && <WeatherPage />}{page === "Strøm" && <ElectricityPage />}{page === "Kalender" && <CalendarPage />}{page === "Varmepumpe" && <MelCloudPage />}{page === "Displays" && <DisplaysPage />}{page === "Indstillinger" && <SettingsPage />}
+        {!isHome && page !== "Garmin" && page !== "Motion" && page !== "Velbefindende" && page !== "Vejr" && page !== "Strøm" && page !== "Kalender" && page !== "Varmepumpe" && page !== "Displays" && page !== "Indstillinger" && <section className="placeholder-card"><p className="section-label">Planlagt</p><h2>{page}</h2><p>Modulet er på vej ind i Nexus.</p></section>}
       </main>
       <footer><span>Nexus v0.1</span><span>Simple by design.</span></footer>
     </div>
