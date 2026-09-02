@@ -21,6 +21,8 @@ export type UnraidOverview = {
 };
 
 const FLEX = ["small", "medium", "wide"] as const;
+const CONTAINER_PREFIX = "unraid.container.";
+const VM_PREFIX = "unraid.vm.";
 
 function statusOk(status: string): boolean {
   const value = status.toLowerCase();
@@ -144,6 +146,51 @@ function entityWidget(kind: "container" | "vm", id: string) {
   };
 }
 
+function parseDynamicEntity(widgetId: string, prefix: string): { id: string; name: string } | null {
+  if (!widgetId.startsWith(prefix)) return null;
+  const payload = widgetId.slice(prefix.length);
+  const separator = payload.indexOf(":");
+  if (separator <= 0) return null;
+  try {
+    return {
+      id: decodeURIComponent(payload.slice(0, separator)),
+      name: decodeURIComponent(payload.slice(separator + 1)),
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function isUnraidContainerWidgetId(widgetId: string): boolean {
+  return widgetId.startsWith(CONTAINER_PREFIX);
+}
+
+export function SelectedContainersWidget({ widgetIds }: { widgetIds: string[] }) {
+  const { data, loading, error } = useOverview();
+  if (loading) return <State>Henter containerstatus…</State>;
+  if (error || !data) return <State>Containerstatus kunne ikke hentes</State>;
+  if (data.unavailable.includes("containers")) return <State>Docker-status utilgængelig</State>;
+
+  const selected = widgetIds
+    .map((widgetId) => parseDynamicEntity(widgetId, CONTAINER_PREFIX))
+    .filter((item): item is { id: string; name: string } => item !== null);
+
+  if (selected.length === 0) return <State>Ingen containere valgt</State>;
+
+  return <div className="unraid-container-group">
+    {selected.map((selectedContainer) => {
+      const container = data.containers.find((candidate) => candidate.id === selectedContainer.id);
+      const ok = container ? statusOk(container.status) : false;
+      const status = container ? (ok ? "Kører" : container.status) : "Ikke fundet";
+      return <div className={`unraid-container-group-item ${ok ? "ok" : "warn"}`} key={selectedContainer.id} title={`${selectedContainer.name}: ${status}`}>
+        <span className="unraid-entity-dot" aria-hidden="true" />
+        <strong>{selectedContainer.name}</strong>
+        <small>{status}</small>
+      </div>;
+    })}
+  </div>;
+}
+
 export const unraidWidgetDefinitions: WidgetDefinition[] = [
   { id: "unraid.system.overview", title: "Server & system", description: "Online-status, CPU, RAM, temperatur og uptime", group: "Unraid", page: "Unraid", defaultSize: "medium", supportedSizes: [...FLEX], component: SystemWidget },
   { id: "unraid.system.cpu", title: "CPU", description: "Aktuel CPU-belastning", group: "Unraid", page: "Unraid", defaultSize: "small", supportedSizes: ["small", "medium"], component: CpuWidget },
@@ -157,19 +204,16 @@ export const unraidWidgetDefinitions: WidgetDefinition[] = [
   { id: "unraid.ups.status", title: "UPS", description: "Batteri, runtime og load", group: "Unraid", page: "Unraid", defaultSize: "small", supportedSizes: ["small", "medium"], component: UpsWidget },
 ];
 
-const CONTAINER_PREFIX = "unraid.container.";
-const VM_PREFIX = "unraid.vm.";
-
 function dynamicDefinition(kind: "container" | "vm", id: string, name: string): WidgetDefinition {
   const prefix = kind === "container" ? CONTAINER_PREFIX : VM_PREFIX;
   return {
     id: `${prefix}${encodeURIComponent(id)}:${encodeURIComponent(name)}`,
     title: name,
-    description: kind === "container" ? "Status for denne Docker-container" : "Status for denne virtuelle maskine",
+    description: kind === "container" ? "Vises i den samlede container-widget" : "Status for denne virtuelle maskine",
     group: kind === "container" ? "Unraid · Containere" : "Unraid · VM'er",
     page: "Unraid",
-    defaultSize: "small",
-    supportedSizes: ["small", "medium"],
+    defaultSize: kind === "container" ? "medium" : "small",
+    supportedSizes: kind === "container" ? ["medium", "wide"] : ["small", "medium"],
     component: entityWidget(kind, id),
   };
 }
@@ -186,14 +230,7 @@ export function resolveDynamicUnraidWidget(widgetId: string): WidgetDefinition |
   const kind = widgetId.startsWith(CONTAINER_PREFIX) ? "container" : widgetId.startsWith(VM_PREFIX) ? "vm" : null;
   if (!kind) return undefined;
   const prefix = kind === "container" ? CONTAINER_PREFIX : VM_PREFIX;
-  const payload = widgetId.slice(prefix.length);
-  const separator = payload.indexOf(":");
-  if (separator <= 0) return undefined;
-  try {
-    const entityId = decodeURIComponent(payload.slice(0, separator));
-    const name = decodeURIComponent(payload.slice(separator + 1)) || (kind === "container" ? "Container" : "VM");
-    return dynamicDefinition(kind, entityId, name);
-  } catch {
-    return undefined;
-  }
+  const parsed = parseDynamicEntity(widgetId, prefix);
+  if (!parsed) return undefined;
+  return dynamicDefinition(kind, parsed.id, parsed.name || (kind === "container" ? "Container" : "VM"));
 }
