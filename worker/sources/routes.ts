@@ -1,6 +1,6 @@
 import { getAuthenticatedUser } from "../auth/session";
 import { getElectricityUsage } from "./eloverblik";
-import { getEloverblikCredentials } from "./eloverblik-credentials";
+import { getEloverblikCredentials, getEloverblikCredentialStatus } from "./eloverblik-credentials";
 import { getEnergyPrices, resolveEnergySettings } from "./energy-prices";
 import { getWeatherForecast, resolveWeatherLocation } from "./weather";
 
@@ -8,6 +8,7 @@ type SourceEnv = Env & {
   ENERGY_PRICE_AREA?: string;
   ENERGY_GRID_PROVIDER?: string;
   ENERGY_SUPPLIER_MARKUP_OERE?: string;
+  ELOVERBLIK_CREDENTIALS_KEY?: string;
   WASTE_CALENDAR_ICS_URL?: string;
   WEATHER_LAT?: string;
   WEATHER_LON?: string;
@@ -34,10 +35,10 @@ export async function handleSourceRoute(request: Request, env: SourceEnv): Promi
   if (!user) return json({ error: "unauthorized" }, { status: 401 });
 
   if (pathname === "/api/sources/status") {
-    const [weatherLocation, energySettings, eloverblikCredentials] = await Promise.all([
+    const [weatherLocation, energySettings, eloverblikStatus] = await Promise.all([
       resolveWeatherLocation(env, user.id),
       resolveEnergySettings(env, user.id),
-      getEloverblikCredentials(env.DB, user.id),
+      getEloverblikCredentialStatus(env, user.id),
     ]);
     return json({
       sources: {
@@ -53,9 +54,9 @@ export async function handleSourceRoute(request: Request, env: SourceEnv): Promi
           supplierMarkupOere: energySettings.supplierMarkupOere,
         },
         electricityUsage: {
-          configured: Boolean(eloverblikCredentials),
+          configured: eloverblikStatus.configured,
           provider: "Eloverblik",
-          meteringPoint: eloverblikCredentials?.meteringPoint ?? null,
+          meteringPoint: eloverblikStatus.meteringPoint || null,
         },
         wasteCalendar: {
           configured: Boolean(env.WASTE_CALENDAR_ICS_URL),
@@ -76,7 +77,7 @@ export async function handleSourceRoute(request: Request, env: SourceEnv): Promi
   }
 
   if (pathname === "/api/sources/energy/usage") {
-    const credentials = await getEloverblikCredentials(env.DB, user.id);
+    const credentials = await getEloverblikCredentials(env, user.id);
     if (!credentials) return json({ error: "source_not_configured" }, { status: 503 });
     return json(await getElectricityUsage(env, user.id, credentials));
   }
