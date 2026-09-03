@@ -50,6 +50,10 @@ async function decryptValue(env: EloverblikCredentialsEnv, ciphertext: string, i
   return decoder.decode(decrypted);
 }
 
+async function clearUsageCache(env: EloverblikCredentialsEnv, userId: string): Promise<void> {
+  await env.DB.prepare(`DELETE FROM source_cache WHERE source_key = ?`).bind(`energy:usage:${userId}`).run();
+}
+
 export async function getEloverblikCredentials(env: EloverblikCredentialsEnv, userId: string): Promise<EloverblikCredentials | null> {
   const row = await env.DB
     .prepare(`SELECT refresh_token_ciphertext, refresh_token_iv, metering_point FROM eloverblik_credentials WHERE user_id = ? LIMIT 1`)
@@ -85,8 +89,10 @@ export async function setEloverblikCredentials(env: EloverblikCredentialsEnv, us
     `)
     .bind(userId, encrypted.ciphertext, encrypted.iv, credentials.meteringPoint)
     .run();
+  await clearUsageCache(env, userId);
 }
 
 export async function clearEloverblikCredentials(env: EloverblikCredentialsEnv, userId: string): Promise<void> {
   await env.DB.prepare(`DELETE FROM eloverblik_credentials WHERE user_id = ?`).bind(userId).run();
+  await clearUsageCache(env, userId);
 }
