@@ -1,3 +1,4 @@
+import { electricityUsageWidgetDefinitions } from "./electricityUsageWidgets";
 import { widgetRegistry } from "./widgetRegistry";
 import {
   dynamicUnraidWidgetDefinitions,
@@ -9,7 +10,7 @@ export type { UnraidOverview } from "./unraidWidgets";
 export { dynamicUnraidWidgetDefinitions } from "./unraidWidgets";
 
 /** Static widgets that are always available in the Home editor. */
-export const widgetCatalog = [...widgetRegistry, ...unraidWidgetDefinitions];
+export const widgetCatalog = [...widgetRegistry, ...electricityUsageWidgetDefinitions, ...unraidWidgetDefinitions];
 const staticWidgetById = new Map(widgetCatalog.map((widget) => [widget.id, widget]));
 
 /**
