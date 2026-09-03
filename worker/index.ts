@@ -1,74 +1,73 @@
 import { handleAuthRoute } from "./auth/routes";
 import { handleCalendarRoute } from "./calendar/routes";
-import { handleDisplayDataAlias, handleDisplayRoute } from "./display/routes";
+import { handleDisplayRoute } from "./display/routes";
 import { handleGarminAgentRoute } from "./garmin/agent-routes";
 import { handleGarminCredentialRoute } from "./garmin/credential-routes";
 import { handleGarminProcessRoute } from "./garmin/process-routes";
 import { handleGarminRoute } from "./garmin/routes";
-import { handleGarminScheduleRoute, queueScheduledGarminSyncs } from "./garmin/scheduled-sync";
+import { runGarminScheduledSync } from "./garmin/scheduled-sync";
 import { handleMelCloudRoute } from "./melcloud/routes";
-import { handleHomeLayoutRoute } from "./settings/home-layout";
-import { handleNavigationRoute } from "./settings/navigation";
-import { handleSettingsRoute } from "./settings/routes";
+import { handleEloverblikSettingsRoute } from "./sources/eloverblik-settings-routes";
 import { handleSourceRoute } from "./sources/routes";
+import { handleSettingsRoute } from "./settings/routes";
 import { handleUnraidRoute } from "./unraid/routes";
-import { handleJournalAiRoute } from "./wellbeing/journal-ai";
-import { handleMiyagiHistoryRoute } from "./wellbeing/miyagi-history";
-import { handleMiyagiRoute } from "./wellbeing/miyagi";
-import { handleWellbeingHistoryRoute } from "./wellbeing/history";
 import { handleWellbeingRoute } from "./wellbeing/routes";
 
-type HealthResponse = { ok: true; service: "nexus"; version: string };
+export interface Env {
+  ASSETS: Fetcher;
+  DB: D1Database;
+  DATA: R2Bucket;
+  MAIL_FROM?: string;
+  MAIL_PROVIDER?: string;
+  FORWARD_EMAIL_API_KEY?: string;
+  ENERGY_PRICE_AREA?: string;
+  ENERGY_GRID_PROVIDER?: string;
+  ENERGY_SUPPLIER_MARKUP_OERE?: string;
+  WASTE_CALENDAR_ICS_URL?: string;
+  WEATHER_LAT?: string;
+  WEATHER_LON?: string;
+  WEATHER_LABEL?: string;
+  GARMIN_AGENT_SECRET?: string;
+  GARMIN_CREDENTIALS_KEY?: string;
+  MELCLOUD_CREDENTIALS_KEY?: string;
+  UNRAID_CREDENTIALS_KEY?: string;
+}
+
+async function handleApi(request: Request, env: Env, ctx: ExecutionContext): Promise<Response | null> {
+  return await handleAuthRoute(request, env)
+    ?? await handleEloverblikSettingsRoute(request, env)
+    ?? await handleSettingsRoute(request, env)
+    ?? await handleSourceRoute(request, env)
+    ?? await handleGarminRoute(request, env)
+    ?? await handleGarminProcessRoute(request, env)
+    ?? await handleGarminAgentRoute(request, env)
+    ?? await handleGarminCredentialRoute(request, env)
+    ?? await handleCalendarRoute(request, env)
+    ?? await handleDisplayRoute(request, env)
+    ?? await handleMelCloudRoute(request, env)
+    ?? await handleUnraidRoute(request, env)
+    ?? await handleWellbeingRoute(request, env, ctx);
+}
 
 export default {
-  async fetch(request, env) {
+  async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
     const url = new URL(request.url);
-    try {
-      if (url.pathname === "/api/health") return Response.json({ ok: true, service: "nexus", version: "0.1.0" } satisfies HealthResponse, { headers: { "Cache-Control": "no-store" } });
 
-      if (url.pathname.startsWith("/api/display/")) {
-        const response = await handleDisplayRoute(request, env);
-        if (response) return response;
-      }
-      const displayDataResponse = await handleDisplayDataAlias(request, env);
-      if (displayDataResponse) return displayDataResponse;
-
-      if (url.pathname.startsWith("/api/auth/")) { const response = await handleAuthRoute(request, env); if (response) return response; }
-      if (url.pathname.startsWith("/api/calendar/")) { const response = await handleCalendarRoute(request, env); if (response) return response; }
-      if (url.pathname.startsWith("/api/garmin/")) {
-        const credentialResponse = await handleGarminCredentialRoute(request, env); if (credentialResponse) return credentialResponse;
-        const scheduleResponse = await handleGarminScheduleRoute(request, env); if (scheduleResponse) return scheduleResponse;
-        const agentResponse = await handleGarminAgentRoute(request, env); if (agentResponse) return agentResponse;
-        const processResponse = await handleGarminProcessRoute(request, env); if (processResponse) return processResponse;
-        const garminResponse = await handleGarminRoute(request, env); if (garminResponse) return garminResponse;
-      }
-      if (url.pathname.startsWith("/api/melcloud/")) { const response = await handleMelCloudRoute(request, env); if (response) return response; }
-      if (url.pathname.startsWith("/api/unraid/")) { const response = await handleUnraidRoute(request, env); if (response) return response; }
-      if (url.pathname.startsWith("/api/wellbeing/miyagi/history")) { const response = await handleMiyagiHistoryRoute(request, env); if (response) return response; }
-      if (url.pathname.startsWith("/api/wellbeing/miyagi/")) { const response = await handleMiyagiRoute(request, env); if (response) return response; }
-      if (url.pathname.startsWith("/api/wellbeing/journal-ai/")) { const response = await handleJournalAiRoute(request, env); if (response) return response; }
-      if (url.pathname === "/api/wellbeing/history") { const response = await handleWellbeingHistoryRoute(request, env); if (response) return response; }
-      if (url.pathname.startsWith("/api/wellbeing/")) { const response = await handleWellbeingRoute(request, env); if (response) return response; }
-      if (url.pathname === "/api/home-layout") { const response = await handleHomeLayoutRoute(request, env); if (response) return response; }
-      if (url.pathname === "/api/navigation") { const response = await handleNavigationRoute(request, env); if (response) return response; }
-      if (url.pathname === "/api/settings") { const response = await handleSettingsRoute(request, env); if (response) return response; }
-      if (url.pathname.startsWith("/api/sources/")) { const response = await handleSourceRoute(request, env); if (response) return response; }
-      if (url.pathname.startsWith("/api/")) return Response.json({ error: "not_found" }, { status: 404 });
-      return new Response(null, { status: 404 });
-    } catch (error) {
-      console.error(JSON.stringify({ event: "request_failed", path: url.pathname, error: error instanceof Error ? error.message : "unknown_error" }));
-      return Response.json({ error: "internal_error" }, { status: 500, headers: { "Cache-Control": "no-store" } });
-    }
-  },
-  async scheduled(_event, env, ctx) {
-    const now = new Date();
-    ctx.waitUntil((async () => {
+    if (url.pathname.startsWith("/api/")) {
       try {
-        const result = await queueScheduledGarminSyncs(env);
-        console.log(JSON.stringify({ event: "garmin_scheduled_sync", at: now.toISOString(), ...result }));
+        const response = await handleApi(request, env, ctx);
+        if (response) return response;
+        return Response.json({ error: "not_found" }, { status: 404 });
       } catch (error) {
-        console.error(JSON.stringify({ event: "garmin_scheduled_sync_failed", at: now.toISOString(), error: error instanceof Error ? error.message : "unknown_error" }));
+        console.error(error);
+        return Response.json({ error: "internal_error" }, { status: 500 });
       }
-    })());
+    }
+
+    return env.ASSETS.fetch(request);
   },
-} satisfies ExportedHandler<Env>;
+
+  async scheduled(controller: ScheduledController, env: Env, ctx: ExecutionContext): Promise<void> {
+    ctx.waitUntil(runGarminScheduledSync(env, controller.scheduledTime));
+  },
+};
