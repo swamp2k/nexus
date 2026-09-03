@@ -1,5 +1,7 @@
 import { getAuthenticatedUser } from "../auth/session";
-import { clearEloverblikCredentials, getEloverblikCredentials, setEloverblikCredentials } from "./eloverblik-credentials";
+import { clearEloverblikCredentials, getEloverblikCredentialStatus, setEloverblikCredentials } from "./eloverblik-credentials";
+
+type EloverblikSettingsEnv = Env & { ELOVERBLIK_CREDENTIALS_KEY?: string };
 
 function json(body: unknown, init: ResponseInit = {}): Response {
   const headers = new Headers(init.headers);
@@ -7,7 +9,7 @@ function json(body: unknown, init: ResponseInit = {}): Response {
   return Response.json(body, { ...init, headers });
 }
 
-export async function handleEloverblikSettingsRoute(request: Request, env: Env): Promise<Response | null> {
+export async function handleEloverblikSettingsRoute(request: Request, env: EloverblikSettingsEnv): Promise<Response | null> {
   const pathname = new URL(request.url).pathname;
   if (pathname !== "/api/settings/eloverblik") return null;
 
@@ -15,16 +17,16 @@ export async function handleEloverblikSettingsRoute(request: Request, env: Env):
   if (!user) return json({ error: "unauthorized" }, { status: 401 });
 
   if (request.method === "GET") {
-    const credentials = await getEloverblikCredentials(env.DB, user.id);
+    const status = await getEloverblikCredentialStatus(env, user.id);
     return json({
-      configured: Boolean(credentials),
-      meteringPoint: credentials?.meteringPoint ?? "",
-      refreshTokenConfigured: Boolean(credentials?.refreshToken),
+      configured: status.configured,
+      meteringPoint: status.meteringPoint,
+      refreshTokenConfigured: status.configured,
     });
   }
 
   if (request.method === "DELETE") {
-    await clearEloverblikCredentials(env.DB, user.id);
+    await clearEloverblikCredentials(env, user.id);
     return json({ ok: true });
   }
 
@@ -43,7 +45,7 @@ export async function handleEloverblikSettingsRoute(request: Request, env: Env):
     if (refreshToken.length < 20) return json({ error: "invalid_refresh_token" }, { status: 400 });
     if (!/^\d{10,30}$/.test(meteringPoint)) return json({ error: "invalid_metering_point" }, { status: 400 });
 
-    await setEloverblikCredentials(env.DB, user.id, { refreshToken, meteringPoint });
+    await setEloverblikCredentials(env, user.id, { refreshToken, meteringPoint });
     return json({ ok: true, configured: true, meteringPoint });
   }
 
