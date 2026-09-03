@@ -22,6 +22,10 @@
   max-height: 220px;
 }
 
+.home-energy-chart {
+  height: 180px;
+}
+
 .home-mini-chart-summary {
   display: flex;
   flex-wrap: wrap;
@@ -341,8 +345,15 @@
     height: 27px;
   }
 
-  .home-widget-order-button {
-    display: none !important;
+  .home-widget > header {
+    position: relative;
+  }
+
+  .home-widget-direct-controls {
+    position: absolute;
+    top: 0;
+    right: 0;
+    z-index: 1;
   }
 }
 
