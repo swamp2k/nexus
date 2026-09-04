@@ -56,14 +56,14 @@ Numbers use Danish formatting: thousands separator `.`, decimal `,`, unit after 
 
 ## 3. Surfaces and breakpoints
 
-| Width | App frame | Dashboard grid |
+| Condition | App frame | Dashboard grid |
 |---|---|---|
-| > 1060 | Sidebar 268px, content column max 1080 | 4 columns |
-| 761–1060 | Sidebar 220px | 2 columns. `medium` and `wide` both span the row |
-| ≤ 760 | Top bar with horizontal chip nav; avatar menu holds Settings and Log ud | 1 column, rows auto |
-| ≤ 460 | Tighter paddings, full-width action buttons | Tiles collapse to 2 across |
+| Dashboard host > 900px | Sidebar follows the app viewport; content column max 1080 | 4 columns |
+| Dashboard host ≤ 900px and viewport > 760px | Sidebar remains visible | 2 columns. `medium` and `wide` both span the row |
+| Viewport ≤ 760px | Top bar with horizontal chip nav; avatar menu holds Settings and Log ud | 1 column, rows auto |
+| Viewport ≤ 460px | Tighter paddings, full-width action buttons | Tiles collapse to 2 across |
 
-The kiosk (`/display`) ignores the app frame and sizes to its own screen. See section 8.
+For Home and the Displays editor preview, the 4/2-column decision is based on the **actual dashboard host width**, not the browser viewport. Sidebar and editor chrome therefore cannot leave a nominally four-column grid with unusably narrow cards. The kiosk (`/display`) ignores the app frame and sizes to its own screen. See section 8.
 
 Page anatomy: an `h1` in `.app-header`, then content. There is no subheading under the page title. Explanations belong next to the control they explain, once.
 
@@ -82,6 +82,7 @@ Home, the Displays editor preview and paired displays all render `WidgetCard` (`
 ```
 
 - The header shows the title and either a drill-down link to the feature page or the edit controls. Never both. The source kicker (`GARMIN`, `STRØM`) appears only while editing, where the catalogue makes it useful.
+- On cards ≤ 300px wide, edit controls have priority over the title. They are positioned over the right side of the header and may obscure part of the title rather than disappear, wrap or make the card overflow.
 - Paired displays show no link and no kicker.
 - Content is vertically centred by default. Anything that should use the whole card (charts, lists, chip groups) wraps itself in `.widget-fill`, which anchors to the top and grows.
 
@@ -161,7 +162,7 @@ Home and Displays use the same pure edit functions (`src/dashboard/layoutEditing
 `/display` is for a tablet on a wall or a kitchen counter, paired with an 8-digit code and no login.
 
 - No sidebar, no user menu, no page heading. One header line: `NEXUS` and the dashboard name on the left, clock and date on the right, theme toggle at the end.
-- The grid keeps 4 columns from 900px up regardless of the app breakpoint, so a landscape iPad shows the same shape as a desktop.
+- The grid keeps 4 columns from 900px up regardless of the app breakpoint, uses 2 columns from 761–899px, and falls to 1 column at 760px and below. A landscape iPad therefore shows the same shape as a desktop without inheriting sidebar-driven app breakpoints.
 - Rows are `minmax(140px, 1fr)`: the grid takes the remaining viewport and shares it between rows, so a display fills the screen. Charts grow into the extra height through `.widget-fill`. If a layout has more rows than fit, the page scrolls rather than clipping; the editor preview is the place to fix that.
 - Big numbers scale up (`clamp(2rem, 3.4vw, 3rem)`) because the reader is further away. Nothing else changes size.
 - Cards show no drill-down links and no kickers. Freshness belongs inside the widget (`Viser seneste kendte data`), not in the chrome.
@@ -199,7 +200,7 @@ One concern has one owner. A stylesheet never re-sizes another module's elements
 
 - [ ] Colours, radii and shadows come from tokens; no new hex outside `styles.css`.
 - [ ] Looks right in light and dark.
-- [ ] Verified at 1280, 1024 (kiosk), 900 and 390 wide. Nothing overflows its card; the page has no horizontal scroll.
+- [ ] Verified at 1280 and ~1100 app widths, 1024 kiosk, 900 and 390 wide. Nothing overflows its card; small-card edit controls remain usable; the page has no horizontal scroll.
 - [ ] A new widget has `defaultSize`, `supportedSizes`, `rows` and a `refreshGroup` if its group label is not a settings key.
 - [ ] A new chart uses `ChartFrame`, pixel coordinates and `.chart-axis` text.
 - [ ] Loading, error, empty and stale states are all present and use the standard wording.
