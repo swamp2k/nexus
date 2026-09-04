@@ -28,6 +28,12 @@ type EnergyResponse = {
   stale: boolean;
 };
 
+type UsageDay = { date: string; kwh: number };
+type UsageResponse = {
+  data: { source: "Eloverblik"; days: UsageDay[] };
+  fetchedAt: string;
+  stale: boolean;
+};
 type PriceBands = { low: number; high: number };
 type SettingsResponse = { settings: { energyLowPriceDkk: number | null; energyHighPriceDkk: number | null } };
 type HourWindow = { start: string; average: number };
@@ -101,6 +107,39 @@ function bandClass(value: number, bands: PriceBands): string {
   return "medium";
 }
 
+function UsageSection({ usage }: { usage: UsageResponse | null }) {
+  const rows = usage?.data.days.filter((day) => Number.isFinite(day.kwh) && day.kwh >= 0).slice(-7) ?? [];
+  if (rows.length === 0) {
+    return <article className="electricity-card electricity-usage-card"><div className="electricity-card-heading"><div><p className="section-label">Eloverblik</p><h3>Elforbrug · seneste 7 dage</h3></div></div><div className="electricity-empty">Ingen Eloverblik-forbrugsdata endnu.</div></article>;
+  }
+
+  const latest = rows[rows.length - 1];
+  const average = rows.reduce((sum, day) => sum + day.kwh, 0) / rows.length;
+  const total = rows.reduce((sum, day) => sum + day.kwh, 0);
+  const max = Math.max(...rows.map((day) => day.kwh), 1);
+  const dayFormatter = new Intl.DateTimeFormat("da-DK", { weekday: "short" });
+  const dateFormatter = new Intl.DateTimeFormat("da-DK", { weekday: "long", day: "numeric", month: "short" });
+
+  return <article className="electricity-card electricity-usage-card">
+    <div className="electricity-card-heading">
+      <div><p className="section-label">Eloverblik</p><h3>Elforbrug · seneste 7 dage</h3></div>
+      {usage && <span className="electricity-usage-freshness">Opdateret {ageLabel(usage.fetchedAt)}{usage.stale ? " · forsinket" : ""}</span>}
+    </div>
+    <div className="electricity-usage-summary">
+      <div><span>Seneste døgn</span><strong>{latest.kwh.toFixed(1).replace(".", ",")} kWh</strong><small>{dateFormatter.format(new Date(latest.date + "T12:00:00"))}</small></div>
+      <div><span>7-dages gennemsnit</span><strong>{average.toFixed(1).replace(".", ",")} kWh</strong><small>pr. døgn</small></div>
+      <div><span>7 dage i alt</span><strong>{total.toFixed(1).replace(".", ",")} kWh</strong><small>{rows.length} registrerede døgn</small></div>
+    </div>
+    <div className="electricity-usage-bars" aria-label="Elforbrug de seneste 7 dage">
+      {rows.map((day) => <div className="electricity-usage-bar-item" key={day.date}>
+        <strong>{day.kwh.toFixed(1).replace(".", ",")}</strong>
+        <div className="electricity-usage-bar-track"><span style={{ height: Math.max(5, (day.kwh / max) * 100) + "%" }} /></div>
+        <small>{dayFormatter.format(new Date(day.date + "T12:00:00"))}</small>
+      </div>)}
+    </div>
+  </article>;
+}
+
 function PriceChart({ points, bands }: { points: PricePoint[]; bands: PriceBands }) {
   const bars = hourlyBars(points);
   if (bars.length === 0) return <div className="electricity-empty">Ingen priser til grafen.</div>;
@@ -146,17 +185,20 @@ function PriceChart({ points, bands }: { points: PricePoint[]; bands: PriceBands
 
 export default function ElectricityPage() {
   const [response, setResponse] = useState<EnergyResponse | null>(null);
+  const [usage, setUsage] = useState<UsageResponse | null>(null);
   const [bands, setBands] = useState<PriceBands>(DEFAULT_BANDS);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
 
   async function refresh() {
     try {
-      const [priceResult, settingsResult] = await Promise.all([
+      const [priceResult, usageResult, settingsResult] = await Promise.all([
         fetch("/api/sources/energy/prices", { credentials: "same-origin", cache: "no-store" }),
+        fetch("/api/sources/energy/usage", { credentials: "same-origin", cache: "no-store" }),
         fetch("/api/settings", { credentials: "same-origin", cache: "no-store" }),
       ]);
       if (!priceResult.ok) throw new Error(`HTTP ${priceResult.status}`);
       setResponse(await priceResult.json() as EnergyResponse);
+      setUsage(usageResult.ok ? await usageResult.json() as UsageResponse : null);
       if (settingsResult.ok) {
         const settings = (await settingsResult.json() as SettingsResponse).settings;
         const low = Number(settings.energyLowPriceDkk ?? DEFAULT_BANDS.low);
@@ -221,6 +263,8 @@ export default function ElectricityPage() {
         <div><p className="section-label">{response.data.area} · {response.data.gridProviderLabel ?? "netselskab ikke valgt"}</p><h2 id="electricity-heading">{current ? `${price(current).toFixed(2)} kr/kWh` : "—"}</h2><strong>Samlet variabel pris lige nu</strong><p>Opdateret {ageLabel(response.fetchedAt)}{response.stale ? " · viser seneste kendte data" : ""}</p></div>
         <div className="electricity-hero-metrics"><div><span>Billigste time</span><strong>{metrics.cheapest ? `${metrics.cheapest.average.toFixed(2)} kr` : "—"}</strong><small>{metrics.cheapest ? `fra ${formatTime(metrics.cheapest.start)}` : ""}</small></div><div><span>Dyreste time</span><strong>{metrics.highest ? `${metrics.highest.average.toFixed(2)} kr` : "—"}</strong><small>{metrics.highest ? `fra ${formatTime(metrics.highest.start)}` : ""}</small></div></div>
       </article>
+
+      <UsageSection usage={usage} />
 
       {current && <article className="electricity-day-card electricity-price-breakdown"><p className="section-label">Pris lige nu</p><div><span>Spot inkl. moms</span><strong>{current.spotInclVatDkkPerKwh.toFixed(2)} kr</strong></div><div><span>Netselskab</span><strong>{current.gridInclVatDkkPerKwh === null ? "—" : `${current.gridInclVatDkkPerKwh.toFixed(2)} kr`}</strong></div><div><span>Energinet</span><strong>{current.energinetInclVatDkkPerKwh.toFixed(2)} kr</strong></div><div><span>Elafgift</span><strong>{current.electricityTaxInclVatDkkPerKwh.toFixed(2)} kr</strong></div><div><span>Elselskabstillæg</span><strong>{supplierInclVat.toFixed(2)} kr</strong></div><div className="electricity-price-total"><span>I alt</span><strong>{price(current).toFixed(2)} kr</strong></div></article>}
 
