@@ -4,7 +4,7 @@
    dashboard/dashboard.css. See docs/UI-GUIDE.md.
    ========================================================================== */
 
-.home-page { display: grid; gap: 14px; }
+.home-page { container-type: inline-size; container-name: dashboard-host; display: grid; gap: 14px; }
 .home-toolbar { display: flex; justify-content: flex-end; min-height: 40px; }
 .home-edit-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
 .home-edit-hint { margin-right: auto; color: var(--muted); font-size: .78rem; }
