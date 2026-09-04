@@ -135,12 +135,26 @@ async function readDisplaySettings(env: DisplayEnv, userId: string) {
   const row = await env.DB.prepare(
     `SELECT energy_low_price_dkk AS energyLowPriceDkk,
             energy_high_price_dkk AS energyHighPriceDkk,
+            energy_usage_low_kwh AS energyUsageLowKwh,
+            energy_usage_high_kwh AS energyUsageHighKwh,
             dashboard_refresh_classes AS dashboardRefreshClasses
      FROM user_settings WHERE user_id=?`,
-  ).bind(userId).first<{ energyLowPriceDkk: number | null; energyHighPriceDkk: number | null; dashboardRefreshClasses: string | null }>();
+  ).bind(userId).first<{
+    energyLowPriceDkk: number | null;
+    energyHighPriceDkk: number | null;
+    energyUsageLowKwh: number | null;
+    energyUsageHighKwh: number | null;
+    dashboardRefreshClasses: string | null;
+  }>();
   let classes: Record<string, string> = {};
   try { classes = JSON.parse(row?.dashboardRefreshClasses ?? "{}"); } catch { /* defaults */ }
-  return { energyLowPriceDkk: row?.energyLowPriceDkk ?? 1, energyHighPriceDkk: row?.energyHighPriceDkk ?? 2, dashboardRefreshClasses: classes };
+  return {
+    energyLowPriceDkk: row?.energyLowPriceDkk ?? 1,
+    energyHighPriceDkk: row?.energyHighPriceDkk ?? 2,
+    energyUsageLowKwh: row?.energyUsageLowKwh ?? 20,
+    energyUsageHighKwh: row?.energyUsageHighKwh ?? 30,
+    dashboardRefreshClasses: classes,
+  };
 }
 
 export async function handleDisplayRoute(request: Request, env: DisplayEnv): Promise<Response | null> {
