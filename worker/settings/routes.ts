@@ -3,6 +3,8 @@ import { GRID_PROVIDERS, normalizeGridProvider, type GridProviderKey } from "../
 
 const DEFAULT_LOW_PRICE_DKK = 1;
 const DEFAULT_HIGH_PRICE_DKK = 2;
+const DEFAULT_LOW_USAGE_KWH = 20;
+const DEFAULT_HIGH_USAGE_KWH = 30;
 const DEFAULT_DASHBOARD_REFRESH_SECONDS = 300;
 
 type RefreshClass = "live" | "standard" | "slow" | "event";
@@ -16,6 +18,8 @@ type SettingsRow = {
   energySupplierMarkupOere: number | null;
   energyLowPriceDkk: number | null;
   energyHighPriceDkk: number | null;
+  energyUsageLowKwh: number | null;
+  energyUsageHighKwh: number | null;
   dashboardRefreshSeconds: number | null;
   dashboardRefreshClasses: Record<string, RefreshClass>;
   updatedAt: string | null;
@@ -34,6 +38,8 @@ type SettingsBody = {
   energySupplierMarkupOere?: unknown;
   energyLowPriceDkk?: unknown;
   energyHighPriceDkk?: unknown;
+  energyUsageLowKwh?: unknown;
+  energyUsageHighKwh?: unknown;
   dashboardRefreshSeconds?: unknown;
   dashboardRefreshClasses?: unknown;
 };
@@ -84,6 +90,12 @@ function cleanPriceBand(value: unknown, fallback: number): number {
   return Math.round(parsed * 100) / 100;
 }
 
+function cleanUsageBand(value: unknown, fallback: number): number {
+  const parsed = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(parsed) || parsed < 0 || parsed > 500) return fallback;
+  return Math.round(parsed * 10) / 10;
+}
+
 function cleanDashboardRefresh(value: unknown): number {
   const parsed = typeof value === "number" ? value : Number(value);
   if (!Number.isFinite(parsed) || parsed < 30 || parsed > 3600) return DEFAULT_DASHBOARD_REFRESH_SECONDS;
@@ -118,6 +130,8 @@ function fallbackSettings(env: SettingsEnv): SettingsRow {
     energySupplierMarkupOere: cleanMarkup(env.ENERGY_SUPPLIER_MARKUP_OERE),
     energyLowPriceDkk: DEFAULT_LOW_PRICE_DKK,
     energyHighPriceDkk: DEFAULT_HIGH_PRICE_DKK,
+    energyUsageLowKwh: DEFAULT_LOW_USAGE_KWH,
+    energyUsageHighKwh: DEFAULT_HIGH_USAGE_KWH,
     dashboardRefreshSeconds: DEFAULT_DASHBOARD_REFRESH_SECONDS,
     dashboardRefreshClasses: {},
     updatedAt: null,
@@ -135,6 +149,8 @@ async function readSettings(env: SettingsEnv, userId: string): Promise<SettingsR
               energy_supplier_markup_oere AS energySupplierMarkupOere,
               energy_low_price_dkk AS energyLowPriceDkk,
               energy_high_price_dkk AS energyHighPriceDkk,
+              energy_usage_low_kwh AS energyUsageLowKwh,
+              energy_usage_high_kwh AS energyUsageHighKwh,
               dashboard_refresh_seconds AS dashboardRefreshSeconds,
               dashboard_refresh_classes AS dashboardRefreshClasses,
               updated_at AS updatedAt
@@ -150,6 +166,8 @@ async function readSettings(env: SettingsEnv, userId: string): Promise<SettingsR
       energySupplierMarkupOere: cleanMarkup(row.energySupplierMarkupOere ?? env.ENERGY_SUPPLIER_MARKUP_OERE),
       energyLowPriceDkk: cleanPriceBand(row.energyLowPriceDkk, DEFAULT_LOW_PRICE_DKK),
       energyHighPriceDkk: cleanPriceBand(row.energyHighPriceDkk, DEFAULT_HIGH_PRICE_DKK),
+      energyUsageLowKwh: cleanUsageBand(row.energyUsageLowKwh, DEFAULT_LOW_USAGE_KWH),
+      energyUsageHighKwh: cleanUsageBand(row.energyUsageHighKwh, DEFAULT_HIGH_USAGE_KWH),
       dashboardRefreshSeconds: cleanDashboardRefresh(row.dashboardRefreshSeconds),
       dashboardRefreshClasses: cleanRefreshClasses(row.dashboardRefreshClasses),
     };
@@ -194,6 +212,8 @@ export async function handleSettingsRoute(request: Request, env: SettingsEnv): P
   const energySupplierMarkupOere = cleanMarkup(body.energySupplierMarkupOere);
   const energyLowPriceDkk = cleanPriceBand(body.energyLowPriceDkk, DEFAULT_LOW_PRICE_DKK);
   const energyHighPriceDkk = cleanPriceBand(body.energyHighPriceDkk, DEFAULT_HIGH_PRICE_DKK);
+  const energyUsageLowKwh = cleanUsageBand(body.energyUsageLowKwh, DEFAULT_LOW_USAGE_KWH);
+  const energyUsageHighKwh = cleanUsageBand(body.energyUsageHighKwh, DEFAULT_HIGH_USAGE_KWH);
   const dashboardRefreshSeconds = body.dashboardRefreshSeconds === undefined
     ? cleanDashboardRefresh(current.dashboardRefreshSeconds)
     : cleanDashboardRefresh(body.dashboardRefreshSeconds);
@@ -210,15 +230,18 @@ export async function handleSettingsRoute(request: Request, env: SettingsEnv): P
   if (energyLowPriceDkk >= energyHighPriceDkk) {
     return json({ error: "invalid_energy_price_bands" }, { status: 400 });
   }
+  if (energyUsageLowKwh >= energyUsageHighKwh) {
+    return json({ error: "invalid_energy_usage_bands" }, { status: 400 });
+  }
 
   const updatedAt = new Date().toISOString();
   await env.DB.prepare(
     `INSERT INTO user_settings (
        user_id, weather_label, weather_lat, weather_lon,
        energy_price_area, energy_grid_provider, energy_supplier_markup_oere,
-       energy_low_price_dkk, energy_high_price_dkk, dashboard_refresh_seconds,
-       dashboard_refresh_classes, updated_at
-     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       energy_low_price_dkk, energy_high_price_dkk, energy_usage_low_kwh, energy_usage_high_kwh,
+       dashboard_refresh_seconds, dashboard_refresh_classes, updated_at
+     ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
      ON CONFLICT(user_id) DO UPDATE SET
        weather_label = excluded.weather_label,
        weather_lat = excluded.weather_lat,
@@ -228,6 +251,8 @@ export async function handleSettingsRoute(request: Request, env: SettingsEnv): P
        energy_supplier_markup_oere = excluded.energy_supplier_markup_oere,
        energy_low_price_dkk = excluded.energy_low_price_dkk,
        energy_high_price_dkk = excluded.energy_high_price_dkk,
+       energy_usage_low_kwh = excluded.energy_usage_low_kwh,
+       energy_usage_high_kwh = excluded.energy_usage_high_kwh,
        dashboard_refresh_seconds = excluded.dashboard_refresh_seconds,
        dashboard_refresh_classes = excluded.dashboard_refresh_classes,
        updated_at = excluded.updated_at`,
@@ -241,6 +266,8 @@ export async function handleSettingsRoute(request: Request, env: SettingsEnv): P
     energySupplierMarkupOere,
     energyLowPriceDkk,
     energyHighPriceDkk,
+    energyUsageLowKwh,
+    energyUsageHighKwh,
     dashboardRefreshSeconds,
     JSON.stringify(dashboardRefreshClasses),
     updatedAt,
@@ -256,6 +283,8 @@ export async function handleSettingsRoute(request: Request, env: SettingsEnv): P
       energySupplierMarkupOere,
       energyLowPriceDkk,
       energyHighPriceDkk,
+      energyUsageLowKwh,
+      energyUsageHighKwh,
       dashboardRefreshSeconds,
       dashboardRefreshClasses,
       updatedAt,
