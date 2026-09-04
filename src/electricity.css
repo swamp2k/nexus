@@ -101,3 +101,8 @@
   .electricity-usage-bar-track { height: 125px; }
   .electricity-usage-bar-item > strong { font-size: 0.68rem; }
 }
+
+.electricity-usage-band-legend { margin: 0 0 12px; }
+.electricity-usage-bar-track > span.low { background: #39b866; }
+.electricity-usage-bar-track > span.medium { background: #f1a62a; }
+.electricity-usage-bar-track > span.high { background: #ef5b4d; }
