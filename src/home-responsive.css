@@ -127,6 +127,72 @@
   font-size: .64rem;
 }
 
+
+.home-usage-chart-block {
+  align-self: stretch;
+}
+
+.home-usage-band-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  color: var(--muted);
+  font-size: .66rem;
+}
+
+.home-usage-band-legend span {
+  padding: 3px 7px;
+  border-radius: 999px;
+  font-weight: 800;
+}
+
+.home-usage-band-legend .low {
+  background: color-mix(in srgb, #39b866 16%, var(--surface));
+  color: #39b866;
+}
+
+.home-usage-band-legend .medium {
+  background: color-mix(in srgb, #f1a62a 16%, var(--surface));
+  color: #d88c13;
+}
+
+.home-usage-band-legend .high {
+  background: color-mix(in srgb, #ef5b4d 16%, var(--surface));
+  color: #ef5b4d;
+}
+
+.home-usage-chart {
+  display: block;
+  width: 100%;
+  height: auto;
+  min-height: 130px;
+  overflow: visible;
+}
+
+.home-usage-baseline {
+  stroke: var(--muted);
+  stroke-width: 1.2;
+  vector-effect: non-scaling-stroke;
+}
+
+.home-usage-axis-unit,
+.home-usage-day-label {
+  font-weight: 800;
+}
+
+.home-usage-bar rect {
+  transition: opacity 120ms ease, filter 120ms ease;
+}
+
+.home-usage-bar:hover rect {
+  opacity: .82;
+  filter: brightness(1.08);
+}
+
+.home-usage-bar--low rect { fill: #39b866; }
+.home-usage-bar--medium rect { fill: #f1a62a; }
+.home-usage-bar--high rect { fill: #ef5b4d; }
+
 .home-weather-hours,
 .home-weather-week {
   display: grid;
