@@ -33,7 +33,7 @@ export default function DisplayDashboard({ dashboard, theme, onThemeChange }: Pr
 
   useEffect(() => {
     if (dashboard.theme === "light" || dashboard.theme === "dark") onThemeChange(dashboard.theme);
-  }, [dashboard.id]);
+  }, [dashboard.id, dashboard.theme, onThemeChange]);
 
   useEffect(() => {
     let interval: number | undefined;
