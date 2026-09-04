@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { DashboardRefreshScope, resolveDashboardRefreshClass } from "./data/dashboardRefresh";
 import type { DashboardRefreshSettingsResponse } from "./data/dashboardRefresh";
 import { useCachedJson } from "./data/queryCache";
-import { widgetById } from "./widgets/widgetRegistry";
+import { widgetDefinitionById } from "./widgets/widgetCatalog";
 import type { WidgetSize } from "./widgets/widgetRegistry";
 
 type DisplayDashboardModel = {
@@ -56,7 +56,7 @@ export default function DisplayDashboard({ dashboard, theme, onThemeChange }: Pr
     {dashboard.layout.length === 0 ? <div className="home-empty"><strong>Displayet er tomt.</strong><span>Tilføj widgets fra Displays i Nexus.</span></div> :
       <main className="home-widget-grid display-dashboard-grid">
         {dashboard.layout.map((item) => {
-          const widget = widgetById.get(item.id);
+          const widget = widgetDefinitionById(item.id);
           if (!widget) return null;
           const Widget = widget.component;
           const refreshClass = resolveDashboardRefreshClass(widget.group, refreshSettings);

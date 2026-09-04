@@ -78,3 +78,26 @@
   .electricity-band-legend { margin-left: 0; }
   .electricity-axis-label--hour { font-size: 10px; }
 }
+
+
+.electricity-usage-card { overflow: hidden; }
+.electricity-usage-freshness { color: var(--muted); font-size: 0.78rem; }
+.electricity-usage-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin-bottom: 18px; }
+.electricity-usage-summary > div { padding: 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-soft); }
+.electricity-usage-summary span, .electricity-usage-summary strong, .electricity-usage-summary small { display: block; }
+.electricity-usage-summary span { color: var(--muted); font-size: 0.75rem; margin-bottom: 6px; }
+.electricity-usage-summary strong { font-size: 1.35rem; }
+.electricity-usage-summary small { color: var(--muted); margin-top: 4px; }
+.electricity-usage-bars { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 10px; align-items: end; min-height: 220px; }
+.electricity-usage-bar-item { display: grid; grid-template-rows: auto 1fr auto; gap: 7px; min-width: 0; text-align: center; }
+.electricity-usage-bar-item > strong { font-size: 0.78rem; }
+.electricity-usage-bar-item > small { color: var(--muted); text-transform: capitalize; }
+.electricity-usage-bar-track { position: relative; height: 165px; border-radius: 10px; background: var(--surface-soft); overflow: hidden; }
+.electricity-usage-bar-track > span { position: absolute; left: 0; right: 0; bottom: 0; min-height: 5%; border-radius: 10px 10px 0 0; background: var(--accent); }
+
+@media (max-width: 700px) {
+  .electricity-usage-summary { grid-template-columns: 1fr; }
+  .electricity-usage-bars { gap: 6px; min-height: 180px; }
+  .electricity-usage-bar-track { height: 125px; }
+  .electricity-usage-bar-item > strong { font-size: 0.68rem; }
+}
