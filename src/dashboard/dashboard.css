@@ -227,7 +227,16 @@
   .home-weather-hours, .home-weather-week { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .home-weather-hours > div:nth-child(n+4), .home-weather-week > div:nth-child(n+4) { display: none; }
   .chart-summary small { display: none; }
-  .home-widget-direct-controls { gap: 3px; }
+  /* Editing controls are more important than the title on very small cards.
+     Let them overlay the header instead of disappearing or forcing overflow. */
+  .home-widget > header { position: relative; }
+  .home-widget-direct-controls {
+    position: absolute;
+    z-index: 1;
+    top: 0;
+    right: 0;
+    gap: 3px;
+  }
   .home-widget-direct-controls button { width: 27px; height: 27px; }
 }
 
@@ -246,7 +255,9 @@
 
 /* --- Breakpoints ---------------------------------------------------------- */
 
-@media (max-width: 1060px) {
+/* App dashboards respond to the width they actually have after sidebar/editor
+   chrome, not to the viewport. Kiosk has its own screen-width rules. */
+@container dashboard-host (max-width: 899px) {
   .home-widget-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .home-widget--small { grid-column: span 1; }
   .home-widget--medium, .home-widget--wide { grid-column: 1 / -1; }
