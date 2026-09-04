@@ -185,9 +185,11 @@ export function EnergyPriceChartWidget() {
       {bars.map((bar, index) => {
         const x = left + index * slot + (slot - barWidth) / 2;
         const yy = y(bar.value);
-        const barHeight = Math.max(1.1, 100 - bottom - yy);
+        const baseline = 100 - bottom;
+        const barHeight = Math.max(1.1, baseline - yy);
+        const barY = baseline - barHeight;
         const band = bandClass(bar.value, bands);
-        return <g key={bar.time} className={`home-energy-bar home-energy-bar--${band}`}><rect x={`${x}%`} y={`${yy}%`} width={`${barWidth}%`} height={`${barHeight}%`} rx="3"><title>{formatHour(bar.time)} · {bar.value.toFixed(2)} kr/kWh · {band === "low" ? "lav" : band === "high" ? "høj" : "middel"}</title></rect>{index % labelEvery === 0 && <text x={`${x+barWidth/2}%`} y="95.6%" textAnchor="middle" className="home-mini-axis">{formatHour(bar.time)}</text>}</g>;
+        return <g key={bar.time} className={`home-energy-bar home-energy-bar--${band}`}><rect x={`${x}%`} y={`${barY}%`} width={`${barWidth}%`} height={`${barHeight}%`} rx="3"><title>{formatHour(bar.time)} · {bar.value.toFixed(2)} kr/kWh · {band === "low" ? "lav" : band === "high" ? "høj" : "middel"}</title></rect>{index % labelEvery === 0 && <text x={`${x+barWidth/2}%`} y="95.6%" textAnchor="middle" className="home-mini-axis">{formatHour(bar.time)}</text>}</g>;
       })}
     </svg>
   </div>;
