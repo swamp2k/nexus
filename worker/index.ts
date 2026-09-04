@@ -10,6 +10,7 @@ import { handleMelCloudRoute } from "./melcloud/routes";
 import { handleHomeLayoutRoute } from "./settings/home-layout";
 import { handleNavigationRoute } from "./settings/navigation";
 import { handleSettingsRoute } from "./settings/routes";
+import { handleEloverblikSettingsRoute } from "./sources/eloverblik-settings-routes";
 import { handleSourceRoute } from "./sources/routes";
 import { handleUnraidRoute } from "./unraid/routes";
 import { handleJournalAiRoute } from "./wellbeing/journal-ai";
@@ -51,6 +52,7 @@ export default {
       if (url.pathname.startsWith("/api/wellbeing/")) { const response = await handleWellbeingRoute(request, env); if (response) return response; }
       if (url.pathname === "/api/home-layout") { const response = await handleHomeLayoutRoute(request, env); if (response) return response; }
       if (url.pathname === "/api/navigation") { const response = await handleNavigationRoute(request, env); if (response) return response; }
+      if (url.pathname === "/api/settings/eloverblik") { const response = await handleEloverblikSettingsRoute(request, env); if (response) return response; }
       if (url.pathname === "/api/settings") { const response = await handleSettingsRoute(request, env); if (response) return response; }
       if (url.pathname.startsWith("/api/sources/")) { const response = await handleSourceRoute(request, env); if (response) return response; }
       if (url.pathname.startsWith("/api/")) return Response.json({ error: "not_found" }, { status: 404 });

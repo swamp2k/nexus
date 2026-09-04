@@ -1,17 +1,8 @@
 import { readSourceCache, recordSourceError, writeSourceCache } from "./cache";
+import type { EloverblikCredentials } from "./eloverblik-credentials";
 
-const CACHE_KEY = "energy:usage";
 const CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 const BASE_URL = "https://api.eloverblik.dk/CustomerApi";
-
-type EloverblikEnv = Env & {
-  ELOVERBLIK_REFRESH_TOKEN?: string;
-  ELOVERBLIK_METERING_POINT?: string;
-};
-
-type TokenResponse = {
-  result?: unknown;
-};
 
 type Point = {
   "out_Quantity.quantity"?: unknown;
@@ -32,13 +23,6 @@ export type ElectricityUsageData = {
   days: UsageDay[];
 };
 
-function configured(env: EloverblikEnv): env is EloverblikEnv & {
-  ELOVERBLIK_REFRESH_TOKEN: string;
-  ELOVERBLIK_METERING_POINT: string;
-} {
-  return Boolean(env.ELOVERBLIK_REFRESH_TOKEN && env.ELOVERBLIK_METERING_POINT);
-}
-
 async function getAccessToken(refreshToken: string): Promise<string> {
   const response = await fetch(`${BASE_URL}/api/Token`, {
     headers: {
@@ -48,7 +32,7 @@ async function getAccessToken(refreshToken: string): Promise<string> {
   });
 
   if (!response.ok) throw new Error(`eloverblik_token_http_${response.status}`);
-  const body = await response.json() as TokenResponse;
+  const body = await response.json() as { result?: unknown };
   if (typeof body.result !== "string" || body.result.length < 20) {
     throw new Error("eloverblik_invalid_token_response");
   }
@@ -61,7 +45,6 @@ function parseDays(payload: unknown): UsageDay[] {
   if (!Array.isArray(result)) return [];
 
   const totals = new Map<string, number>();
-
   for (const item of result) {
     if (typeof item !== "object" || item === null) continue;
     const document = (item as { MyEnergyData_MarketDocument?: unknown }).MyEnergyData_MarketDocument;
@@ -88,9 +71,7 @@ function parseDays(payload: unknown): UsageDay[] {
         }
 
         const date = start.slice(0, 10);
-        if (/^\d{4}-\d{2}-\d{2}$/.test(date)) {
-          totals.set(date, (totals.get(date) ?? 0) + sum);
-        }
+        if (/^\d{4}-\d{2}-\d{2}$/.test(date)) totals.set(date, (totals.get(date) ?? 0) + sum);
       }
     }
   }
@@ -100,11 +81,8 @@ function parseDays(payload: unknown): UsageDay[] {
     .sort((a, b) => a.date.localeCompare(b.date));
 }
 
-async function fetchUsage(env: EloverblikEnv & {
-  ELOVERBLIK_REFRESH_TOKEN: string;
-  ELOVERBLIK_METERING_POINT: string;
-}): Promise<ElectricityUsageData> {
-  const accessToken = await getAccessToken(env.ELOVERBLIK_REFRESH_TOKEN);
+async function fetchUsage(credentials: EloverblikCredentials): Promise<ElectricityUsageData> {
+  const accessToken = await getAccessToken(credentials.refreshToken);
   const from = new Date();
   from.setUTCDate(from.getUTCDate() - 10);
   const to = new Date();
@@ -122,37 +100,28 @@ async function fetchUsage(env: EloverblikEnv & {
     },
     body: JSON.stringify({
       meteringPoints: {
-        meteringPoint: [env.ELOVERBLIK_METERING_POINT],
+        meteringPoint: [credentials.meteringPoint],
       },
     }),
   });
 
   if (!response.ok) throw new Error(`eloverblik_timeseries_http_${response.status}`);
-  const body = await response.json() as unknown;
-  const days = parseDays(body);
+  const days = parseDays(await response.json() as unknown);
   if (days.length === 0) throw new Error("eloverblik_no_usage_data");
 
-  return {
-    source: "Eloverblik",
-    days,
-  };
+  return { source: "Eloverblik", days };
 }
 
-export async function getElectricityUsage(env: EloverblikEnv) {
-  const cached = await readSourceCache<ElectricityUsageData>(env.DB, CACHE_KEY);
+export async function getElectricityUsage(env: Env, userId: string, credentials: EloverblikCredentials) {
+  const cacheKey = `energy:usage:${userId}`;
+  const cached = await readSourceCache<ElectricityUsageData>(env.DB, cacheKey);
   if (cached && !cached.stale) return cached;
 
-  if (!configured(env)) {
-    if (cached) return { ...cached, stale: true };
-    return null;
-  }
-
   try {
-    const data = await fetchUsage(env);
-    return await writeSourceCache(env.DB, CACHE_KEY, data, CACHE_TTL_MS);
+    return await writeSourceCache(env.DB, cacheKey, await fetchUsage(credentials), CACHE_TTL_MS);
   } catch (error) {
     const message = error instanceof Error ? error.message : "eloverblik_fetch_failed";
-    await recordSourceError(env.DB, CACHE_KEY, message);
+    await recordSourceError(env.DB, cacheKey, message);
     if (cached) return { ...cached, stale: true, lastErrorAt: new Date().toISOString(), lastErrorMessage: message };
     throw error;
   }
