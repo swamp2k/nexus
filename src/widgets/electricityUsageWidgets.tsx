@@ -1,28 +1,10 @@
 import { useMemo } from "react";
+import ChartFrame from "../dashboard/ChartFrame";
 import { useDashboardJson } from "../data/dashboardRefresh";
-import { useCachedJson } from "../data/queryCache";
+import { useSettings } from "../data/settings";
+import { bandFor, bandsFrom, DEFAULT_USAGE_BANDS } from "../data/api-types";
+import type { ElectricityUsageResponse } from "../data/api-types";
 import type { WidgetDefinition } from "./widgetRegistry";
-
-type UsageDay = {
-  date: string;
-  kwh: number;
-};
-
-type ElectricityUsageResponse = {
-  data: {
-    source: "Eloverblik";
-    days: UsageDay[];
-  };
-  fetchedAt: string;
-  stale: boolean;
-};
-
-type UsageSettingsResponse = {
-  settings: {
-    energyUsageLowKwh: number | null;
-    energyUsageHighKwh: number | null;
-  };
-};
 
 function WidgetState({ label }: { label: string }) {
   return <div className="home-widget-state">{label}</div>;
@@ -32,84 +14,58 @@ function shortDay(value: string): string {
   return new Intl.DateTimeFormat("da-DK", { weekday: "short" }).format(new Date(`${value}T12:00:00`));
 }
 
-function usageBand(value: number, low: number, high: number): "low" | "medium" | "high" {
-  if (value <= low) return "low";
-  if (value >= high) return "high";
-  return "medium";
+function kwh(value: number): string {
+  return value.toFixed(1).replace(".", ",");
 }
 
 function ElectricityUsageWeekWidget() {
   const { data, loading, error } = useDashboardJson<ElectricityUsageResponse>("/api/sources/energy/usage");
-  const { data: settings } = useCachedJson<UsageSettingsResponse>("/api/settings", 10 * 60_000);
-  const low = Number(settings?.settings.energyUsageLowKwh ?? 20);
-  const high = Number(settings?.settings.energyUsageHighKwh ?? 30);
+  const { data: settings } = useSettings();
+  const bands = bandsFrom(settings?.settings.energyUsageLowKwh, settings?.settings.energyUsageHighKwh, DEFAULT_USAGE_BANDS);
 
   const stats = useMemo(() => {
     const rows = (data?.data.days ?? []).filter((row) => Number.isFinite(row.kwh) && row.kwh >= 0).slice(-7);
     if (rows.length === 0) return null;
-
     const latest = rows[rows.length - 1];
     const average = rows.reduce((sum, row) => sum + row.kwh, 0) / rows.length;
-    const max = Math.max(...rows.map((row) => row.kwh), high, 1);
+    const max = Math.max(...rows.map((row) => row.kwh), bands.high, 1);
     const axisMax = Math.max(10, Math.ceil(max / 10) * 10);
-
     return { rows, latest, average, axisMax };
-  }, [data, high]);
+  }, [data, bands.high]);
 
   if (loading) return <WidgetState label="Henter elforbrug…" />;
   if (error || !stats) return <WidgetState label="Elforbruget kunne ikke hentes" />;
 
-  const width = 700;
-  const height = 190;
-  const left = 48;
-  const right = 8;
-  const top = 8;
-  const bottom = 30;
-  const plotWidth = width - left - right;
-  const plotHeight = height - top - bottom;
-  const slot = plotWidth / stats.rows.length;
-  const barWidth = Math.min(48, slot * 0.58);
-  const baseline = height - bottom;
-  const y = (value: number) => top + (1 - Math.min(stats.axisMax, Math.max(0, value)) / stats.axisMax) * plotHeight;
-  const ticks = [0, stats.axisMax / 2, stats.axisMax];
-
   return (
-    <div className="home-week-bars-block home-usage-chart-block">
-      <div className="home-week-summary">
-        <strong>{stats.latest.kwh.toFixed(1).replace(".", ",")} kWh</strong>
-        <span>seneste registrerede døgn</span>
-        <small>7-dages gns. {stats.average.toFixed(1).replace(".", ",")} kWh</small>
-      </div>
-      <div className="home-usage-band-legend" aria-label="Forbrugsgrænser">
-        <span className="low">Lav ≤ {low.toFixed(1).replace(".", ",")}</span>
-        <span className="medium">Middel</span>
-        <span className="high">Høj ≥ {high.toFixed(1).replace(".", ",")} kWh</span>
-      </div>
-      <svg className="home-usage-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Elforbrug de seneste 7 dage i kilowatt-timer">
-        {ticks.map((tick) => {
-          const yy = y(tick);
-          return <g key={tick}>
-            <line x1={left} y1={yy} x2={width - right} y2={yy} className="home-mini-grid" />
-            <text x={left - 7} y={yy + 4} textAnchor="end" className="home-mini-axis">{Math.round(tick)}</text>
-          </g>;
-        })}
-        <text x="3" y={top + 5} className="home-mini-axis home-usage-axis-unit">kWh</text>
-        {stats.rows.map((row, index) => {
-          const xx = left + index * slot + (slot - barWidth) / 2;
-          const yy = y(row.kwh);
-          const barHeight = Math.max(2, baseline - yy);
-          const band = usageBand(row.kwh, low, high);
-          return <g key={row.date} className={`home-usage-bar home-usage-bar--${band}`}>
-            <rect x={xx} y={baseline - barHeight} width={barWidth} height={barHeight} rx="5">
-              <title>{shortDay(row.date)} · {row.kwh.toFixed(1).replace(".", ",")} kWh</title>
-            </rect>
-            <text x={xx + barWidth / 2} y={Math.max(top + 11, baseline - barHeight - 5)} textAnchor="middle" className="home-mini-axis home-usage-value-label">{row.kwh.toFixed(1).replace(".", ",")}</text>
-            <text x={xx + barWidth / 2} y={height - 8} textAnchor="middle" className="home-mini-axis home-usage-day-label">{shortDay(row.date)}</text>
-          </g>;
-        })}
-        <line x1={left} y1={baseline} x2={width - right} y2={baseline} className="home-usage-baseline" />
-      </svg>
-      {data?.stale && <small>Viser seneste kendte Eloverblik-data</small>}
+    <div className="widget-fill">
+      <div className="chart-summary"><strong>{kwh(stats.latest.kwh)} kWh</strong><span>seneste registrerede døgn</span><small>7-dages gns. {kwh(stats.average)} kWh</small></div>
+      <div className="band-legend" aria-label="Forbrugsgrænser"><span className="low">Lav ≤ {kwh(bands.low)}</span><span className="medium">Middel</span><span className="high">Høj ≥ {kwh(bands.high)} kWh</span></div>
+      <ChartFrame label="Elforbrug de seneste 7 dage i kilowatt-timer">{({ width, height }) => {
+        const left = 34, right = 6, top = 16, bottom = 18;
+        const plotWidth = width - left - right;
+        const plotHeight = height - top - bottom;
+        const slot = plotWidth / stats.rows.length;
+        const barWidth = Math.max(6, Math.min(44, slot * 0.58));
+        const baseline = height - bottom;
+        const y = (value: number) => top + (1 - Math.min(stats.axisMax, Math.max(0, value)) / stats.axisMax) * plotHeight;
+        const ticks = [0, stats.axisMax / 2, stats.axisMax];
+        const showValues = slot >= 30;
+        return <>
+          {ticks.map((tick) => <g key={tick}><line x1={left} y1={y(tick)} x2={width - right} y2={y(tick)} className="chart-grid" /><text x={left - 6} y={y(tick) + 3.5} textAnchor="end" className="chart-axis">{Math.round(tick)}</text></g>)}
+          {stats.rows.map((row, index) => {
+            const x = left + index * slot + (slot - barWidth) / 2;
+            const barHeight = Math.max(2, baseline - y(row.kwh));
+            const band = bandFor(row.kwh, bands);
+            return <g key={row.date} className={`chart-bar chart-bar--${band}`}>
+              <rect x={x} y={baseline - barHeight} width={barWidth} height={barHeight} rx="4"><title>{shortDay(row.date)} · {kwh(row.kwh)} kWh</title></rect>
+              {showValues && <text x={x + barWidth / 2} y={Math.max(top - 4, baseline - barHeight - 4)} textAnchor="middle" className="chart-axis chart-axis--strong">{kwh(row.kwh)}</text>}
+              <text x={x + barWidth / 2} y={height - 5} textAnchor="middle" className="chart-axis">{shortDay(row.date)}</text>
+            </g>;
+          })}
+          <line x1={left} y1={baseline} x2={width - right} y2={baseline} className="chart-baseline" />
+        </>;
+      }}</ChartFrame>
+      {data?.stale && <p className="chart-note">Viser seneste kendte Eloverblik-data</p>}
     </div>
   );
 }
@@ -123,6 +79,7 @@ export const electricityUsageWidgetDefinitions: WidgetDefinition[] = [
     page: "Strøm",
     defaultSize: "medium",
     supportedSizes: ["medium", "wide"],
+    rows: 2,
     component: ElectricityUsageWeekWidget,
   },
 ];

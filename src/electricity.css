@@ -34,22 +34,11 @@
 .electricity-card-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
 .electricity-card-heading h3 { margin: 0; font-size: 1.28rem; letter-spacing: -0.025em; }
 .electricity-chart-wrap { min-width: 0; max-width: 100%; overflow: hidden; }
-.electricity-chart-scroll { overflow-x: hidden; padding-bottom: 4px; }
-.electricity-chart { display: block; width: 100%; max-width: 100%; min-width: 0; height: auto; min-height: 260px; }
-.electricity-gridline { stroke: var(--border); stroke-width: 1; }
-.electricity-axis-label { fill: var(--muted); font-size: 12px; font-weight: 700; }
-.electricity-axis-label--hour { font-size: 11px; }
-.electricity-hour-bar rect { transition: opacity 120ms ease, filter 120ms ease; }
-.electricity-hour-bar:hover rect { opacity: 0.82; filter: brightness(1.08); }
-.electricity-hour-bar--low rect { fill: #39b866; }
-.electricity-hour-bar--medium rect { fill: #f1a62a; }
-.electricity-hour-bar--high rect { fill: #ef5b4d; }
-.electricity-band-legend { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 8px 52px; }
-.electricity-band-legend span { padding: 5px 9px; border-radius: 999px; font-size: 0.72rem; font-weight: 800; }
-.electricity-band-legend .low { background: color-mix(in srgb, #39b866 16%, var(--surface)); color: #39b866; }
-.electricity-band-legend .medium { background: color-mix(in srgb, #f1a62a 16%, var(--surface)); color: #d88c13; }
-.electricity-band-legend .high { background: color-mix(in srgb, #ef5b4d 16%, var(--surface)); color: #ef5b4d; }
-.electricity-chart-cap-note { margin: 8px 0 0; color: var(--muted); font-size: 0.75rem; }
+.electricity-chart { --chart-h: 300px; }
+.electricity-chart .chart-axis { font-size: 11px; }
+.electricity-band-legend { margin: 0 0 8px 40px; font-size: 0.72rem; }
+.electricity-band-legend span { padding: 5px 9px; }
+.electricity-chart-cap-note { margin-top: 8px; }
 
 .electricity-price-strip { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(66px, 1fr); gap: 6px; overflow-x: auto; margin-top: 18px; padding-bottom: 6px; scrollbar-width: thin; }
 .electricity-price-cell { padding: 10px 7px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface-soft); text-align: center; }
@@ -76,7 +65,7 @@
   .electricity-hero-metrics, .electricity-day-card { grid-template-columns: 1fr; }
   .electricity-day-card .section-label { grid-column: auto; }
   .electricity-band-legend { margin-left: 0; }
-  .electricity-axis-label--hour { font-size: 10px; }
+  .electricity-chart { --chart-h: 220px; }
 }
 
 
@@ -103,6 +92,6 @@
 }
 
 .electricity-usage-band-legend { margin: 0 0 12px; }
-.electricity-usage-bar-track > span.low { background: #39b866; }
-.electricity-usage-bar-track > span.medium { background: #f1a62a; }
-.electricity-usage-bar-track > span.high { background: #ef5b4d; }
+.electricity-usage-bar-track > span.low { background: var(--band-low); }
+.electricity-usage-bar-track > span.medium { background: var(--band-medium); }
+.electricity-usage-bar-track > span.high { background: var(--band-high); }

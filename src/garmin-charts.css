@@ -6,10 +6,11 @@
   min-width: 0;
 }
 
+.sleep-axis-chart .chart-frame {
+  --chart-h: 180px;
+}
+
 .sleep-axis-chart svg {
-  display: block;
-  width: 100%;
-  height: 180px;
   touch-action: none;
   user-select: none;
 }
@@ -283,8 +284,8 @@
 }
 
 @media (max-width: 600px) {
-  .sleep-axis-chart svg {
-    height: 165px;
+  .sleep-axis-chart .chart-frame {
+    --chart-h: 165px;
   }
   .sleep-axis-text {
     font-size: 10px;

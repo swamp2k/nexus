@@ -1,33 +1,37 @@
+/* ==========================================================================
+   Home page — toolbar, editor catalogue, shared action buttons and widget
+   content patterns (numbers, tiles, chips). Grid/card/chart sizing lives in
+   dashboard/dashboard.css. See docs/UI-GUIDE.md.
+   ========================================================================== */
+
 .home-page { display: grid; gap: 14px; }
 .home-toolbar { display: flex; justify-content: flex-end; min-height: 40px; }
-.home-edit-actions { display: flex; gap: 8px; }
+.home-edit-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; }
+.home-edit-hint { margin-right: auto; color: var(--muted); font-size: .78rem; }
 .primary-action, .secondary-action { min-height: 40px; padding: 9px 13px; border-radius: 11px; cursor: pointer; font-weight: 800; }
 .primary-action { border: 1px solid var(--accent); background: var(--accent); color: white; }
 .secondary-action { border: 1px solid var(--border); background: var(--surface); color: var(--text); }
 .primary-action:disabled, .secondary-action:disabled { opacity: .55; cursor: default; }
 .home-layout-note { margin: 0; padding: 10px 12px; border: 1px solid var(--border); border-radius: 11px; background: var(--surface-soft); color: var(--muted); font-size: .86rem; }
-.home-layout-note--error { color: #d64545; }
-.home-widget-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); grid-auto-flow: dense; grid-auto-rows: minmax(148px, auto); gap: 14px; align-items: stretch; }
-.home-widget { min-width: 0; display: flex; flex-direction: column; padding: 18px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); box-shadow: var(--shadow-soft); }
-.home-widget--small { grid-column: span 1; }
-.home-widget--medium { grid-column: span 2; }
-.home-widget--wide { grid-column: span 4; }
-.home-widget > header { display: flex; align-items: flex-start; justify-content: space-between; gap: 14px; padding-bottom: 12px; border-bottom: 1px solid var(--border); }
-.home-widget > header span { display: block; margin-bottom: 2px; color: var(--muted); font-size: .72rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
-.home-widget > header h3 { margin: 0; font-size: 1rem; }
-.home-widget > header button { flex: 0 0 auto; padding: 5px 0; border: 0; background: transparent; color: var(--accent); cursor: pointer; font-size: .78rem; font-weight: 800; }
-.home-widget-content { flex: 1; display: flex; align-items: center; min-width: 0; padding-top: 14px; }
-.home-widget-state { color: var(--muted); font-size: .9rem; }
+.home-layout-note--error { color: var(--danger); }
+
+/* --- Widget content patterns ---------------------------------------------- */
+
+/* One big number with a label and optional detail line. */
 .home-metric { display: grid; gap: 3px; }
 .home-metric > strong { font-size: clamp(1.65rem, 3vw, 2.35rem); line-height: 1; letter-spacing: -.045em; }
 .home-metric > span { color: var(--muted-strong); font-weight: 700; }
 .home-metric > small { margin-top: 5px; color: var(--muted); }
+
 .home-weather { display: flex; align-items: center; gap: 16px; }
 .home-weather-icon { font-size: 2.6rem; }
 .home-weather div { display: grid; gap: 2px; }
 .home-weather strong { font-size: 2.25rem; line-height: 1; letter-spacing: -.04em; }
 .home-weather span:not(.home-weather-icon) { color: var(--muted-strong); font-weight: 800; }
 .home-weather small { color: var(--muted); }
+.home-weather-details { display: flex; flex-wrap: wrap; gap: 2px 12px; }
+.home-weather-details > span { color: inherit !important; font-weight: inherit !important; }
+
 .home-wellbeing { width: 100%; display: grid; gap: 10px; }
 .home-wellbeing-summary { display: flex; align-items: baseline; gap: 7px; color: var(--muted); font-size: .82rem; }
 .home-wellbeing-summary strong { color: var(--text); font-size: 1rem; }
@@ -37,41 +41,39 @@
 .home-wellbeing-journal > span { color: var(--muted); font-size: .72rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
 .home-wellbeing-journal p { max-width: 68ch; margin: 0; color: var(--muted-strong); line-height: 1.5; }
 .home-wellbeing-no-journal { color: var(--muted); }
-.home-mini-chart-block, .home-week-bars-block { width: 100%; min-width: 0; display: grid; gap: 10px; }
-.home-mini-chart-summary { display: flex; align-items: baseline; flex-wrap: wrap; gap: 8px 14px; color: var(--muted); font-size: .76rem; }
-.home-mini-chart-summary strong { color: var(--text); }
-.home-mini-chart-summary small { margin-left: auto; color: var(--muted); }
-.home-mini-chart { display: block; width: 100%; height: 170px; overflow: visible; }
-.home-mini-grid { stroke: var(--border); stroke-width: 1; vector-effect: non-scaling-stroke; }
-.home-mini-axis { fill: var(--muted); font-size: 10px; }
-.home-energy-bar rect { opacity: .9; transition: opacity 120ms ease, filter 120ms ease; }
-.home-energy-bar:hover rect { opacity: .82; filter: brightness(1.08); }
-.home-energy-bar--low rect { fill: #39b866; }
-.home-energy-bar--medium rect { fill: #f1a62a; }
-.home-energy-bar--high rect { fill: #ef5b4d; }
+
+/* Three equal stat tiles (min / avg / max). */
 .home-three-stats { width: 100%; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .home-three-stats > div { min-width: 0; display: grid; gap: 4px; padding: 9px 10px; border-radius: 10px; background: var(--surface-soft); }
 .home-three-stats span { color: var(--muted); font-size: .72rem; }
 .home-three-stats strong { font-size: 1.2rem; letter-spacing: -.03em; }
 .home-three-stats > small { grid-column: 1 / -1; color: var(--muted); }
-.home-week-summary { display: flex; align-items: baseline; gap: 7px; }
-.home-week-summary strong { font-size: 1.35rem; letter-spacing: -.03em; }
-.home-week-summary span { color: var(--muted); font-size: .78rem; }
-.home-week-bars { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); align-items: end; gap: 7px; height: 118px; }
+
+/* Seven plain bars (steps / sleep). Height comes from the card via flex. */
+.home-week-bars { flex: 1; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); align-items: end; gap: 7px; min-height: 110px; }
 .home-week-bars > div { height: 100%; min-width: 0; display: grid; grid-template-rows: 1fr auto; align-items: end; gap: 5px; }
-.home-week-bars > div > span { display: block; min-height: 4px; border-radius: 4px 4px 2px 2px; background: var(--accent); }
+.home-week-bars > div > span { display: block; width: min(100%, 26px); justify-self: center; min-height: 4px; border-radius: 4px 4px 2px 2px; background: var(--accent); }
 .home-week-bars--sleep > div > span { background: var(--sleep-light, var(--accent)); }
 .home-week-bars small { overflow: hidden; color: var(--muted); font-size: .65rem; text-align: center; text-transform: capitalize; }
+
+/* Forecast tiles. */
 .home-weather-hours, .home-weather-week { width: 100%; min-width: 0; display: grid; gap: 7px; }
 .home-weather-hours { grid-template-columns: repeat(6, minmax(0, 1fr)); }
 .home-weather-week { grid-template-columns: repeat(7, minmax(0, 1fr)); }
-.home-weather-hours > div, .home-weather-week > div { min-width: 0; display: grid; place-items: center; gap: 4px; padding: 8px 4px; border-radius: 10px; background: var(--surface-soft); text-align: center; }
+.home-weather-hours > div, .home-weather-week > div { min-width: 0; display: grid; justify-items: center; align-content: start; gap: 4px; padding: 8px 4px; border-radius: 10px; background: var(--surface-soft); text-align: center; }
 .home-weather-hours span, .home-weather-week span { color: var(--muted); font-size: .7rem; text-transform: capitalize; }
 .home-weather-hours b, .home-weather-week b { font-size: 1.35rem; font-weight: 400; }
 .home-weather-hours strong, .home-weather-week strong { font-size: 1.05rem; }
-.home-weather-hours small, .home-weather-week small { overflow: hidden; max-width: 100%; color: var(--muted); font-size: .66rem; text-overflow: ellipsis; white-space: nowrap; }
+.home-weather-week strong em { color: var(--muted); font-size: .78em; font-style: normal; font-weight: 700; }
+.home-weather-hours small, .home-weather-week small { overflow: hidden; max-width: 100%; color: var(--muted); font-size: .66rem; line-height: 1.25; text-overflow: ellipsis; white-space: nowrap; }
+.home-weather-wind { color: var(--muted-strong) !important; }
+.home-weather-rain { color: var(--muted) !important; }
+
 .home-empty { min-height: 190px; display: grid; place-content: center; gap: 6px; padding: 30px; border: 1px dashed var(--border-strong); border-radius: var(--radius-md); color: var(--muted); text-align: center; }
 .home-empty strong { color: var(--text); }
+
+/* --- Editor catalogue ----------------------------------------------------- */
+
 .home-editor { display: grid; gap: 16px; padding: 18px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); box-shadow: var(--shadow-soft); }
 .home-editor-copy { display: grid; gap: 4px; }
 .home-editor-copy span { color: var(--muted); font-size: .86rem; }
@@ -91,18 +93,13 @@
 .home-editor-controls button:disabled { opacity: .35; cursor: default; }
 
 @media (max-width: 1060px) {
-  .home-widget-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .home-widget--small { grid-column: span 1; }
-  .home-widget--medium, .home-widget--wide { grid-column: span 2; }
   .home-weather-week { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 
 @media (max-width: 760px) {
-  .home-widget-grid, .home-editor-groups { grid-template-columns: 1fr; }
-  .home-widget--small, .home-widget--medium, .home-widget--wide { grid-column: 1; }
-  .home-widget-grid { grid-auto-rows: auto; }
-  .home-widget { min-height: 132px; }
-  .home-mini-chart { height: 150px; }
+  .home-editor-groups { grid-template-columns: 1fr; }
+  .home-edit-actions { width: 100%; }
+  .home-edit-hint { width: 100%; margin: 0 0 4px; }
   .home-weather-hours { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .home-weather-week { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
@@ -110,7 +107,6 @@
 @media (max-width: 460px) {
   .home-toolbar { min-height: 0; }
   .home-toolbar > .secondary-action { width: 100%; }
-  .home-edit-actions { width: 100%; }
   .home-edit-actions button { flex: 1; }
   .home-editor-row { align-items: flex-start; flex-direction: column; }
   .home-editor-controls { padding-left: 26px; }

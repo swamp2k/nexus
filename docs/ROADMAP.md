@@ -158,6 +158,20 @@ With Modular Home v1 in place, the audit is now being applied selectively agains
 - Strøm B5: the current-price breakdown is one hierarchy with `I alt` visually separated as the total; the 15-minute strip gets a right-edge scroll affordance. The chart remains deliberately fixed at 0–6 kr/kWh.
 - Vejr B6: wide 7-day rows use tighter fixed information columns rather than stretching across the whole card, and the hourly strip visually indicates horizontal overflow.
 
+### Dashboard layout foundation (2026-09-04) ✅
+
+Root-cause fix for charts drifting inside widgets and widgets rendering out of stored order:
+
+- `src/dashboard/dashboard.css` is now the only owner of grid, card and chart-frame sizing. `grid-auto-flow: dense` and the fixed 56px rows with a per-widget-ID span table are gone; rows are `minmax(150px, auto)` and widgets that need two rows declare `rows: 2` in the registry.
+- `src/dashboard/ChartFrame.tsx` measures its CSS-defined box with a ResizeObserver and charts draw in pixels, so axis text is a constant 10px on every screen and label density follows the available width. Used by the usage and price widgets, the Strøm page chart and the overnight sleep charts.
+- `src/dashboard/WidgetCard.tsx` and `src/dashboard/layoutEditing.ts` are shared by Home, the Displays editor and paired displays. Card headers show the title and one action; the source kicker only appears while editing. Order buttons read `↑/↓` in one-column layouts.
+- Paired displays fill the screen: one-line header, four columns from 900px, rows share the viewport height, charts grow into their cards.
+- Colour bands are tokens (`--band-low/medium/high`), `/api/settings` has one cache TTL and is invalidated on save, API response types live in `src/data/api-types.ts`.
+- Removed the unused `KitchenDisplay` view and stylesheet, `home-responsive.css` (merged) and empty stylesheets; page subheadings under the `h1` are gone.
+- `docs/UI-GUIDE.md` documents the system.
+
+Follow-ups: move the Garmin health bar chart onto `ChartFrame`; add a `config` slot to layout items so the grouped container widget becomes a real registry entry; consider one `dashboards` table with a `kind` column so Home and displays share storage and defaults.
+
 ### Next candidates
 
 - Velbefindende follow-up: add short trend views where the history endpoint supports it cleanly and the visual adds real value.

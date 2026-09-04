@@ -1,4 +1,5 @@
 import { useState } from "react";
+import ChartFrame from "./dashboard/ChartFrame";
 
 type Point = { time: number; value: number };
 type SleepBar = { date: string; seconds: number | null };
@@ -39,16 +40,11 @@ export function SleepMetricChart({ points, min, max, unit = "" }: { points: Poin
   const [tooltip, setTooltip] = useState<TooltipPos | null>(null);
   if (points.length < 2) return <div className="sleep-chart-empty">Ingen målinger</div>;
 
-  const width = 720, height = 180, left = 44, right = 10, top = 12, bottom = 30;
   const values = points.map((p) => p.value);
   const rawLow = min ?? Math.min(...values), rawHigh = max ?? Math.max(...values);
   const low = min ?? Math.floor(rawLow / 5) * 5, high = max ?? Math.ceil(rawHigh / 5) * 5;
   const span = Math.max(1, high - low), start = points[0].time, end = points.at(-1)?.time ?? start + 1;
-  const plotW = width - left - right, plotH = height - top - bottom;
-  const x = (time: number) => left + ((time - start) / Math.max(1, end - start)) * plotW;
-  const y = (value: number) => top + (1 - (value - low) / span) * plotH;
-  const path = points.map((p, i) => `${i ? "L" : "M"}${x(p.time).toFixed(1)},${y(p.value).toFixed(1)}`).join(" ");
-  const yTicks = [high, high - span / 2, low], xTicks = [start, start + (end - start) / 2, end];
+  const selected = active === null ? null : points[active];
 
   function choose(clientX: number, clientY: number, target: SVGSVGElement) {
     const rect = target.getBoundingClientRect();
@@ -57,23 +53,31 @@ export function SleepMetricChart({ points, min, max, unit = "" }: { points: Poin
     let best = 0;
     for (let i = 1; i < points.length; i += 1) if (Math.abs(points[i].time - time) < Math.abs(points[best].time - time)) best = i;
     setActive(best);
-    setTooltip(pointerPos(clientX, clientY, target.parentElement ?? target));
+    setTooltip(pointerPos(clientX, clientY, target.parentElement?.parentElement ?? target));
   }
 
-  const selected = active === null ? null : points[active];
   return <div className="sleep-axis-chart">
-    <svg viewBox={`0 0 ${width} ${height}`}
-      onPointerDown={(e) => { e.currentTarget.setPointerCapture(e.pointerId); choose(e.clientX, e.clientY, e.currentTarget); }}
-      onPointerMove={(e) => { if (e.pointerType === "mouse" || e.currentTarget.hasPointerCapture(e.pointerId)) choose(e.clientX, e.clientY, e.currentTarget); }}
-      onPointerEnter={(e) => { if (e.pointerType === "mouse") choose(e.clientX, e.clientY, e.currentTarget); }}
-      onPointerLeave={(e) => { if (e.pointerType === "mouse") { setActive(null); setTooltip(null); } }}
-      onPointerUp={(e) => { if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId); }}
-      onPointerCancel={() => { setActive(null); setTooltip(null); }}>
-      {yTicks.map((tick) => { const yy = y(tick); return <g key={tick}><line x1={left} x2={width-right} y1={yy} y2={yy} className="sleep-chart-grid" /><text x={left-6} y={yy+4} textAnchor="end" className="sleep-axis-text">{Math.round(tick)}{unit}</text></g>; })}
-      {xTicks.map((tick, i) => <text key={tick} x={x(tick)} y={height-7} textAnchor={i===0?"start":i===2?"end":"middle"} className="sleep-axis-text">{clock(tick)}</text>)}
-      <path d={path} className="sleep-chart-line" />
-      {selected && <><line x1={x(selected.time)} x2={x(selected.time)} y1={top} y2={height-bottom} className="sleep-crosshair" /><circle cx={x(selected.time)} cy={y(selected.value)} r="5" className="sleep-crosshair-dot" /></>}
-    </svg>
+    <ChartFrame label="Måling gennem natten">{({ width, height }) => {
+      const left = 40, right = 8, top = 10, bottom = 20;
+      const plotW = width - left - right, plotH = height - top - bottom;
+      const x = (time: number) => left + ((time - start) / Math.max(1, end - start)) * plotW;
+      const y = (value: number) => top + (1 - (value - low) / span) * plotH;
+      const path = points.map((p, i) => `${i ? "L" : "M"}${x(p.time).toFixed(1)},${y(p.value).toFixed(1)}`).join(" ");
+      const yTicks = [high, high - span / 2, low], xTicks = [start, start + (end - start) / 2, end];
+      return <g
+        onPointerDown={(e) => { const svg = e.currentTarget.ownerSVGElement!; svg.setPointerCapture(e.pointerId); choose(e.clientX, e.clientY, svg); }}
+        onPointerMove={(e) => { const svg = e.currentTarget.ownerSVGElement!; if (e.pointerType === "mouse" || svg.hasPointerCapture(e.pointerId)) choose(e.clientX, e.clientY, svg); }}
+        onPointerEnter={(e) => { if (e.pointerType === "mouse") choose(e.clientX, e.clientY, e.currentTarget.ownerSVGElement!); }}
+        onPointerLeave={(e) => { if (e.pointerType === "mouse") { setActive(null); setTooltip(null); } }}
+        onPointerUp={(e) => { const svg = e.currentTarget.ownerSVGElement!; if (svg.hasPointerCapture(e.pointerId)) svg.releasePointerCapture(e.pointerId); }}
+        onPointerCancel={() => { setActive(null); setTooltip(null); }}>
+        <rect x="0" y="0" width={width} height={height} fill="transparent" />
+        {yTicks.map((tick) => { const yy = y(tick); return <g key={tick}><line x1={left} x2={width - right} y1={yy} y2={yy} className="sleep-chart-grid" /><text x={left - 6} y={yy + 4} textAnchor="end" className="sleep-axis-text">{Math.round(tick)}{unit}</text></g>; })}
+        {xTicks.map((tick, i) => <text key={tick} x={x(tick)} y={height - 5} textAnchor={i === 0 ? "start" : i === 2 ? "end" : "middle"} className="sleep-axis-text">{clock(tick)}</text>)}
+        <path d={path} className="sleep-chart-line" />
+        {selected && <><line x1={x(selected.time)} x2={x(selected.time)} y1={top} y2={height - bottom} className="sleep-crosshair" /><circle cx={x(selected.time)} cy={y(selected.value)} r="5" className="sleep-crosshair-dot" /></>}
+      </g>;
+    }}</ChartFrame>
     {selected && tooltip && <div className="sleep-chart-tooltip cursor-tooltip" style={{ left: tooltip.x, top: tooltip.y }}><strong>{selected.value.toFixed(unit === "" ? 0 : 1)}{unit}</strong><span>{clock(selected.time)}</span></div>}
   </div>;
 }

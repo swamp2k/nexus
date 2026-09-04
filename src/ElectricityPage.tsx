@@ -1,49 +1,19 @@
 import { useEffect, useMemo, useState } from "react";
+import ChartFrame from "./dashboard/ChartFrame";
+import { bandFor, bandsFrom, DEFAULT_PRICE_BANDS, DEFAULT_USAGE_BANDS } from "./data/api-types";
+import type { Bands, EnergyPricePoint, EnergyPricesResponse, ElectricityUsageResponse, SettingsResponse } from "./data/api-types";
 
-type PricePoint = {
-  timeUtc: string;
-  eurPerMwh: number;
-  spotInclVatDkkPerKwh: number;
-  gridInclVatDkkPerKwh: number | null;
-  energinetInclVatDkkPerKwh: number;
-  electricityTaxInclVatDkkPerKwh: number;
-  supplierMarkupExVatDkkPerKwh: number;
-  totalDkkPerKwh: number | null;
-  approxDkkPerKwh: number;
-};
-
-type EnergyResponse = {
-  data: {
-    source: "Energi Data Service";
-    area: "DK1" | "DK2";
-    gridProvider: string | null;
-    gridProviderLabel: string | null;
-    supplierMarkupOere: number;
-    resolutionMinutes: 15;
-    intervals: PricePoint[];
-    totalPriceIncludes: string[];
-    totalPriceExcludes: string[];
-  };
-  fetchedAt: string;
-  stale: boolean;
-};
-
-type UsageDay = { date: string; kwh: number };
-type UsageResponse = {
-  data: { source: "Eloverblik"; days: UsageDay[] };
-  fetchedAt: string;
-  stale: boolean;
-};
-type PriceBands = { low: number; high: number };
-type UsageBands = { low: number; high: number };
-type SettingsResponse = { settings: { energyLowPriceDkk: number | null; energyHighPriceDkk: number | null; energyUsageLowKwh: number | null; energyUsageHighKwh: number | null } };
+type PricePoint = EnergyPricePoint;
+type EnergyResponse = EnergyPricesResponse;
+type UsageResponse = ElectricityUsageResponse;
+type PriceBands = Bands;
+type UsageBands = Bands;
 type HourWindow = { start: string; average: number };
 type HourBar = { start: string; average: number };
 
 const TIME_ZONE = "Europe/Copenhagen";
 const CHART_MAX_DKK = 6;
-const DEFAULT_BANDS: PriceBands = { low: 1, high: 2 };
-const DEFAULT_USAGE_BANDS: UsageBands = { low: 20, high: 30 };
+const DEFAULT_BANDS = DEFAULT_PRICE_BANDS;
 
 function price(point: PricePoint): number {
   return point.totalDkkPerKwh ?? point.approxDkkPerKwh;
@@ -103,11 +73,7 @@ function hourlyBars(points: PricePoint[]): HourBar[] {
   })).slice(0, 25);
 }
 
-function bandClass(value: number, bands: PriceBands): string {
-  if (value <= bands.low) return "low";
-  if (value >= bands.high) return "high";
-  return "medium";
-}
+const bandClass = bandFor;
 
 function UsageSection({ usage, bands }: { usage: UsageResponse | null; bands: UsageBands }) {
   const rows = usage?.data.days.filter((day) => Number.isFinite(day.kwh) && day.kwh >= 0).slice(-7) ?? [];
@@ -132,7 +98,7 @@ function UsageSection({ usage, bands }: { usage: UsageResponse | null; bands: Us
       <div><span>7-dages gennemsnit</span><strong>{average.toFixed(1).replace(".", ",")} kWh</strong><small>pr. døgn</small></div>
       <div><span>7 dage i alt</span><strong>{total.toFixed(1).replace(".", ",")} kWh</strong><small>{rows.length} registrerede døgn</small></div>
     </div>
-    <div className="electricity-band-legend electricity-usage-band-legend"><span className="low">Lav ≤ {bands.low.toFixed(1).replace(".", ",")} kWh</span><span className="medium">Middel</span><span className="high">Høj ≥ {bands.high.toFixed(1).replace(".", ",")} kWh</span></div>
+    <div className="band-legend electricity-band-legend electricity-usage-band-legend"><span className="low">Lav ≤ {bands.low.toFixed(1).replace(".", ",")} kWh</span><span className="medium">Middel</span><span className="high">Høj ≥ {bands.high.toFixed(1).replace(".", ",")} kWh</span></div>
     <div className="electricity-usage-bars" aria-label="Elforbrug de seneste 7 dage">
       {rows.map((day) => <div className="electricity-usage-bar-item" key={day.date}>
         <strong>{day.kwh.toFixed(1).replace(".", ",")}</strong>
@@ -146,42 +112,34 @@ function UsageSection({ usage, bands }: { usage: UsageResponse | null; bands: Us
 function PriceChart({ points, bands }: { points: PricePoint[]; bands: PriceBands }) {
   const bars = hourlyBars(points);
   if (bars.length === 0) return <div className="electricity-empty">Ingen priser til grafen.</div>;
-
-  const width = 1200;
-  const height = 330;
-  const padLeft = 52;
-  const padRight = 18;
-  const padTop = 18;
-  const padBottom = 46;
-  const plotWidth = width - padLeft - padRight;
-  const plotHeight = height - padTop - padBottom;
-  const slotWidth = plotWidth / Math.max(1, bars.length);
-  const barWidth = Math.max(8, slotWidth * 0.72);
-  const yForPrice = (value: number) => padTop + (1 - Math.max(0, Math.min(CHART_MAX_DKK, value)) / CHART_MAX_DKK) * plotHeight;
   const yTicks = Array.from({ length: CHART_MAX_DKK + 1 }, (_, index) => index);
   const hasClippedValues = bars.some((bar) => bar.average > CHART_MAX_DKK);
 
   return (
     <div className="electricity-chart-wrap">
-      <div className="electricity-band-legend"><span className="low">Lav ≤ {bands.low.toFixed(2)} kr</span><span className="medium">Middel</span><span className="high">Høj ≥ {bands.high.toFixed(2)} kr</span></div>
-      <div className="electricity-chart-scroll">
-        <svg className="electricity-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label="Samlet variabel elpris pr. time med fast skala fra 0 til 6 kroner pr. kWh">
-          {yTicks.map((tick) => {
-            const y = yForPrice(tick);
-            return <g key={`y-${tick}`}><line x1={padLeft} y1={y} x2={width - padRight} y2={y} className="electricity-gridline" /><text x={padLeft - 10} y={y + 4} textAnchor="end" className="electricity-axis-label">{tick} kr</text></g>;
-          })}
+      <div className="band-legend electricity-band-legend"><span className="low">Lav ≤ {bands.low.toFixed(2)} kr</span><span className="medium">Middel</span><span className="high">Høj ≥ {bands.high.toFixed(2)} kr</span></div>
+      <ChartFrame className="electricity-chart" label="Samlet variabel elpris pr. time med fast skala fra 0 til 6 kroner pr. kWh">{({ width, height }) => {
+        const padLeft = 40, padRight = 10, padTop = 10, padBottom = 22;
+        const plotWidth = width - padLeft - padRight;
+        const plotHeight = height - padTop - padBottom;
+        const slotWidth = plotWidth / Math.max(1, bars.length);
+        const barWidth = Math.max(4, slotWidth * 0.72);
+        const baseline = height - padBottom;
+        const yForPrice = (value: number) => padTop + (1 - Math.max(0, Math.min(CHART_MAX_DKK, value)) / CHART_MAX_DKK) * plotHeight;
+        const labelEvery = Math.max(1, Math.ceil(36 / slotWidth));
+        return <>
+          {yTicks.map((tick) => <g key={`y-${tick}`}><line x1={padLeft} y1={yForPrice(tick)} x2={width - padRight} y2={yForPrice(tick)} className="chart-grid" /><text x={padLeft - 8} y={yForPrice(tick) + 3.5} textAnchor="end" className="chart-axis">{tick} kr</text></g>)}
           {bars.map((bar, index) => {
             const x = padLeft + index * slotWidth + (slotWidth - barWidth) / 2;
-            const y = yForPrice(bar.average);
-            const barHeight = height - padBottom - y;
-            return <g key={bar.start} className={`electricity-hour-bar electricity-hour-bar--${bandClass(bar.average, bands)}`}>
-              <rect x={x} y={y} width={barWidth} height={Math.max(1, barHeight)} rx="4"><title>{formatTime(bar.start)} · {bar.average.toFixed(2)} kr/kWh</title></rect>
-              <text x={x + barWidth / 2} y={height - 18} textAnchor="middle" className="electricity-axis-label electricity-axis-label--hour">{formatHour(bar.start)}</text>
+            const barHeight = Math.max(2, baseline - yForPrice(bar.average));
+            return <g key={bar.start} className={`chart-bar chart-bar--${bandClass(bar.average, bands)}`}>
+              <rect x={x} y={baseline - barHeight} width={barWidth} height={barHeight} rx="4"><title>{formatTime(bar.start)} · {bar.average.toFixed(2)} kr/kWh</title></rect>
+              {index % labelEvery === 0 && <text x={x + barWidth / 2} y={height - 6} textAnchor="middle" className="chart-axis">{formatHour(bar.start)}</text>}
             </g>;
           })}
-        </svg>
-      </div>
-      {hasClippedValues && <p className="electricity-chart-cap-note">Priser over {CHART_MAX_DKK} kr/kWh vises ved toppen af grafen.</p>}
+        </>;
+      }}</ChartFrame>
+      {hasClippedValues && <p className="chart-note electricity-chart-cap-note">Priser over {CHART_MAX_DKK} kr/kWh vises ved toppen af grafen.</p>}
     </div>
   );
 }
@@ -205,12 +163,8 @@ export default function ElectricityPage() {
       setUsage(usageResult.ok ? await usageResult.json() as UsageResponse : null);
       if (settingsResult.ok) {
         const settings = (await settingsResult.json() as SettingsResponse).settings;
-        const low = Number(settings.energyLowPriceDkk ?? DEFAULT_BANDS.low);
-        const high = Number(settings.energyHighPriceDkk ?? DEFAULT_BANDS.high);
-        if (Number.isFinite(low) && Number.isFinite(high) && low >= 0 && high > low) setBands({ low, high });
-        const usageLow = Number(settings.energyUsageLowKwh ?? DEFAULT_USAGE_BANDS.low);
-        const usageHigh = Number(settings.energyUsageHighKwh ?? DEFAULT_USAGE_BANDS.high);
-        if (Number.isFinite(usageLow) && Number.isFinite(usageHigh) && usageLow >= 0 && usageHigh > usageLow) setUsageBands({ low: usageLow, high: usageHigh });
+        setBands(bandsFrom(settings.energyLowPriceDkk, settings.energyHighPriceDkk, DEFAULT_BANDS));
+        setUsageBands(bandsFrom(settings.energyUsageLowKwh, settings.energyUsageHighKwh, DEFAULT_USAGE_BANDS));
       }
       setState("ready");
     } catch {

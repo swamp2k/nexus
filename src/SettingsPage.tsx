@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { invalidateSettings } from "./data/settings";
 import CalendarSourceSettings from "./CalendarSourceSettings";
 import EloverblikSettings from "./EloverblikSettings";
 import GarminImportSettings from "./GarminImportSettings";
@@ -136,6 +137,7 @@ export default function SettingsPage() {
         body: JSON.stringify({ weatherLabel: label, weatherLat: Number(latitude), weatherLon: Number(longitude), energyPriceArea, energyGridProvider, energySupplierMarkupOere: Number(energySupplierMarkupOere), energyLowPriceDkk: lowBand, energyHighPriceDkk: highBand, energyUsageLowKwh: lowUsage, energyUsageHighKwh: highUsage, dashboardRefreshClasses }),
       });
       if (!response.ok) throw new Error(await responseError(response));
+      invalidateSettings();
       const { settings } = await response.json() as SettingsResponse;
       setLabel(settings.weatherLabel || "Hjem"); setLatitude(String(settings.weatherLat)); setLongitude(String(settings.weatherLon));
       setEnergyPriceArea(settings.energyPriceArea === "DK2" ? "DK2" : "DK1"); setEnergyGridProvider(settings.energyGridProvider || "Konstant");

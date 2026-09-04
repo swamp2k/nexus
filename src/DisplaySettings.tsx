@@ -61,7 +61,7 @@ export default function DisplaySettings() {
     </div>
 
     {pairing && <div className="display-pairing-code-panel">
-      <span>Indtast denne kode på <strong>/display/kitchen</strong></span>
+      <span>Indtast denne kode på <strong>/display</strong></span>
       <strong className="display-pairing-code">{pairing.code.slice(0, 4)} {pairing.code.slice(4)}</strong>
       <small>Udløber {timeLabel(pairing.expiresAt)} · kan kun bruges én gang.</small>
     </div>}

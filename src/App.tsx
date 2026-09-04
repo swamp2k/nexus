@@ -149,16 +149,6 @@ function App() {
 
   const isHome = page === "Hjem";
   const heading = isHome ? "Hjem" : page;
-  const subheading = isHome ? "Dit personlige overblik over de data, du faktisk vil se."
-    : page === "Garmin" ? "Din sundhedshistorik samlet, importeret og klar til analyse."
-    : page === "Motion" ? "Aktiviteter, træningshistorik og på sigt dine egne rekorder og træningsdata."
-    : page === "Velbefindende" ? "Daglige målinger og journalnoter om hvordan du faktisk har det."
-    : page === "Indstillinger" ? "Dine personlige Nexus-indstillinger."
-    : page === "Strøm" ? "Spotpriser og de bedste tidspunkter at bruge strøm på."
-    : page === "Kalender" ? "Dine kommende aftaler samlet fra iCal-kalendere."
-    : page === "Varmepumpe" ? "Luft/vand-varmepumpen samlet fra MELCloud."
-    : page === "Unraid" ? "Serverstatus, array, Docker, VM'er, shares og UPS fra UnraidWatch."
-    : page === "Displays" ? "Byg og par dashboards til iPads og andre faste skærme." : "";
 
   return <div className="app-frame">
     <aside className={`sidebar${editingNav ? " sidebar--editing" : ""}`}>
@@ -179,7 +169,7 @@ function App() {
     </aside>
 
     <div className="content-shell">
-      <header className="app-header"><div><h1>{heading}</h1>{subheading && <p>{subheading}</p>}</div><div className="header-actions"><button className="theme-toggle" onClick={toggleTheme} aria-label="Skift tema">{theme === "light" ? "☾" : "☀"}</button><details className="user-menu"><summary className="user-menu-summary" aria-label="Åbn brugermenu"><span className="avatar">{initials(session.user)}</span><span className="user-name">{displayName}</span></summary><div className="user-menu-popover"><button type="button" onClick={(event) => { setPage("Indstillinger"); closeUserMenu(event); }}>Indstillinger</button><button className="logout-button" type="button" onClick={logout}>Log ud</button></div></details></div></header>
+      <header className="app-header"><div><h1>{heading}</h1></div><div className="header-actions"><button className="theme-toggle" onClick={toggleTheme} aria-label="Skift tema">{theme === "light" ? "☾" : "☀"}</button><details className="user-menu"><summary className="user-menu-summary" aria-label="Åbn brugermenu"><span className="avatar">{initials(session.user)}</span><span className="user-name">{displayName}</span></summary><div className="user-menu-popover"><button type="button" onClick={(event) => { setPage("Indstillinger"); closeUserMenu(event); }}>Indstillinger</button><button className="logout-button" type="button" onClick={logout}>Log ud</button></div></details></div></header>
       <main className="main-content">
         {page === "Hjem" && <HomePage onOpenPage={setPage} />}{page === "Garmin" && <GarminPage />}{page === "Motion" && <MotionPage />}{page === "Velbefindende" && <WellbeingPage />}{page === "Vejr" && <WeatherPage />}{page === "Strøm" && <ElectricityPage />}{page === "Kalender" && <CalendarPage />}{page === "Varmepumpe" && <MelCloudPage />}{page === "Unraid" && <UnraidPage />}{page === "Displays" && <DisplaysPage />}{page === "Indstillinger" && <SettingsPage />}
         {!isHome && page !== "Garmin" && page !== "Motion" && page !== "Velbefindende" && page !== "Vejr" && page !== "Strøm" && page !== "Kalender" && page !== "Varmepumpe" && page !== "Unraid" && page !== "Displays" && page !== "Indstillinger" && <section className="placeholder-card"><p className="section-label">Planlagt</p><h2>{page}</h2><p>Modulet er på vej ind i Nexus.</p></section>}

@@ -1,15 +1,16 @@
 import { useEffect, useState } from "react";
-import { DashboardRefreshScope, resolveDashboardRefreshClass } from "./data/dashboardRefresh";
-import type { DashboardRefreshSettingsResponse } from "./data/dashboardRefresh";
-import { useCachedJson } from "./data/queryCache";
+import WidgetCard from "./dashboard/WidgetCard";
+import type { LayoutItem } from "./dashboard/layoutEditing";
+import { resolveDashboardRefreshClass } from "./data/dashboardRefresh";
+import { useSettings } from "./data/settings";
 import { widgetDefinitionById } from "./widgets/widgetCatalog";
-import type { WidgetSize } from "./widgets/widgetRegistry";
+import { widgetRefreshGroup } from "./widgets/widgetRegistry";
 
 type DisplayDashboardModel = {
   id: string;
   name: string;
   theme: "light" | "dark" | "system";
-  layout: Array<{ id: string; size: WidgetSize }>;
+  layout: LayoutItem[];
 };
 
 type Props = {
@@ -21,8 +22,13 @@ type Props = {
 const TIME_FORMATTER = new Intl.DateTimeFormat("da-DK", { hour: "2-digit", minute: "2-digit" });
 const DATE_FORMATTER = new Intl.DateTimeFormat("da-DK", { weekday: "long", day: "numeric", month: "long" });
 
+/**
+ * Paired kiosk view. No app chrome, no drill-down links, fills the screen:
+ * the grid distributes the viewport height across its rows and only scrolls
+ * when the layout genuinely cannot fit.
+ */
 export default function DisplayDashboard({ dashboard, theme, onThemeChange }: Props) {
-  const { data: refreshSettings } = useCachedJson<DashboardRefreshSettingsResponse>("/api/settings", 1_000);
+  const { data: refreshSettings } = useSettings();
   const [now, setNow] = useState(() => new Date());
 
   useEffect(() => {
@@ -46,10 +52,10 @@ export default function DisplayDashboard({ dashboard, theme, onThemeChange }: Pr
 
   return <div className="display-dashboard-shell">
     <header className="display-dashboard-header">
-      <div><span className="display-brand">NEXUS DISPLAY</span><h1>{dashboard.name}</h1></div>
+      <div className="display-dashboard-title"><span className="display-brand">NEXUS</span><h1>{dashboard.name}</h1></div>
       <div className="display-dashboard-header-actions">
         <div className="display-clock"><strong>{TIME_FORMATTER.format(now)}</strong><span>{DATE_FORMATTER.format(now)}</span></div>
-        <button className="theme-toggle" type="button" onClick={() => onThemeChange(theme === "light" ? "dark" : "light")} aria-label="Skift tema">{theme === "light" ? "☾" : "☀"}</button>
+        <button className="theme-toggle display-theme-toggle" type="button" onClick={() => onThemeChange(theme === "light" ? "dark" : "light")} aria-label="Skift tema">{theme === "light" ? "☾" : "☀"}</button>
       </div>
     </header>
 
@@ -59,11 +65,8 @@ export default function DisplayDashboard({ dashboard, theme, onThemeChange }: Pr
           const widget = widgetDefinitionById(item.id);
           if (!widget) return null;
           const Widget = widget.component;
-          const refreshClass = resolveDashboardRefreshClass(widget.group, refreshSettings);
-          return <article className={`home-widget home-widget--${item.size}`} data-widget-id={item.id} data-refresh-class={refreshClass} key={item.id}>
-            <header><div><span>{widget.group}</span><h3>{widget.title}</h3></div></header>
-            <div className="home-widget-content"><DashboardRefreshScope refreshClass={refreshClass}><Widget /></DashboardRefreshScope></div>
-          </article>;
+          const refreshClass = resolveDashboardRefreshClass(widgetRefreshGroup(widget), refreshSettings);
+          return <WidgetCard key={item.id} id={item.id} title={widget.title} size={item.size} rows={widget.rows} refreshClass={refreshClass}><Widget /></WidgetCard>;
         })}
       </main>}
   </div>;

@@ -1,39 +1,76 @@
-.unraid-page{display:grid;gap:14px}.unraid-toolbar{display:flex;justify-content:space-between;align-items:flex-start;gap:20px}.unraid-toolbar h2,.unraid-toolbar p{margin:0}.unraid-toolbar>div:first-child{display:grid;gap:5px}.unraid-toolbar>div:first-child>p:last-child{color:var(--muted)}.unraid-toolbar-actions{display:flex;align-items:center;gap:8px}.unraid-tabs{display:flex;gap:7px;overflow-x:auto;padding-bottom:2px}.unraid-tabs button{flex:0 0 auto;padding:9px 13px;border:1px solid var(--border);border-radius:999px;background:var(--surface);color:var(--muted-strong);cursor:pointer;font-weight:800}.unraid-tabs button.active{border-color:color-mix(in srgb,var(--accent) 35%,var(--border));background:var(--accent-soft);color:var(--accent)}.unraid-stat-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.unraid-stat{display:grid;gap:5px;padding:18px;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--surface);box-shadow:var(--shadow-soft)}.unraid-stat span{color:var(--muted);font-size:.75rem;font-weight:900;letter-spacing:.08em;text-transform:uppercase}.unraid-stat strong{font-size:clamp(1.55rem,3vw,2.25rem);letter-spacing:-.045em}.unraid-stat small{color:var(--muted)}.unraid-panel{display:grid;gap:14px;padding:18px;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--surface);box-shadow:var(--shadow-soft)}.unraid-panel-heading{display:flex;justify-content:space-between;align-items:flex-start;gap:16px}.unraid-panel-heading h3{margin:0}.unraid-status{display:inline-flex;align-items:center;padding:5px 9px;border-radius:999px;font-size:.72rem;font-weight:900;text-transform:capitalize}.unraid-status.ok{background:color-mix(in srgb,var(--success) 12%,var(--surface));color:var(--success)}.unraid-status.warn{background:color-mix(in srgb,#d97706 12%,var(--surface));color:#d97706}.unraid-disk-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.unraid-disk{min-width:0;display:grid;grid-template-columns:minmax(0,1fr) auto;gap:4px 10px;padding:13px;border-radius:12px;background:var(--surface-soft)}.unraid-disk>div{min-width:0;display:grid}.unraid-disk strong{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.unraid-disk span,.unraid-disk small{color:var(--muted)}.unraid-disk small{grid-column:1/-1}.unraid-list{display:grid}.unraid-row{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:11px 0}.unraid-row+.unraid-row{border-top:1px solid var(--border)}.unraid-share-list{display:grid;gap:12px}.unraid-share{display:grid;grid-template-columns:minmax(0,220px) minmax(120px,1fr) auto;align-items:center;gap:14px}.unraid-share>div:first-child{display:grid;gap:2px}.unraid-share>div:first-child span{color:var(--muted);font-size:.76rem}.unraid-progress{height:9px;border-radius:999px;background:var(--surface-soft);overflow:hidden}.unraid-progress span{display:block;height:100%;border-radius:inherit;background:var(--accent)}.unraid-stat-grid--three{grid-template-columns:repeat(3,minmax(0,1fr))}
+/* Unraid page and Unraid dashboard widget content. Card/grid sizing lives in
+   dashboard/dashboard.css. */
 
-/* Home dashboard: regular cards occupy two compact rows, while an individual
-   VM card occupies one. Selected Docker containers are rendered together in
-   one regular card below. */
-.home-widget-grid{grid-auto-rows:56px}.home-widget{grid-row:span 4}.home-widget--compact{grid-row:span 2;padding:11px 13px}.home-widget--compact.home-widget--editing{grid-row:span 3}.home-widget--compact>header{align-items:center;padding-bottom:7px}.home-widget--compact>header span{margin:0;font-size:.62rem}.home-widget--compact>header h3{max-width:22ch;overflow:hidden;font-size:.88rem;text-overflow:ellipsis;white-space:nowrap}.home-widget--compact .home-widget-content{padding-top:7px}.home-widget--compact .home-widget-content>.home-metric strong{font-size:1.35rem}.unraid-entity-status{display:flex;align-items:center;gap:7px;width:100%;min-width:0}.unraid-entity-status strong{overflow:hidden;font-size:.9rem;text-overflow:ellipsis;white-space:nowrap}.unraid-entity-status small{margin-left:auto;color:var(--muted);font-size:.68rem;text-transform:uppercase}.unraid-entity-dot{width:9px;height:9px;flex:0 0 auto;border-radius:50%;background:#d97706}.unraid-entity-status.ok .unraid-entity-dot{background:var(--success)}.unraid-home-system{width:100%;display:grid;gap:12px}.unraid-home-server{display:flex;align-items:baseline;gap:9px}.unraid-home-server>strong{font-size:1.25rem;letter-spacing:-.03em}.unraid-home-server>span{color:var(--muted);font-weight:700}
+.unraid-page { display: grid; gap: 14px; }
+.unraid-toolbar { display: flex; justify-content: space-between; align-items: flex-start; gap: 20px; }
+.unraid-toolbar h2, .unraid-toolbar p { margin: 0; }
+.unraid-toolbar > div:first-child { display: grid; gap: 5px; }
+.unraid-toolbar > div:first-child > p:last-child { color: var(--muted); }
+.unraid-toolbar-actions { display: flex; align-items: center; gap: 8px; }
+.unraid-tabs { display: flex; gap: 7px; overflow-x: auto; padding-bottom: 2px; }
+.unraid-tabs button { flex: 0 0 auto; padding: 9px 13px; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); color: var(--muted-strong); cursor: pointer; font-weight: 800; }
+.unraid-tabs button.active { border-color: color-mix(in srgb, var(--accent) 35%, var(--border)); background: var(--accent-soft); color: var(--accent); }
+.unraid-stat-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.unraid-stat-grid--three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.unraid-stat { display: grid; gap: 5px; padding: 18px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); box-shadow: var(--shadow-soft); }
+.unraid-stat span { color: var(--muted); font-size: .75rem; font-weight: 900; letter-spacing: .08em; text-transform: uppercase; }
+.unraid-stat strong { font-size: clamp(1.55rem, 3vw, 2.25rem); letter-spacing: -.045em; }
+.unraid-stat small { color: var(--muted); }
+.unraid-panel { display: grid; gap: 14px; padding: 18px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); box-shadow: var(--shadow-soft); }
+.unraid-panel-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; }
+.unraid-panel-heading h3 { margin: 0; }
+.unraid-status { display: inline-flex; align-items: center; padding: 5px 9px; border-radius: 999px; font-size: .72rem; font-weight: 900; text-transform: capitalize; }
+.unraid-status.ok { background: color-mix(in srgb, var(--success) 12%, var(--surface)); color: var(--success); }
+.unraid-status.warn { background: color-mix(in srgb, var(--warning) 12%, var(--surface)); color: var(--warning); }
+.unraid-disk-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.unraid-disk { min-width: 0; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 10px; padding: 13px; border-radius: 12px; background: var(--surface-soft); }
+.unraid-disk > div { min-width: 0; display: grid; }
+.unraid-disk strong { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.unraid-disk span, .unraid-disk small { color: var(--muted); }
+.unraid-disk small { grid-column: 1 / -1; }
+.unraid-list { display: grid; }
+.unraid-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 11px 0; }
+.unraid-row + .unraid-row { border-top: 1px solid var(--border); }
+.unraid-share-list { display: grid; gap: 12px; }
+.unraid-share { display: grid; grid-template-columns: minmax(0, 220px) minmax(120px, 1fr) auto; align-items: center; gap: 14px; }
+.unraid-share > div:first-child { display: grid; gap: 2px; }
+.unraid-share > div:first-child span { color: var(--muted); font-size: .76rem; }
+.unraid-progress { height: 9px; border-radius: 999px; background: var(--surface-soft); overflow: hidden; }
+.unraid-progress span { display: block; height: 100%; border-radius: inherit; background: var(--accent); }
 
-/* The grouped Docker widget should be dense, not inherit the full height of a
-   generic dashboard card. Let the selected services use both the available
-   width and the remaining card height. */
-.home-widget[data-widget-id="unraid.containers.selected"]{grid-row:span 3}.home-widget[data-widget-id="unraid.containers.selected"]:has(.unraid-container-group-item:nth-child(7)){grid-row:span 4}.home-widget[data-widget-id="unraid.containers.selected"] .home-widget-content{align-items:stretch}.unraid-container-group{width:100%;height:100%;min-width:0;display:grid;grid-template-columns:repeat(auto-fit,minmax(145px,1fr));grid-auto-rows:minmax(0,1fr);align-content:stretch;gap:8px}.unraid-container-group-item{min-width:0;display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;align-content:center;gap:7px;padding:9px 10px;border-radius:10px;background:var(--surface-soft)}.unraid-container-group-item strong{min-width:0;overflow:hidden;font-size:.86rem;text-overflow:ellipsis;white-space:nowrap}.unraid-container-group-item small{color:var(--muted);font-size:.68rem;white-space:nowrap}.unraid-container-group-item.ok .unraid-entity-dot{background:var(--success)}.unraid-container-group-item.warn small{color:#d97706}
+/* --- Dashboard widget content --------------------------------------------- */
 
-/* Main Home density review: most glanceable cards do not need the old four-row
-   height. Keep them at three rows and reserve four rows for charts, lists and
-   other genuinely information-dense widgets. Scope this to Home so display
-   dashboards keep their own sizing policy. */
-@media(min-width:761px){
-  .home-page .home-widget-grid{grid-auto-rows:56px}
-  .home-page .home-widget{grid-row:span 3}
-  .home-page .home-widget--compact{grid-row:span 2}
-  .home-page .home-widget--compact.home-widget--editing{grid-row:span 3}
-  .home-page .home-widget[data-widget-id="energy.price.next24h"],
-  .home-page .home-widget[data-widget-id="garmin.steps.week"],
-  .home-page .home-widget[data-widget-id="garmin.sleep.week"],
-  .home-page .home-widget[data-widget-id="calendar.waste.next"],
-  .home-page .home-widget[data-widget-id="unraid.disks.temperature"]{grid-row:span 4}
-  .home-page .home-widget--medium[data-widget-id="weather.nextHours"],
-  .home-page .home-widget--wide[data-widget-id="weather.nextHours"],
-  .home-page .home-widget--medium[data-widget-id="weather.week"],
-  .home-page .home-widget--wide[data-widget-id="weather.week"],
-  .home-page .home-widget--medium[data-widget-id="wellbeing.today"],
-  .home-page .home-widget--wide[data-widget-id="wellbeing.today"]{grid-row:span 4}
-  .home-page .home-widget--small[data-widget-id="unraid.system.overview"],
-  .home-page .home-widget--small[data-widget-id="melcloud.atw.current"]{grid-row:span 4}
-  .home-page .home-widget[data-widget-id="unraid.containers.selected"]{grid-row:span 3}
-  .home-page .home-widget[data-widget-id="unraid.containers.selected"]:has(.unraid-container-group-item:nth-child(7)){grid-row:span 4}
+.unraid-entity-status { display: flex; align-items: center; gap: 7px; width: 100%; min-width: 0; }
+.unraid-entity-status strong { overflow: hidden; font-size: .9rem; text-overflow: ellipsis; white-space: nowrap; }
+.unraid-entity-status small { margin-left: auto; color: var(--muted); font-size: .68rem; text-transform: uppercase; }
+.unraid-entity-dot { width: 9px; height: 9px; flex: 0 0 auto; border-radius: 50%; background: var(--warning); }
+.unraid-entity-status.ok .unraid-entity-dot { background: var(--success); }
+.unraid-home-system { width: 100%; display: grid; gap: 12px; }
+.unraid-home-server { display: flex; align-items: baseline; gap: 9px; }
+.unraid-home-server > strong { font-size: 1.25rem; letter-spacing: -.03em; }
+.unraid-home-server > span { color: var(--muted); font-weight: 700; }
+
+/* Selected Docker containers share one card and use its full width. */
+.unraid-container-group { display: grid; grid-template-columns: repeat(auto-fit, minmax(145px, 1fr)); grid-auto-rows: minmax(0, auto); align-content: start; gap: 8px; }
+.unraid-container-group-item { min-width: 0; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 7px; padding: 9px 10px; border-radius: 10px; background: var(--surface-soft); }
+.unraid-container-group-item strong { min-width: 0; overflow: hidden; font-size: .86rem; text-overflow: ellipsis; white-space: nowrap; }
+.unraid-container-group-item small { color: var(--muted); font-size: .68rem; white-space: nowrap; }
+.unraid-container-group-item.ok .unraid-entity-dot { background: var(--success); }
+.unraid-container-group-item.warn small { color: var(--warning); }
+
+@media (max-width: 850px) {
+  .unraid-stat-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .unraid-disk-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .unraid-share { grid-template-columns: minmax(0, 1fr) auto; }
+  .unraid-share .unraid-progress { grid-column: 1 / -1; grid-row: 2; }
 }
 
-@media(max-width:850px){.unraid-stat-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.unraid-disk-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.unraid-share{grid-template-columns:minmax(0,1fr) auto}.unraid-share .unraid-progress{grid-column:1/-1;grid-row:2}}@media(max-width:760px){.home-widget-grid{grid-auto-rows:auto}.home-widget,.home-widget--compact,.home-widget--compact.home-widget--editing,.home-widget[data-widget-id="unraid.containers.selected"]{grid-row:auto}.home-widget--compact{min-height:108px}.unraid-container-group{height:auto;grid-template-columns:1fr;grid-auto-rows:auto}}@media(max-width:600px){.unraid-toolbar{flex-direction:column}.unraid-stat-grid,.unraid-stat-grid--three,.unraid-disk-grid{grid-template-columns:1fr}.unraid-toolbar-actions{width:100%;justify-content:space-between}}
+@media (max-width: 760px) {
+  .unraid-container-group { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 600px) {
+  .unraid-toolbar { flex-direction: column; }
+  .unraid-stat-grid, .unraid-stat-grid--three, .unraid-disk-grid { grid-template-columns: 1fr; }
+  .unraid-toolbar-actions { width: 100%; justify-content: space-between; }
+}

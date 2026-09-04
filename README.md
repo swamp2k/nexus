@@ -108,9 +108,9 @@ Electricity-price module using Danish day-ahead prices plus configurable grid/pr
 
 These are reusable domain components, not systems Nexus keeps at arm's length. Each stays the source of truth for its own domain, and Nexus reuses it rather than reimplementing it.
 
-## Kitchen display
+## Paired displays
 
-`/display/kitchen` is a separate kiosk-style view intended for a shared kitchen tablet. It has no normal app chrome and is designed for glanceable, touch-friendly, automatically refreshed household information.
+`/display` is a kiosk-style view intended for a shared tablet. A device is paired once with a code from the Displays page and then shows its assigned dashboard without a login. It has no normal app chrome, fills the screen, refreshes automatically and renders the same widgets as Home.
 
 ## Data strategy
 
@@ -181,5 +181,6 @@ Never put credentials, API keys, Garmin passwords, encryption keys, or tokens in
 - `docs/MVP.md` — product scope/direction
 - `docs/AUTH.md` — authentication design
 - `docs/GARMIN-AGENT-UNRAID.md` — Garmin agent deployment/operations
+- `docs/UI-GUIDE.md` — design system: tokens, dashboard cards, charts, displays
 
 Documentation should describe the system that actually exists. When implementation changes invalidate a documented fact, update the relevant documentation in the same workstream.

@@ -1,3 +1,81 @@
-.displays-page{display:grid;gap:16px}.displays-toolbar{display:flex;justify-content:space-between;gap:18px;align-items:flex-start}.displays-toolbar h2,.displays-toolbar p{margin:0}.displays-toolbar>div{display:grid;gap:5px}.displays-toolbar>div>p:last-child{color:var(--muted);max-width:70ch}.displays-layout{display:grid;grid-template-columns:220px minmax(0,1fr);gap:16px}.display-dashboard-list{display:grid;align-content:start;gap:8px}.display-dashboard-list button{display:grid;gap:3px;text-align:left;padding:13px;border:1px solid var(--border);border-radius:12px;background:var(--surface);color:var(--text);cursor:pointer}.display-dashboard-list button.active{border-color:var(--accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 12%,transparent)}.display-dashboard-list span{color:var(--muted);font-size:.76rem}.display-dashboard-editor{display:grid;gap:14px}.display-editor-actions{display:flex;justify-content:flex-end;gap:8px}.display-layout-preview{display:grid;gap:14px;padding:18px;border:1px solid var(--border);border-radius:var(--radius-md);background:var(--surface);box-shadow:var(--shadow-soft)}.display-dashboard-grid--editing .display-edit-widget{cursor:grab;transition:opacity 120ms ease,transform 120ms ease,box-shadow 120ms ease}.display-dashboard-grid--editing .display-edit-widget:active{cursor:grabbing}.display-dashboard-grid--editing .display-edit-widget.is-dragging{opacity:.42;transform:scale(.985);box-shadow:none}.display-dashboard-grid--editing .home-widget>header{pointer-events:auto}.display-dashboard-grid--editing .home-widget-direct-controls{display:flex;gap:4px;align-items:center}.display-dashboard-grid--editing .home-widget-direct-controls button{width:30px;height:30px;padding:0;border:1px solid var(--border);border-radius:8px;background:var(--surface-soft);color:var(--text);cursor:pointer}.display-dashboard-grid--editing .home-widget-direct-controls button:disabled{opacity:.35;cursor:default}.display-dashboard-grid--editing .home-widget-direct-controls .home-widget-remove{color:#d64545}.display-dashboard-shell{min-height:100vh;padding:24px;background:radial-gradient(circle at 88% 5%,color-mix(in srgb,var(--accent) 8%,transparent),transparent 30%),var(--bg);color:var(--text)}.display-dashboard-header{width:min(1460px,100%);margin:0 auto 20px;display:flex;justify-content:space-between;align-items:flex-start;gap:20px}.display-dashboard-header h1{margin:0;font-size:clamp(2.2rem,4.5vw,4rem);letter-spacing:-.05em}.display-dashboard-header-actions{display:flex;align-items:flex-start;gap:14px}.display-dashboard-grid{width:min(1460px,100%);margin:0 auto}.display-dashboard-grid .home-widget{min-height:170px}.display-dashboard-grid .home-widget--wide .home-mini-chart-block{align-self:flex-start}.display-dashboard-grid .home-widget--wide .home-energy-chart{height:150px;max-height:150px}.display-dashboard-shell .display-dashboard-grid .home-widget>header{pointer-events:none}.display-dashboard-shell .display-dashboard-grid .home-widget>header button{display:none}@media(max-width:900px){.displays-layout{grid-template-columns:1fr}.display-dashboard-list{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:700px){.displays-toolbar,.display-dashboard-header{flex-direction:column}.display-dashboard-list{grid-template-columns:1fr}.display-dashboard-shell{padding:16px}.display-dashboard-header-actions{width:100%;justify-content:space-between}.display-dashboard-grid--editing .home-widget-direct-controls .home-widget-order-button{display:none}}
+/* Displays page (dashboard editor) and the paired kiosk view. Card and grid
+   sizing lives in dashboard/dashboard.css; this file only adds the page frame
+   and the kiosk's fit-to-screen behaviour. */
 
-.display-dashboard-grid .home-widget[data-widget-id="energy.usage.week"] .home-widget-content{align-items:stretch;padding-top:10px}.display-dashboard-grid .home-widget[data-widget-id="energy.usage.week"] .home-usage-chart-block{height:100%;align-content:start;gap:6px}.display-dashboard-grid .home-widget[data-widget-id="energy.usage.week"] .home-week-summary{flex-wrap:wrap;gap:4px 6px;line-height:1.1}.display-dashboard-grid .home-widget[data-widget-id="energy.usage.week"] .home-week-summary strong{font-size:1.3rem}.display-dashboard-grid .home-widget[data-widget-id="energy.usage.week"] .home-usage-chart{min-height:175px;max-height:230px}.display-dashboard-grid .home-widget[data-widget-id="energy.usage.week"] .home-usage-band-legend{margin-top:1px}
+/* --- Displays page (editor) ----------------------------------------------- */
+
+.displays-page { display: grid; gap: 16px; }
+.displays-toolbar { display: flex; justify-content: space-between; align-items: flex-start; gap: 18px; }
+.displays-toolbar h2, .displays-toolbar p { margin: 0; }
+.displays-toolbar > div { display: grid; gap: 5px; }
+.displays-toolbar > div > p:last-child { color: var(--muted); max-width: 70ch; }
+.displays-layout { display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 16px; }
+.display-dashboard-list { display: grid; align-content: start; gap: 8px; }
+.display-dashboard-list button { display: grid; gap: 3px; text-align: left; padding: 13px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); color: var(--text); cursor: pointer; }
+.display-dashboard-list button.active { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 12%, transparent); }
+.display-dashboard-list span { color: var(--muted); font-size: .76rem; }
+.display-dashboard-editor { display: grid; gap: 14px; }
+.display-editor-actions { display: flex; justify-content: flex-end; gap: 8px; }
+.display-layout-preview { display: grid; gap: 14px; padding: 18px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); box-shadow: var(--shadow-soft); }
+
+/* --- Kiosk ---------------------------------------------------------------- */
+
+.display-dashboard-shell {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px 20px 18px;
+  background: radial-gradient(circle at 88% 5%, color-mix(in srgb, var(--accent) 8%, transparent), transparent 30%), var(--bg);
+  color: var(--text);
+}
+
+/* One-line header: name left, clock right. The data is the point, not the chrome. */
+.display-dashboard-header { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.display-dashboard-title { min-width: 0; display: flex; align-items: baseline; gap: 10px; }
+.display-dashboard-title h1 { margin: 0; overflow: hidden; font-size: 1.35rem; letter-spacing: -.03em; text-overflow: ellipsis; white-space: nowrap; }
+.display-brand { color: var(--accent); font-size: .68rem; font-weight: 900; letter-spacing: .16em; }
+.display-dashboard-header-actions { display: flex; align-items: center; gap: 12px; }
+.display-clock { display: flex; align-items: baseline; gap: 10px; }
+.display-clock strong { font-size: 1.7rem; line-height: 1; letter-spacing: -.04em; }
+.display-clock span { color: var(--muted); font-size: .85rem; text-transform: capitalize; }
+.display-theme-toggle { width: 36px; height: 36px; box-shadow: none; }
+
+/* The grid takes the remaining viewport and shares it between its rows, so a
+   display fills the screen without scrolling. It only scrolls when the layout
+   genuinely cannot fit. Charts grow into the extra height via .widget-fill. */
+.display-dashboard-shell .display-dashboard-grid {
+  --card-row: 140px;
+  flex: 1;
+  width: 100%;
+  max-width: 1600px;
+  min-height: 0;
+  margin: 0 auto;
+  grid-auto-rows: minmax(var(--card-row), 1fr);
+}
+
+.display-dashboard-shell .home-widget { overflow: hidden; }
+.display-dashboard-shell .home-metric > strong,
+.display-dashboard-shell .home-weather strong { font-size: clamp(2rem, 3.4vw, 3rem); }
+
+/* Landscape tablets keep four columns even though the app breakpoint would
+   drop to two: a kiosk sizes to its screen, not to the app's content column. */
+@media (min-width: 900px) {
+  .display-dashboard-shell .display-dashboard-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .display-dashboard-shell .home-widget--small { grid-column: span 1; }
+  .display-dashboard-shell .home-widget--medium { grid-column: span 2; }
+  .display-dashboard-shell .home-widget--wide { grid-column: 1 / -1; }
+}
+
+@media (max-width: 900px) {
+  .displays-layout { grid-template-columns: 1fr; }
+  .display-dashboard-list { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 700px) {
+  .displays-toolbar { flex-direction: column; }
+  .display-dashboard-list { grid-template-columns: 1fr; }
+  .display-dashboard-shell { padding: 12px 14px 14px; }
+  .display-clock span { display: none; }
+}

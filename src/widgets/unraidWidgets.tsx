@@ -177,7 +177,7 @@ export function SelectedContainersWidget({ widgetIds }: { widgetIds: string[] })
 
   if (selected.length === 0) return <State>Ingen containere valgt</State>;
 
-  return <div className="unraid-container-group">
+  return <div className="widget-fill unraid-container-group">
     {selected.map((selectedContainer) => {
       const container = data.containers.find((candidate) => candidate.id === selectedContainer.id);
       const ok = container ? statusOk(container.status) : false;
@@ -211,6 +211,7 @@ function dynamicDefinition(kind: "container" | "vm", id: string, name: string): 
     title: name,
     description: kind === "container" ? "Vises i den samlede container-widget" : "Status for denne virtuelle maskine",
     group: kind === "container" ? "Unraid · Containere" : "Unraid · VM'er",
+    refreshGroup: "Unraid",
     page: "Unraid",
     defaultSize: kind === "container" ? "medium" : "small",
     supportedSizes: kind === "container" ? ["medium", "wide"] : ["small", "medium"],

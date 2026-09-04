@@ -1,0 +1,265 @@
+/* ==========================================================================
+   Dashboard layer — grid, card, header, edit controls and chart frames.
+
+   Shared by Home, the Displays editor preview and paired displays. This is
+   the only stylesheet that may size `.home-widget` or `.chart-frame`.
+   Widget content styles (numbers, tiles, chips) live next to their widget.
+   See docs/UI-GUIDE.md.
+   ========================================================================== */
+
+/* --- Grid ----------------------------------------------------------------- */
+
+.home-widget-grid {
+  --card-row: 150px;
+  --card-gap: 14px;
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  /* Rows grow with content. Never fixed-height rows: content decides height,
+     the grid keeps neighbours aligned. Never `dense`: stored order is visual
+     order, or the editor cannot be reasoned about. */
+  grid-auto-rows: minmax(var(--card-row), auto);
+  gap: var(--card-gap);
+  align-items: stretch;
+}
+
+.home-widget--small { grid-column: span 1; }
+.home-widget--medium { grid-column: span 2; }
+.home-widget--wide { grid-column: 1 / -1; }
+.home-widget--rows-2 { grid-row: span 2; }
+
+/* --- Card ----------------------------------------------------------------- */
+
+.home-widget {
+  container-type: inline-size;
+  container-name: home-widget;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 16px 18px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-soft);
+}
+
+.home-widget > header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.home-widget > header > div { min-width: 0; }
+
+.home-widget > header h3 {
+  margin: 0;
+  overflow: hidden;
+  font-size: 0.95rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Source label. Rendered only in editors, where the catalogue is the context. */
+.home-widget-kicker {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--muted);
+  font-size: 0.66rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.home-widget-link {
+  flex: 0 0 auto;
+  padding: 4px 0;
+  border: 0;
+  background: transparent;
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.home-widget-content {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  padding-top: 12px;
+}
+
+/* Content that wants the whole card (charts, lists) opts in with .widget-fill.
+   Numbers stay vertically centred; charts anchor to the top and fill down. */
+.home-widget-content:has(> .widget-fill) { justify-content: flex-start; }
+
+.widget-fill {
+  flex: 1;
+  width: 100%;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Compact entity cards (one line of status). */
+.home-widget--compact { padding: 11px 13px; }
+.home-widget--compact > header { padding-bottom: 7px; }
+.home-widget--compact > header h3 { font-size: 0.88rem; }
+.home-widget--compact .home-widget-content { padding-top: 7px; }
+.home-widget--compact .home-metric > strong { font-size: 1.35rem; }
+
+.home-widget-state { color: var(--muted); font-size: 0.9rem; }
+
+/* --- Chart frame ---------------------------------------------------------- */
+
+/* CSS decides the height, ChartFrame measures it, the SVG draws into it in
+   pixels. Text inside charts is therefore always the size declared here. */
+.chart-frame {
+  position: relative;
+  width: 100%;
+  height: var(--chart-h, 150px);
+  min-height: 0;
+}
+
+.widget-fill > .chart-frame { flex: 1 1 var(--chart-h, 150px); }
+.chart-frame > svg { display: block; overflow: visible; }
+
+.chart-axis { fill: var(--muted); font-size: 10px; font-weight: 600; }
+.chart-axis--strong { fill: var(--muted-strong); font-weight: 800; }
+.chart-grid { stroke: var(--border); stroke-width: 1; }
+.chart-baseline { stroke: var(--muted); stroke-width: 1.2; }
+.chart-bar rect { transition: opacity 120ms ease, filter 120ms ease; }
+.chart-bar:hover rect { opacity: 0.82; filter: brightness(1.08); }
+.chart-bar--low rect { fill: var(--band-low); }
+.chart-bar--medium rect { fill: var(--band-medium); }
+.chart-bar--high rect { fill: var(--band-high); }
+.chart-bar--accent rect { fill: var(--accent); }
+
+.chart-summary {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 12px;
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+.chart-summary strong { color: var(--text); }
+.chart-summary > strong:first-child { font-size: 1.35rem; letter-spacing: -0.03em; }
+.chart-summary small { margin-left: auto; color: var(--muted); }
+
+.band-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  color: var(--muted);
+  font-size: 0.66rem;
+}
+
+.band-legend span { padding: 3px 7px; border-radius: 999px; font-weight: 800; }
+.band-legend .low { background: color-mix(in srgb, var(--band-low) 16%, var(--surface)); color: var(--band-low); }
+.band-legend .medium { background: color-mix(in srgb, var(--band-medium) 16%, var(--surface)); color: var(--band-medium-text); }
+.band-legend .high { background: color-mix(in srgb, var(--band-high) 16%, var(--surface)); color: var(--band-high); }
+
+.chart-note { margin: 0; color: var(--muted); font-size: 0.72rem; }
+
+/* --- Edit controls -------------------------------------------------------- */
+
+.home-widget-direct-controls {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.home-widget-direct-controls button {
+  width: 30px;
+  height: 30px;
+  display: inline-grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-soft);
+  color: var(--muted-strong);
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 900;
+  line-height: 1;
+  user-select: none;
+}
+
+.home-widget-direct-controls button:disabled { opacity: 0.3; cursor: default; }
+.home-widget-direct-controls .home-widget-remove { color: var(--danger); }
+/* Order buttons carry both glyph sets; the layout decides which is truthful. */
+.home-widget-order-button .glyph-col { display: none; }
+
+.home-page--editing .home-widget {
+  outline: 1px dashed color-mix(in srgb, var(--accent) 45%, transparent);
+  outline-offset: -4px;
+}
+
+.display-edit-widget { cursor: grab; transition: opacity 120ms ease, transform 120ms ease, box-shadow 120ms ease; }
+.display-edit-widget:active { cursor: grabbing; }
+.display-edit-widget.is-dragging { opacity: 0.42; transform: scale(0.985); box-shadow: none; }
+
+/* --- Size-aware content --------------------------------------------------- */
+
+/* Small cards: the glanceable number only. */
+@container home-widget (max-width: 300px) {
+  .home-widget-content { --chart-h: 120px; }
+  .home-metric > small { display: none; }
+  .home-weather { gap: 10px; }
+  .home-weather-icon { font-size: 2rem; }
+  .home-weather small { display: none; }
+  .home-wellbeing-journal, .home-wellbeing-no-journal { display: none; }
+  .home-wellbeing-metrics span:nth-child(n+3) { display: none; }
+  .home-three-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .home-three-stats > div:nth-child(2) { display: none; }
+  .home-weather-hours, .home-weather-week { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .home-weather-hours > div:nth-child(n+4), .home-weather-week > div:nth-child(n+4) { display: none; }
+  .chart-summary small { display: none; }
+  .home-widget-direct-controls { gap: 3px; }
+  .home-widget-direct-controls button { width: 27px; height: 27px; }
+}
+
+/* Medium cards: the full named horizon, compact. */
+@container home-widget (min-width: 301px) and (max-width: 650px) {
+  .home-widget-content { --chart-h: 150px; }
+  .home-wellbeing-journal { display: none; }
+  .home-weather-hours small, .home-weather-week small { font-size: 0.58rem; }
+}
+
+/* Wide cards: complete forecast, journal and taller charts. */
+@container home-widget (min-width: 651px) {
+  .home-widget-content { --chart-h: 170px; }
+  .home-wellbeing-journal p { max-width: 90ch; }
+}
+
+/* --- Breakpoints ---------------------------------------------------------- */
+
+@media (max-width: 1060px) {
+  .home-widget-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .home-widget--small { grid-column: span 1; }
+  .home-widget--medium, .home-widget--wide { grid-column: 1 / -1; }
+}
+
+@media (max-width: 760px) {
+  .home-widget-grid { --card-row: 0px; grid-template-columns: 1fr; grid-auto-rows: auto; }
+  .home-widget--small, .home-widget--medium, .home-widget--wide { grid-column: 1; }
+  .home-widget--rows-2 { grid-row: auto; }
+  .home-widget { min-height: 120px; }
+  .home-widget-content { --chart-h: 150px; }
+  /* One column: earlier/later is up/down. */
+  .home-widget-order-button .glyph-row { display: none; }
+  .home-widget-order-button .glyph-col { display: inline; }
+  .chart-summary small { margin-left: 0; flex-basis: 100%; }
+}

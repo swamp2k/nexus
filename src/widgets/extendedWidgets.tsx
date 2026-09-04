@@ -1,16 +1,9 @@
 import { useMemo } from "react";
+import ChartFrame from "../dashboard/ChartFrame";
 import { useDashboardJson } from "../data/dashboardRefresh";
-import { useCachedJson } from "../data/queryCache";
-
-type EnergyPoint = {
-  timeUtc: string;
-  totalDkkPerKwh: number | null;
-  approxDkkPerKwh: number;
-};
-
-type EnergyResponse = { data: { intervals: EnergyPoint[] } };
-type EnergySettingsResponse = { settings: { energyLowPriceDkk: number | null; energyHighPriceDkk: number | null } };
-type PriceBands = { low: number; high: number };
+import { useSettings } from "../data/settings";
+import { bandFor, bandsFrom, DEFAULT_PRICE_BANDS } from "../data/api-types";
+import type { EnergyPricePoint, EnergyPricesResponse, WeatherResponse } from "../data/api-types";
 
 type GarminHealthRow = {
   date: string;
@@ -27,31 +20,8 @@ type GarminSleepRow = {
 
 type GarminSleepResponse = { history: GarminSleepRow[] };
 
-type WeatherResponse = {
-  data: {
-    hourly: Array<{
-      time: string;
-      temperature: number;
-      symbol: string | null;
-      precipitationMm: number | null;
-      windSpeed: number | null;
-      windDirection: number | null;
-    }>;
-    daily: Array<{
-      date: string;
-      minTemperature: number;
-      maxTemperature: number;
-      symbol: string | null;
-      precipitationMm: number | null;
-      maxPrecipitationProbability: number | null;
-      windSpeed: number | null;
-      windDirection: number | null;
-    }>;
-  };
-};
-
+/** Fixed visual reference scale shared with the Strøm page. */
 const ENERGY_MAX = 6;
-const DEFAULT_BANDS: PriceBands = { low: 1, high: 2 };
 const TZ = "Europe/Copenhagen";
 
 function WidgetState({ label }: { label: string }) {
@@ -64,20 +34,8 @@ function localDate(): string {
   return new Date(now.getTime() - offset).toISOString().slice(0, 10);
 }
 
-function price(point: EnergyPoint): number {
+function price(point: EnergyPricePoint): number {
   return point.totalDkkPerKwh ?? point.approxDkkPerKwh;
-}
-
-function priceBands(settings: EnergySettingsResponse | null): PriceBands {
-  const low = Number(settings?.settings.energyLowPriceDkk ?? DEFAULT_BANDS.low);
-  const high = Number(settings?.settings.energyHighPriceDkk ?? DEFAULT_BANDS.high);
-  return Number.isFinite(low) && Number.isFinite(high) && low >= 0 && high > low ? { low, high } : DEFAULT_BANDS;
-}
-
-function bandClass(value: number, bands: PriceBands): "low" | "medium" | "high" {
-  if (value <= bands.low) return "low";
-  if (value >= bands.high) return "high";
-  return "medium";
 }
 
 function localHourKey(value: string): string {
@@ -140,9 +98,9 @@ function hours(seconds: number | null): string {
 }
 
 export function EnergyPriceChartWidget() {
-  const { data, loading, error } = useDashboardJson<EnergyResponse>("/api/sources/energy/prices");
-  const { data: settings } = useCachedJson<EnergySettingsResponse>("/api/settings", 10 * 60_000);
-  const bands = priceBands(settings);
+  const { data, loading, error } = useDashboardJson<EnergyPricesResponse>("/api/sources/energy/prices");
+  const { data: settings } = useSettings();
+  const bands = bandsFrom(settings?.settings.energyLowPriceDkk, settings?.settings.energyHighPriceDkk, DEFAULT_PRICE_BANDS);
   const bars = useMemo(() => {
     if (!data) return [];
     const now = Date.now();
@@ -150,7 +108,7 @@ export function EnergyPriceChartWidget() {
       const time = Date.parse(point.timeUtc);
       return time >= now - 15 * 60_000 && time <= now + 24 * 60 * 60_000;
     });
-    const grouped = new Map<string, EnergyPoint[]>();
+    const grouped = new Map<string, EnergyPricePoint[]>();
     for (const point of future) {
       const key = localHourKey(point.timeUtc);
       const list = grouped.get(key) ?? [];
@@ -166,37 +124,38 @@ export function EnergyPriceChartWidget() {
   if (loading) return <WidgetState label="Henter elprisgraf…" />;
   if (error || bars.length === 0) return <WidgetState label="Elprisgraf kunne ikke hentes" />;
 
-  const left = 4.7, right = 1.1, top = 5.6, bottom = 15.6;
-  const plotW = 100 - left - right, plotH = 100 - top - bottom;
-  const slot = plotW / bars.length;
-  const barWidth = Math.max(.7, slot * .68);
-  const y = (value: number) => top + (1 - Math.max(0, Math.min(ENERGY_MAX, value)) / ENERGY_MAX) * plotH;
-  const labelEvery = Math.max(1, Math.ceil(bars.length / 6));
   const values = bars.map((bar) => bar.value);
   const min = Math.min(...values), max = Math.max(...values);
 
-  return <div className="home-mini-chart-block">
-    <div className="home-mini-chart-summary"><span>Lavest <strong>{min.toFixed(2).replace(".", ",")} kr</strong></span><span>Højest <strong>{max.toFixed(2).replace(".", ",")} kr</strong></span><small>Fast skala 0–6 kr/kWh</small></div>
-    <svg className="home-mini-chart home-energy-chart" role="img" aria-label="Elpris næste 24 timer, fast skala 0 til 6 kroner pr. kWh">
-      {[0, 2, 4, 6].map((tick) => {
-        const yy = y(tick);
-        return <g key={tick}><line x1={`${left}%`} x2={`${100-right}%`} y1={`${yy}%`} y2={`${yy}%`} className="home-mini-grid" /><text x={`${left-.8}%`} y={`${yy+2.2}%`} textAnchor="end" className="home-mini-axis">{tick}</text></g>;
-      })}
-      {bars.map((bar, index) => {
-        const x = left + index * slot + (slot - barWidth) / 2;
-        const yy = y(bar.value);
-        const baseline = 100 - bottom;
-        const barHeight = Math.max(1.1, baseline - yy);
-        const barY = baseline - barHeight;
-        const band = bandClass(bar.value, bands);
-        return <g key={bar.time} className={`home-energy-bar home-energy-bar--${band}`}><rect x={`${x}%`} y={`${barY}%`} width={`${barWidth}%`} height={`${barHeight}%`} rx="3"><title>{formatHour(bar.time)} · {bar.value.toFixed(2)} kr/kWh · {band === "low" ? "lav" : band === "high" ? "høj" : "middel"}</title></rect>{index % labelEvery === 0 && <text x={`${x+barWidth/2}%`} y="95.6%" textAnchor="middle" className="home-mini-axis">{formatHour(bar.time)}</text>}</g>;
-      })}
-    </svg>
+  return <div className="widget-fill">
+    <div className="chart-summary"><span>Lavest <strong>{min.toFixed(2).replace(".", ",")} kr</strong></span><span>Højest <strong>{max.toFixed(2).replace(".", ",")} kr</strong></span><small>Fast skala 0–6 kr/kWh</small></div>
+    <ChartFrame label="Elpris næste 24 timer, fast skala 0 til 6 kroner pr. kWh">{({ width, height }) => {
+      const left = 22, right = 4, top = 8, bottom = 18;
+      const plotW = width - left - right, plotH = height - top - bottom;
+      const slot = plotW / bars.length;
+      const barWidth = Math.max(3, slot * 0.68);
+      const baseline = height - bottom;
+      const y = (value: number) => top + (1 - Math.max(0, Math.min(ENERGY_MAX, value)) / ENERGY_MAX) * plotH;
+      // Label every n-th hour so labels never collide: ~40px per label.
+      const labelEvery = Math.max(1, Math.ceil(40 / slot));
+      return <>
+        {[0, 2, 4, 6].map((tick) => <g key={tick}><line x1={left} x2={width - right} y1={y(tick)} y2={y(tick)} className="chart-grid" /><text x={left - 6} y={y(tick) + 3.5} textAnchor="end" className="chart-axis">{tick}</text></g>)}
+        {bars.map((bar, index) => {
+          const x = left + index * slot + (slot - barWidth) / 2;
+          const barHeight = Math.max(2, baseline - y(bar.value));
+          const band = bandFor(bar.value, bands);
+          return <g key={bar.time} className={`chart-bar chart-bar--${band}`}>
+            <rect x={x} y={baseline - barHeight} width={barWidth} height={barHeight} rx="3"><title>{formatHour(bar.time)} · {bar.value.toFixed(2)} kr/kWh · {band === "low" ? "lav" : band === "high" ? "høj" : "middel"}</title></rect>
+            {index % labelEvery === 0 && <text x={x + barWidth / 2} y={height - 5} textAnchor="middle" className="chart-axis">{formatHour(bar.time)}</text>}
+          </g>;
+        })}
+      </>;
+    }}</ChartFrame>
   </div>;
 }
 
 export function EnergyTodayRangeWidget() {
-  const { data, loading, error } = useDashboardJson<EnergyResponse>("/api/sources/energy/prices");
+  const { data, loading, error } = useDashboardJson<EnergyPricesResponse>("/api/sources/energy/prices");
   const stats = useMemo(() => {
     if (!data) return null;
     const today = new Intl.DateTimeFormat("en-CA", { year: "numeric", month: "2-digit", day: "2-digit", timeZone: TZ }).format(new Date());
@@ -222,7 +181,7 @@ export function GarminStepsWeekWidget() {
   const values = rows.map((row) => row.steps ?? 0);
   const max = Math.max(...values, 1);
   const avg = average(rows.map((row) => row.steps).filter((value): value is number => value !== null));
-  return <div className="home-week-bars-block"><div className="home-week-summary"><strong>{avg === null ? "—" : Math.round(avg).toLocaleString("da-DK")}</strong><span>gns. skridt · 7 dage</span></div><div className="home-week-bars">{rows.map((row) => <div key={row.date}><span style={{ height: `${Math.max(4, ((row.steps ?? 0) / max) * 100)}%` }} title={`${row.steps?.toLocaleString("da-DK") ?? "—"} skridt`} /><small>{shortDay(row.date)}</small></div>)}</div></div>;
+  return <div className="widget-fill"><div className="chart-summary"><strong>{avg === null ? "—" : Math.round(avg).toLocaleString("da-DK")}</strong><span>gns. skridt · 7 dage</span></div><div className="home-week-bars">{rows.map((row) => <div key={row.date}><span style={{ height: `${Math.max(4, ((row.steps ?? 0) / max) * 100)}%` }} title={`${row.steps?.toLocaleString("da-DK") ?? "—"} skridt`} /><small>{shortDay(row.date)}</small></div>)}</div></div>;
 }
 
 export function GarminSleepWeekWidget() {
@@ -233,7 +192,7 @@ export function GarminSleepWeekWidget() {
   if (error || rows.length === 0) return <WidgetState label="Ingen søvnhistorik" />;
   const max = 12 * 3600;
   const avg = average(rows.map((row) => row.sleep_seconds!).filter((value) => Number.isFinite(value)));
-  return <div className="home-week-bars-block"><div className="home-week-summary"><strong>{hours(avg)}</strong><span>gns. søvn · 7 nætter</span></div><div className="home-week-bars home-week-bars--sleep">{rows.map((row) => <div key={row.date}><span style={{ height: `${Math.max(4, Math.min(100, ((row.sleep_seconds ?? 0) / max) * 100))}%` }} title={hours(row.sleep_seconds)} /><small>{shortDay(row.date)}</small></div>)}</div></div>;
+  return <div className="widget-fill"><div className="chart-summary"><strong>{hours(avg)}</strong><span>gns. søvn · 7 nætter</span></div><div className="home-week-bars home-week-bars--sleep">{rows.map((row) => <div key={row.date}><span style={{ height: `${Math.max(4, Math.min(100, ((row.sleep_seconds ?? 0) / max) * 100))}%` }} title={hours(row.sleep_seconds)} /><small>{shortDay(row.date)}</small></div>)}</div></div>;
 }
 
 export function WeatherNextHoursWidget() {

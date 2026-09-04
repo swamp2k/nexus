@@ -178,6 +178,15 @@ The compact Settings layout is the preferred reference for density and spacing.
 
 Preserve existing successful visual patterns unless there is a concrete reason to change them.
 
+`docs/UI-GUIDE.md` is the design reference: tokens, typography, breakpoints, dashboard cards and sizes, chart rules, editing controls and the kiosk display. Follow it for any UI change and update it in the same change when a rule moves.
+
+Dashboard-specific rules that must not regress:
+
+- stored widget order is visual order (no `grid-auto-flow: dense`)
+- rows grow with content; a widget that needs two rows declares `rows: 2` in the registry, never in a stylesheet
+- every SVG chart renders through `src/dashboard/ChartFrame.tsx` in pixel coordinates with CSS-owned height
+- only `src/dashboard/dashboard.css` sizes `.home-widget` and `.chart-frame`
+
 ## Module boundaries
 
 ### Garmin
@@ -311,19 +320,21 @@ When extending Motion:
 - downsample large tracks if needed rather than shipping pathological payloads
 - avoid exposing raw device/source formats directly to UI components
 
-## Kitchen display
+## Paired displays
 
-`/display/kitchen` is a dedicated kiosk/tablet experience.
+`/display` is the dedicated kiosk/tablet experience. A device is paired once with an 8-digit code generated on the Displays page and then renders the dashboard assigned to it without a user login. `/display/kitchen` remains an alias of the same view.
+
+Displays render the same registered widgets as Home through the same card component; only the widgets the display data alias can serve are offered (`worker/display/routes.ts`).
 
 It should:
 
 - avoid normal app chrome
-- be glanceable
+- be glanceable and fill the screen without scrolling where the layout allows
 - remain usable by touch
-- refresh automatically
-- show freshness/last-known-good state where relevant
+- refresh automatically according to the refresh classes in Settings
+- show freshness/last-known-good state inside the widget where relevant
 
-Do not force normal desktop navigation patterns into this view.
+Do not force normal desktop navigation patterns into this view. Layout and sizing rules are in `docs/UI-GUIDE.md`.
 
 ## Coding style
 
@@ -374,6 +385,7 @@ Important docs:
 - `docs/MVP.md` — product scope/direction
 - `docs/AUTH.md` — authentication
 - `docs/GARMIN-AGENT-UNRAID.md` — Garmin agent operations
+- `docs/UI-GUIDE.md` — design system, dashboard cards, charts and displays
 
 When implementation makes a documented statement false, update the relevant document in the same workstream.
 

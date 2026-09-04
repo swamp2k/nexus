@@ -110,9 +110,9 @@
 .settings-choice.active { border-color: var(--accent); background: var(--accent-soft); }
 .energy-band-preview { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
 .energy-band-preview span { padding: 9px 10px; border-radius: 10px; text-align: center; font-size: 0.78rem; font-weight: 800; }
-.energy-band-preview .low { background: color-mix(in srgb, #39b866 16%, var(--surface)); color: #39b866; }
-.energy-band-preview .medium { background: color-mix(in srgb, #f1a62a 16%, var(--surface)); color: #d88c13; }
-.energy-band-preview .high { background: color-mix(in srgb, #ef5b4d 16%, var(--surface)); color: #ef5b4d; }
+.energy-band-preview .low { background: color-mix(in srgb, var(--band-low) 16%, var(--surface)); color: var(--band-low); }
+.energy-band-preview .medium { background: color-mix(in srgb, var(--band-medium) 16%, var(--surface)); color: var(--band-medium-text); }
+.energy-band-preview .high { background: color-mix(in srgb, var(--band-high) 16%, var(--surface)); color: var(--band-high); }
 .settings-feedback { margin: 0; padding: 11px 13px; border-radius: 11px; font-size: 0.86rem; }
 .settings-feedback.success { background: color-mix(in srgb, var(--success) 12%, var(--surface)); color: var(--success); }
 .settings-feedback.error { background: color-mix(in srgb, #d64545 12%, var(--surface)); color: #d64545; }
