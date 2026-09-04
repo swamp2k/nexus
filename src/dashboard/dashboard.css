@@ -257,7 +257,7 @@
 
 /* App dashboards respond to the width they actually have after sidebar/editor
    chrome, not to the viewport. Kiosk has its own screen-width rules. */
-@container dashboard-host (max-width: 899px) {
+@container dashboard-host (max-width: 900px) {
   .home-widget-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
   .home-widget--small { grid-column: span 1; }
   .home-widget--medium, .home-widget--wide { grid-column: 1 / -1; }
