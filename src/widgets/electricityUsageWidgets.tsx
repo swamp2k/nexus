@@ -60,11 +60,11 @@ function ElectricityUsageWeekWidget() {
   if (error || !stats) return <WidgetState label="Elforbruget kunne ikke hentes" />;
 
   const width = 700;
-  const height = 150;
+  const height = 190;
   const left = 48;
   const right = 8;
   const top = 8;
-  const bottom = 28;
+  const bottom = 30;
   const plotWidth = width - left - right;
   const plotHeight = height - top - bottom;
   const slot = plotWidth / stats.rows.length;
