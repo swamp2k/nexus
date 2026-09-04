@@ -3,6 +3,7 @@ import { createOpaqueToken, hashToken } from "../auth/tokens";
 import { calendarEventsForUser } from "../calendar/routes";
 import { melCloudDevicesForUser } from "../melcloud/routes";
 import { getElectricityUsage } from "../sources/eloverblik";
+import { getEloverblikCredentialStatus, getEloverblikCredentials } from "../sources/eloverblik-credentials";
 import { getEnergyPrices, resolveEnergySettings } from "../sources/energy-prices";
 import { getWeatherForecast, resolveWeatherLocation } from "../sources/weather";
 
@@ -21,8 +22,7 @@ type DisplayEnv = Env & {
   ENERGY_PRICE_AREA?: string;
   ENERGY_GRID_PROVIDER?: string;
   ENERGY_SUPPLIER_MARKUP_OERE?: string;
-  ELOVERBLIK_REFRESH_TOKEN?: string;
-  ELOVERBLIK_METERING_POINT?: string;
+  ELOVERBLIK_CREDENTIALS_KEY?: string;
   WASTE_CALENDAR_ICS_URL?: string;
   WEATHER_LAT?: string;
   WEATHER_LON?: string;
@@ -309,15 +309,20 @@ export async function handleDisplayDataAlias(request: Request, env: DisplayEnv):
   }
   if (pathname === "/api/sources/energy/prices") return json(await getEnergyPrices(env, device.userId));
   if (pathname === "/api/sources/energy/usage") {
-    const result = await getElectricityUsage(env);
-    return result ? json(result) : json({ error: "source_not_configured" }, { status: 503 });
+    const credentials = await getEloverblikCredentials(env, device.userId);
+    if (!credentials) return json({ error: "source_not_configured" }, { status: 503 });
+    return json(await getElectricityUsage(env, device.userId, credentials));
   }
   if (pathname === "/api/sources/status") {
-    const [weatherLocation, energySettings] = await Promise.all([resolveWeatherLocation(env, device.userId), resolveEnergySettings(env, device.userId)]);
+    const [weatherLocation, energySettings, eloverblikStatus] = await Promise.all([
+      resolveWeatherLocation(env, device.userId),
+      resolveEnergySettings(env, device.userId),
+      getEloverblikCredentialStatus(env, device.userId),
+    ]);
     return json({ sources: {
       weather: { configured: Boolean(weatherLocation), provider: "MET Norway", label: weatherLocation?.label ?? "Hjem" },
       energyPrices: { configured: Boolean(energySettings.gridProvider), area: energySettings.area, gridProvider: energySettings.gridProvider, supplierMarkupOere: energySettings.supplierMarkupOere },
-      electricityUsage: { configured: Boolean(env.ELOVERBLIK_REFRESH_TOKEN && env.ELOVERBLIK_METERING_POINT) },
+      electricityUsage: { configured: eloverblikStatus.configured, provider: "Eloverblik", meteringPoint: eloverblikStatus.meteringPoint || null },
       wasteCalendar: { configured: true, implementation: "ical" },
     } });
   }
