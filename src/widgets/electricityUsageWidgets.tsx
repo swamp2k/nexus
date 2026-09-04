@@ -103,6 +103,7 @@ function ElectricityUsageWeekWidget() {
             <rect x={xx} y={baseline - barHeight} width={barWidth} height={barHeight} rx="5">
               <title>{shortDay(row.date)} · {row.kwh.toFixed(1).replace(".", ",")} kWh</title>
             </rect>
+            <text x={xx + barWidth / 2} y={Math.max(top + 11, baseline - barHeight - 5)} textAnchor="middle" className="home-mini-axis home-usage-value-label">{row.kwh.toFixed(1).replace(".", ",")}</text>
             <text x={xx + barWidth / 2} y={height - 8} textAnchor="middle" className="home-mini-axis home-usage-day-label">{shortDay(row.date)}</text>
           </g>;
         })}
