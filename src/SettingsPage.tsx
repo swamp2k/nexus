@@ -20,6 +20,8 @@ type SettingsResponse = {
     energySupplierMarkupOere: number | null;
     energyLowPriceDkk: number | null;
     energyHighPriceDkk: number | null;
+    energyUsageLowKwh: number | null;
+    energyUsageHighKwh: number | null;
     dashboardRefreshSeconds: number | null;
     dashboardRefreshClasses: Record<string, RefreshClass> | null;
     updatedAt: string | null;
@@ -51,6 +53,8 @@ export default function SettingsPage() {
   const [energySupplierMarkupOere, setEnergySupplierMarkupOere] = useState("0");
   const [energyLowPriceDkk, setEnergyLowPriceDkk] = useState("1");
   const [energyHighPriceDkk, setEnergyHighPriceDkk] = useState("2");
+  const [energyUsageLowKwh, setEnergyUsageLowKwh] = useState("20");
+  const [energyUsageHighKwh, setEnergyUsageHighKwh] = useState("30");
   const [dashboardRefreshClasses, setDashboardRefreshClasses] = useState<Record<string, RefreshClass>>({});
   const [gridProviders, setGridProviders] = useState<GridProviderOption[]>([]);
   const [loading, setLoading] = useState(true);
@@ -73,6 +77,8 @@ export default function SettingsPage() {
         setEnergySupplierMarkupOere(String(settings.energySupplierMarkupOere ?? 0));
         setEnergyLowPriceDkk(String(settings.energyLowPriceDkk ?? 1));
         setEnergyHighPriceDkk(String(settings.energyHighPriceDkk ?? 2));
+        setEnergyUsageLowKwh(String(settings.energyUsageLowKwh ?? 20));
+        setEnergyUsageHighKwh(String(settings.energyUsageHighKwh ?? 30));
         setDashboardRefreshClasses(settings.dashboardRefreshClasses ?? {});
         setGridProviders(options?.gridProviders ?? []);
       })
@@ -110,8 +116,15 @@ export default function SettingsPage() {
   async function save() {
     const lowBand = Number(energyLowPriceDkk);
     const highBand = Number(energyHighPriceDkk);
+    const lowUsage = Number(energyUsageLowKwh);
+    const highUsage = Number(energyUsageHighKwh);
     if (!Number.isFinite(lowBand) || !Number.isFinite(highBand) || lowBand < 0 || highBand <= lowBand) {
       setSaveError("Grænsen for høj pris skal være større end grænsen for lav pris.");
+      setSaveState("error");
+      return;
+    }
+    if (!Number.isFinite(lowUsage) || !Number.isFinite(highUsage) || lowUsage < 0 || highUsage <= lowUsage) {
+      setSaveError("Grænsen for højt forbrug skal være større end grænsen for lavt forbrug.");
       setSaveState("error");
       return;
     }
@@ -120,13 +133,13 @@ export default function SettingsPage() {
     try {
       const response = await fetch("/api/settings", {
         method: "PUT", credentials: "same-origin", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ weatherLabel: label, weatherLat: Number(latitude), weatherLon: Number(longitude), energyPriceArea, energyGridProvider, energySupplierMarkupOere: Number(energySupplierMarkupOere), energyLowPriceDkk: lowBand, energyHighPriceDkk: highBand, dashboardRefreshClasses }),
+        body: JSON.stringify({ weatherLabel: label, weatherLat: Number(latitude), weatherLon: Number(longitude), energyPriceArea, energyGridProvider, energySupplierMarkupOere: Number(energySupplierMarkupOere), energyLowPriceDkk: lowBand, energyHighPriceDkk: highBand, energyUsageLowKwh: lowUsage, energyUsageHighKwh: highUsage, dashboardRefreshClasses }),
       });
       if (!response.ok) throw new Error(await responseError(response));
       const { settings } = await response.json() as SettingsResponse;
       setLabel(settings.weatherLabel || "Hjem"); setLatitude(String(settings.weatherLat)); setLongitude(String(settings.weatherLon));
       setEnergyPriceArea(settings.energyPriceArea === "DK2" ? "DK2" : "DK1"); setEnergyGridProvider(settings.energyGridProvider || "Konstant");
-      setEnergySupplierMarkupOere(String(settings.energySupplierMarkupOere ?? 0)); setEnergyLowPriceDkk(String(settings.energyLowPriceDkk ?? 1)); setEnergyHighPriceDkk(String(settings.energyHighPriceDkk ?? 2)); setDashboardRefreshClasses(settings.dashboardRefreshClasses ?? {}); setSaveState("saved");
+      setEnergySupplierMarkupOere(String(settings.energySupplierMarkupOere ?? 0)); setEnergyLowPriceDkk(String(settings.energyLowPriceDkk ?? 1)); setEnergyHighPriceDkk(String(settings.energyHighPriceDkk ?? 2)); setEnergyUsageLowKwh(String(settings.energyUsageLowKwh ?? 20)); setEnergyUsageHighKwh(String(settings.energyUsageHighKwh ?? 30)); setDashboardRefreshClasses(settings.dashboardRefreshClasses ?? {}); setSaveState("saved");
     } catch (error) { setSaveError(error instanceof Error ? error.message : "Ukendt fejl"); setSaveState("error"); }
   }
 
@@ -135,7 +148,7 @@ export default function SettingsPage() {
 
     <details className="settings-card settings-collapsible"><summary className="settings-card-heading"><div><p className="section-label">Dashboard</p><h2>Widget-opdatering</h2></div><span className="settings-icon" aria-hidden="true">↻</span></summary>{loading ? <p className="settings-loading">Henter indstillinger…</p> : <div className="settings-form"><p className="settings-help">Hver widgetgruppe har én opdateringsklasse. Alle Garmin-widgets følger Garmin-klassen, alle MELCloud-widgets følger MELCloud-klassen osv. Polling kører kun mens browserfanen er synlig.</p><div className="settings-coordinate-grid">{REFRESH_GROUPS.map((group) => { const defaultClass = defaultRefreshClassForGroup(group); const value = dashboardRefreshClasses[group] ?? defaultClass; return <label key={group}><span>{group}</span><select value={value} onChange={(event) => setRefreshClass(group, event.target.value as RefreshClass)}>{REFRESH_CLASSES.map((refreshClass) => <option value={refreshClass} key={refreshClass}>{REFRESH_CLASS_LABELS[refreshClass]}</option>)}</select><small>Standard: {REFRESH_CLASS_LABELS[defaultClass]}</small></label>; })}</div><p className="settings-help"><strong>Live</strong> = 1 min · <strong>Normal</strong> = 5 min · <strong>Langsom</strong> = 30 min · <strong>Ved åbning / event</strong> = ingen periodisk polling.</p></div>}</details>
 
-    <details className="settings-card settings-collapsible"><summary className="settings-card-heading"><div><p className="section-label">Strøm</p><h2>Elpris</h2></div><span className="settings-icon" aria-hidden="true">ϟ</span></summary>{loading ? <p className="settings-loading">Henter indstillinger…</p> : <div className="settings-form"><div className="settings-choice-grid" role="radiogroup" aria-label="Elprisområde"><button className={`settings-choice ${energyPriceArea === "DK1" ? "active" : ""}`} type="button" onClick={() => { setEnergyPriceArea("DK1"); changed(); }}><strong>DK1</strong><span>Vestdanmark · Jylland og Fyn</span></button><button className={`settings-choice ${energyPriceArea === "DK2" ? "active" : ""}`} type="button" onClick={() => { setEnergyPriceArea("DK2"); changed(); }}><strong>DK2</strong><span>Østdanmark · Sjælland og Bornholm</span></button></div><label><span>Netselskab</span><select value={energyGridProvider} onChange={(event) => { setEnergyGridProvider(event.target.value); changed(); }}>{(gridProviders.length ? gridProviders : [{ key: "Konstant", label: "Konstant" }]).map((provider) => <option key={provider.key} value={provider.key}>{provider.label}</option>)}</select></label><label><span>Elselskabets tillæg · øre/kWh ekskl. moms</span><input inputMode="decimal" type="number" min="0" max="500" step="0.01" value={energySupplierMarkupOere} onChange={(event) => { setEnergySupplierMarkupOere(event.target.value); changed(); }} /></label><div className="settings-coordinate-grid"><label><span>Lav pris · op til kr/kWh</span><input inputMode="decimal" type="number" min="0" max="20" step="0.05" value={energyLowPriceDkk} onChange={(event) => { setEnergyLowPriceDkk(event.target.value); changed(); }} /></label><label><span>Høj pris · fra kr/kWh</span><input inputMode="decimal" type="number" min="0" max="20" step="0.05" value={energyHighPriceDkk} onChange={(event) => { setEnergyHighPriceDkk(event.target.value); changed(); }} /></label></div><div className="energy-band-preview" aria-label="Farvegrænser for elpris"><span className="low">Lav ≤ {energyLowPriceDkk || "—"} kr</span><span className="medium">Middel</span><span className="high">Høj ≥ {energyHighPriceDkk || "—"} kr</span></div><p className="settings-help">Farvegrænserne bruges på elprissøjlerne på både Strøm-siden og displays. Faste abonnementer fordeles ikke ind i timeprisen.</p></div>}</details>
+    <details className="settings-card settings-collapsible"><summary className="settings-card-heading"><div><p className="section-label">Strøm</p><h2>Elpris</h2></div><span className="settings-icon" aria-hidden="true">ϟ</span></summary>{loading ? <p className="settings-loading">Henter indstillinger…</p> : <div className="settings-form"><div className="settings-choice-grid" role="radiogroup" aria-label="Elprisområde"><button className={`settings-choice ${energyPriceArea === "DK1" ? "active" : ""}`} type="button" onClick={() => { setEnergyPriceArea("DK1"); changed(); }}><strong>DK1</strong><span>Vestdanmark · Jylland og Fyn</span></button><button className={`settings-choice ${energyPriceArea === "DK2" ? "active" : ""}`} type="button" onClick={() => { setEnergyPriceArea("DK2"); changed(); }}><strong>DK2</strong><span>Østdanmark · Sjælland og Bornholm</span></button></div><label><span>Netselskab</span><select value={energyGridProvider} onChange={(event) => { setEnergyGridProvider(event.target.value); changed(); }}>{(gridProviders.length ? gridProviders : [{ key: "Konstant", label: "Konstant" }]).map((provider) => <option key={provider.key} value={provider.key}>{provider.label}</option>)}</select></label><label><span>Elselskabets tillæg · øre/kWh ekskl. moms</span><input inputMode="decimal" type="number" min="0" max="500" step="0.01" value={energySupplierMarkupOere} onChange={(event) => { setEnergySupplierMarkupOere(event.target.value); changed(); }} /></label><div className="settings-coordinate-grid"><label><span>Lav pris · op til kr/kWh</span><input inputMode="decimal" type="number" min="0" max="20" step="0.05" value={energyLowPriceDkk} onChange={(event) => { setEnergyLowPriceDkk(event.target.value); changed(); }} /></label><label><span>Høj pris · fra kr/kWh</span><input inputMode="decimal" type="number" min="0" max="20" step="0.05" value={energyHighPriceDkk} onChange={(event) => { setEnergyHighPriceDkk(event.target.value); changed(); }} /></label></div><div className="energy-band-preview" aria-label="Farvegrænser for elpris"><span className="low">Lav ≤ {energyLowPriceDkk || "—"} kr</span><span className="medium">Middel</span><span className="high">Høj ≥ {energyHighPriceDkk || "—"} kr</span></div><p className="settings-help">Farvegrænserne bruges på elprissøjlerne på både Strøm-siden og displays. Faste abonnementer fordeles ikke ind i timeprisen.</p><div className="settings-coordinate-grid"><label><span>Lavt forbrug · op til kWh/døgn</span><input inputMode="decimal" type="number" min="0" max="500" step="0.5" value={energyUsageLowKwh} onChange={(event) => { setEnergyUsageLowKwh(event.target.value); changed(); }} /></label><label><span>Højt forbrug · fra kWh/døgn</span><input inputMode="decimal" type="number" min="0" max="500" step="0.5" value={energyUsageHighKwh} onChange={(event) => { setEnergyUsageHighKwh(event.target.value); changed(); }} /></label></div><div className="energy-band-preview" aria-label="Farvegrænser for elforbrug"><span className="low">Lav ≤ {energyUsageLowKwh || "—"} kWh</span><span className="medium">Middel</span><span className="high">Høj ≥ {energyUsageHighKwh || "—"} kWh</span></div><p className="settings-help">Forbrugsgrænserne farver Eloverblik-søjlerne grøn, orange og rød på Hjem, Strøm-siden og displays.</p></div>}</details>
 
     <details className="settings-card settings-collapsible settings-component-wrapper"><summary className="settings-card-heading"><div><p className="section-label">Datakilde</p><h2>Eloverblik</h2></div><span className="settings-icon" aria-hidden="true">ϟ</span></summary><EloverblikSettings /></details>
     <details className="settings-card settings-collapsible settings-component-wrapper"><summary className="settings-card-heading"><div><p className="section-label">Datakilde</p><h2>UnraidWatch</h2></div><span className="settings-icon" aria-hidden="true">▤</span></summary><UnraidSettings /></details>
