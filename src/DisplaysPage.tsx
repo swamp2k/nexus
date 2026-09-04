@@ -2,14 +2,14 @@ import { useEffect, useMemo, useState } from "react";
 import { DashboardRefreshScope, resolveDashboardRefreshClass } from "./data/dashboardRefresh";
 import type { DashboardRefreshSettingsResponse } from "./data/dashboardRefresh";
 import { useCachedJson } from "./data/queryCache";
-import { widgetRegistry, widgetById } from "./widgets/widgetRegistry";
+import { widgetCatalog, widgetDefinitionById } from "./widgets/widgetCatalog";
 import type { WidgetSize } from "./widgets/widgetRegistry";
 
 type Dashboard = { id: string; name: string; theme: "light" | "dark" | "system"; layout: Array<{ id: string; size: WidgetSize }>; createdAt: string; updatedAt: string };
 type Device = { id: string; name: string; dashboardId: string | null; dashboardName: string | null; createdAt: string; lastSeenAt: string };
 
 const DISPLAY_GROUPS = new Set(["Strøm", "Vejr", "Kalender", "MELCloud"]);
-const displayWidgets = widgetRegistry.filter((widget) => DISPLAY_GROUPS.has(widget.group));
+const displayWidgets = widgetCatalog.filter((widget) => DISPLAY_GROUPS.has(widget.group));
 
 export default function DisplaysPage() {
   const [dashboards, setDashboards] = useState<Dashboard[]>([]);
@@ -75,7 +75,7 @@ export default function DisplaysPage() {
 
   function toggleWidget(id: string) {
     if (!draft) return;
-    const widget = widgetById.get(id);
+    const widget = widgetDefinitionById(id);
     if (!widget) return;
     setDraft({ ...draft, layout: draft.layout.some((item) => item.id === id) ? draft.layout.filter((item) => item.id !== id) : [...draft.layout, { id, size: widget.defaultSize }] });
   }
@@ -93,7 +93,7 @@ export default function DisplaysPage() {
 
   function stepSize(id: string, direction: -1 | 1) {
     if (!draft) return;
-    const widget = widgetById.get(id);
+    const widget = widgetDefinitionById(id);
     const item = draft.layout.find((entry) => entry.id === id);
     if (!widget || !item) return;
     const index = widget.supportedSizes.indexOf(item.size);
@@ -139,7 +139,7 @@ export default function DisplaysPage() {
           <div className="home-editor-copy"><strong>Layout</strong><span>Træk kortene rundt direkte her. Brug −/+ til størrelse og × til at fjerne.</span></div>
           {draft.layout.length === 0 ? <div className="home-empty"><strong>Displayet er tomt.</strong><span>Tilføj widgets nedenfor.</span></div> : <div className="home-widget-grid display-dashboard-grid display-dashboard-grid--editing">
             {draft.layout.map((item, index) => {
-              const widget = widgetById.get(item.id);
+              const widget = widgetDefinitionById(item.id);
               if (!widget) return null;
               const Widget = widget.component;
               const sizeIndex = widget.supportedSizes.indexOf(item.size);
