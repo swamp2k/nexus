@@ -176,8 +176,14 @@
 }
 
 .home-usage-axis-unit,
-.home-usage-day-label {
+.home-usage-day-label,
+.home-usage-value-label {
   font-weight: 800;
+}
+
+.home-usage-value-label {
+  font-size: 10px;
+  fill: var(--muted-strong);
 }
 
 .home-usage-bar rect {
