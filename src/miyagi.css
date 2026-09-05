@@ -578,3 +578,26 @@
   opacity: 0.52;
   cursor: default;
 }
+
+
+@media (max-width: 560px) {
+  .miyagi-chat-launcher {
+    right: 14px;
+    bottom: 14px;
+  }
+
+  .miyagi-chat-popout {
+    inset: 8px;
+    width: auto;
+    height: auto;
+    border-radius: 16px;
+  }
+
+  .miyagi-chat-popout .miyagi-message {
+    width: 94%;
+  }
+
+  .miyagi-chat-compose-actions small {
+    display: none;
+  }
+}
