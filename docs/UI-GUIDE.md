@@ -154,7 +154,7 @@ Home and Displays use the same pure edit functions (`src/dashboard/layoutEditing
 - `Rediger Hjem` switches Home into edit mode: dashed outlines, the catalogue panel above the grid, `Annuller` and `Gem layout` in the toolbar. Nothing is saved until `Gem`.
 - Per card: `−` `+` step through the widget's supported sizes, arrows move it one place, `×` removes it. Disabled buttons stay visible so the boundary is obvious.
 - Arrows are `←` `→` in multi-column layouts and `↑` `↓` in the one-column phone layout. Both glyph sets are in the markup; CSS shows the truthful pair.
-- The catalogue offers the same widgets grouped by source, with a size select and up/down for keyboard and touch users. The Displays catalogue only lists sources the display data alias can serve.
+- The catalogue offers the same widgets grouped by source, with a size select and up/down for keyboard and touch users. Display availability is declared by each widget through its `surfaces` capability; only widgets marked for `display` may be offered, and that capability must match what the display data alias can actually serve.
 - The Displays preview is drag-and-drop on desktop with the same buttons as fallback. The preview renders the same grid the kiosk will show.
 
 ## 8. Paired displays (kiosk)
