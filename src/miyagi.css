@@ -286,6 +286,10 @@
   gap: 8px;
 }
 
+.miyagi-period-group > div {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
 .miyagi-option-group button {
   display: grid;
   gap: 3px;
@@ -350,6 +354,10 @@
 
   .miyagi-option-group > div {
     grid-template-columns: 1fr;
+  }
+
+  .miyagi-period-group > div {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .miyagi-option-group button {
