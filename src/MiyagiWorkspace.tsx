@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import MiyagiHistory from "./MiyagiHistory";
 import MiyagiMarkdown from "./MiyagiMarkdown";
 
@@ -65,6 +65,8 @@ export default function MiyagiWorkspace() {
   const [state, setState] = useState<"loading" | "ready" | "analyzing" | "error">("loading");
   const [chatText, setChatText] = useState("");
   const [chatBusy, setChatBusy] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
+  const chatMessagesRef = useRef<HTMLDivElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [analysisDialogOpen, setAnalysisDialogOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -100,6 +102,25 @@ export default function MiyagiWorkspace() {
     window.addEventListener("keydown", close);
     return () => window.removeEventListener("keydown", close);
   }, [analysisDialogOpen]);
+
+  useEffect(() => {
+    if (!chatOpen) return;
+    const close = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setChatOpen(false);
+    };
+    window.addEventListener("keydown", close);
+    return () => window.removeEventListener("keydown", close);
+  }, [chatOpen]);
+
+  useEffect(() => {
+    if (!chatOpen) return;
+    const frame = window.requestAnimationFrame(() => {
+      const container = chatMessagesRef.current;
+      if (!container) return;
+      container.scrollTo({ top: container.scrollHeight, behavior: "smooth" });
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [chatOpen, messages, chatBusy]);
 
   function openAnalysisDialog() {
     setFocus("");
@@ -139,9 +160,19 @@ export default function MiyagiWorkspace() {
   async function sendMessage() {
     if (!analysis || !chatText.trim() || chatBusy) return;
     const text = chatText.trim();
+    const pendingId = `pending-${Date.now()}`;
+    const pendingMessage: Message = {
+      id: pendingId,
+      role: "user",
+      body: text,
+      createdAt: new Date().toISOString(),
+    };
+
     setChatBusy(true);
     setError(null);
     setChatText("");
+    setMessages((current) => [...current, pendingMessage]);
+
     try {
       const response = await fetch("/api/wellbeing/miyagi/chat", {
         method: "POST",
@@ -151,8 +182,12 @@ export default function MiyagiWorkspace() {
       });
       if (!response.ok) throw new Error(await errorText(response));
       const body = await response.json() as { messages: Message[] };
-      setMessages((current) => [...current, ...body.messages]);
+      setMessages((current) => [
+        ...current.filter((message) => message.id !== pendingId),
+        ...body.messages,
+      ]);
     } catch (caught) {
+      setMessages((current) => current.filter((message) => message.id !== pendingId));
       setChatText(text);
       setError(caught instanceof Error ? caught.message : "Miyagi kunne ikke svare lige nu.");
     } finally {
@@ -191,17 +226,65 @@ export default function MiyagiWorkspace() {
       <p>Start en analyse. Standard er kort og empatisk; du kan vælge fokus eller en anden svarstil i dialogen.</p>
     </div>}
 
-    {analysis && <section className="miyagi-conversation">
-      <div className="miyagi-conversation-heading"><strong>Tal med Miyagi</strong><span>Svar på hans spørgsmål, spørg ind til et fund eller giv ham kontekst han ikke kunne se i data.</span></div>
-      {messages.length > 0 && <div className="miyagi-messages">{messages.map((message, index) => <article className={`miyagi-message ${message.role}`} key={message.id ?? `${message.createdAt}-${index}`}>
-        <strong>{message.role === "assistant" ? "Miyagi" : "Dig"}</strong>
-        <MiyagiMarkdown text={message.body} />
-      </article>)}</div>}
-      <form className="miyagi-chat-shell" onSubmit={(event) => { event.preventDefault(); void sendMessage(); }}>
-        <input value={chatText} onChange={(event) => setChatText(event.target.value)} disabled={chatBusy} maxLength={4000} placeholder="Fx: Ja, i juli var vi på ferie og jeg sov et andet sted…" aria-label="Spørg Mr. Miyagi" />
-        <button type="submit" disabled={chatBusy || !chatText.trim()}>{chatBusy ? "…" : "Send"}</button>
-      </form>
-    </section>}
+    {analysis && <>
+      <button
+        className={`miyagi-chat-launcher ${chatOpen ? "open" : ""}`}
+        type="button"
+        onClick={() => setChatOpen((open) => !open)}
+        aria-expanded={chatOpen}
+        aria-controls="miyagi-chat-popout"
+      >
+        <span className="miyagi-chat-launcher-icon" aria-hidden="true">🥋</span>
+        <span>Tal med Miyagi</span>
+      </button>
+
+      {chatOpen && <section id="miyagi-chat-popout" className="miyagi-chat-popout" role="dialog" aria-label="Tal med Mr. Miyagi">
+        <header className="miyagi-chat-popout-header">
+          <div>
+            <strong>Mr. Miyagi</strong>
+            <span>Spørg ind til analysen eller giv ham mere kontekst.</span>
+          </div>
+          <button className="icon-action" type="button" onClick={() => setChatOpen(false)} aria-label="Luk chat">×</button>
+        </header>
+
+        <div className="miyagi-chat-popout-messages" ref={chatMessagesRef}>
+          {messages.length === 0 && <div className="miyagi-chat-empty">
+            <strong>Analysen er klar.</strong>
+            <span>Svar på et af Miyagis spørgsmål eller spørg ind til noget, han fandt.</span>
+          </div>}
+          {messages.map((message, index) => <article className={`miyagi-message ${message.role}`} key={message.id ?? `${message.createdAt}-${index}`}>
+            <strong>{message.role === "assistant" ? "Miyagi" : "Dig"}</strong>
+            <MiyagiMarkdown text={message.body} />
+          </article>)}
+          {chatBusy && <div className="miyagi-chat-typing" role="status">
+            <span className="miyagi-thinking-dot" />
+            <span>Miyagi tænker…</span>
+          </div>}
+        </div>
+
+        <form className="miyagi-chat-compose" onSubmit={(event) => { event.preventDefault(); void sendMessage(); }}>
+          <textarea
+            rows={3}
+            value={chatText}
+            onChange={(event) => setChatText(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && !event.shiftKey) {
+                event.preventDefault();
+                void sendMessage();
+              }
+            }}
+            disabled={chatBusy}
+            maxLength={4000}
+            placeholder="Skriv til Miyagi…"
+            aria-label="Skriv til Mr. Miyagi"
+          />
+          <div className="miyagi-chat-compose-actions">
+            <small>Shift+Enter = ny linje</small>
+            <button type="submit" disabled={chatBusy || !chatText.trim()}>{chatBusy ? "…" : "Send"}</button>
+          </div>
+        </form>
+      </section>}
+    </>}
 
     {error && <p className="settings-feedback error">{error}</p>}
     <small className="miyagi-disclaimer">Miyagi er et analyseværktøj i et privat hobbyprojekt. Han kan hjælpe med mønstre og refleksion, men er ikke læge og erstatter ikke faglig vurdering.</small>
