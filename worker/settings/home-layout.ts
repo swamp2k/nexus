@@ -1,7 +1,8 @@
 import { getAuthenticatedUser } from "../auth/session";
 
 type HomeWidgetSize = "small" | "medium" | "wide";
-type HomeWidgetLayoutItem = { id: string; size: HomeWidgetSize };
+type HomeWidgetConfig = Record<string, unknown>;
+type HomeWidgetLayoutItem = { id: string; size: HomeWidgetSize; type?: string; config?: HomeWidgetConfig };
 type HomeLayoutBody = { layout?: unknown };
 
 const DEFAULT_LAYOUT: HomeWidgetLayoutItem[] = [
@@ -18,6 +19,18 @@ function json(body: unknown, init: ResponseInit = {}): Response {
   return Response.json(body, { ...init, headers });
 }
 
+function cleanConfig(value: unknown): HomeWidgetConfig | undefined | null {
+  if (value === undefined) return undefined;
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  try {
+    const serialized = JSON.stringify(value);
+    if (serialized.length > 4096) return null;
+    return JSON.parse(serialized) as HomeWidgetConfig;
+  } catch {
+    return null;
+  }
+}
+
 function normalizeLayout(value: unknown): HomeWidgetLayoutItem[] | null {
   if (!Array.isArray(value) || value.length > 64) return null;
   const result: HomeWidgetLayoutItem[] = [];
@@ -25,14 +38,23 @@ function normalizeLayout(value: unknown): HomeWidgetLayoutItem[] | null {
 
   for (const item of value) {
     if (!item || typeof item !== "object") return null;
-    const candidate = item as { id?: unknown; size?: unknown };
+    const candidate = item as { id?: unknown; size?: unknown; type?: unknown; config?: unknown };
     if (typeof candidate.id !== "string") return null;
     const id = candidate.id.trim();
     if (!id || id.length > 240 || seen.has(id)) return null;
     const size = candidate.size;
     if (size !== "small" && size !== "medium" && size !== "wide") return null;
+    const type = candidate.type === undefined ? undefined : typeof candidate.type === "string" ? candidate.type.trim() : null;
+    if (type === null || (type !== undefined && (!type || type.length > 100))) return null;
+    const config = cleanConfig(candidate.config);
+    if (config === null) return null;
     seen.add(id);
-    result.push({ id, size });
+    result.push({
+      id,
+      size,
+      ...(type ? { type } : {}),
+      ...(config ? { config } : {}),
+    });
   }
 
   return result;

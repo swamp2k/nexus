@@ -217,7 +217,7 @@ export default function HomePage({ onOpenPage }: { onOpenPage: (page: WidgetTarg
             </WidgetCard>;
           }
 
-          const widget = resolve(item.id);
+          const widget = resolve(item.type ?? item.id);
           if (!widget) return null;
           const Widget = widget.component;
           const refreshClass = resolveDashboardRefreshClass(widgetRefreshGroup(widget), refreshSettings);

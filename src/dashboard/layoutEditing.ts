@@ -1,7 +1,18 @@
 import type { WidgetDefinition, WidgetSize } from "../widgets/widgetRegistry";
 
-/** The stored dashboard model: ordered widget IDs with a size each. */
-export type LayoutItem = { id: string; size: WidgetSize };
+export type WidgetConfig = Record<string, unknown>;
+
+/**
+ * Stored dashboard item. Legacy widgets use `id` as both instance and widget
+ * type. Configurable widgets can keep a stable instance `id` and point at a
+ * reusable widget definition through `type`.
+ */
+export type LayoutItem = {
+  id: string;
+  size: WidgetSize;
+  type?: string;
+  config?: WidgetConfig;
+};
 
 export type WidgetResolver = (id: string) => WidgetDefinition | undefined;
 
@@ -17,10 +28,13 @@ export function normalizeLayout(layout: LayoutItem[], resolve: WidgetResolver): 
   const seen = new Set<string>();
   const result: LayoutItem[] = [];
   for (const item of layout) {
-    const widget = resolve(item.id);
+    const widget = resolve(item.type ?? item.id);
     if (!widget || seen.has(item.id)) continue;
     seen.add(item.id);
-    result.push({ id: item.id, size: widget.supportedSizes.includes(item.size) ? item.size : widget.defaultSize });
+    result.push({
+      ...item,
+      size: widget.supportedSizes.includes(item.size) ? item.size : widget.defaultSize,
+    });
   }
   return result;
 }
@@ -36,13 +50,15 @@ export function removeWidget(layout: LayoutItem[], id: string): LayoutItem[] {
 }
 
 export function changeSize(layout: LayoutItem[], id: string, size: WidgetSize, resolve: WidgetResolver): LayoutItem[] {
-  const widget = resolve(id);
+  const item = layout.find((candidate) => candidate.id === id);
+  const widget = item ? resolve(item.type ?? item.id) : undefined;
   if (!widget?.supportedSizes.includes(size)) return layout;
-  return layout.map((item) => item.id === id ? { ...item, size } : item);
+  return layout.map((candidate) => candidate.id === id ? { ...candidate, size } : candidate);
 }
 
 export function stepSize(layout: LayoutItem[], id: string, direction: -1 | 1, resolve: WidgetResolver): LayoutItem[] {
-  const widget = resolve(id);
+  const current = layout.find((item) => item.id === id);
+  const widget = current ? resolve(current.type ?? current.id) : undefined;
   if (!widget) return layout;
   return layout.map((item) => {
     if (item.id !== id) return item;

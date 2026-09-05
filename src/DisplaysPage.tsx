@@ -5,15 +5,13 @@ import type { LayoutItem } from "./dashboard/layoutEditing";
 import { resolveDashboardRefreshClass } from "./data/dashboardRefresh";
 import { useSettings } from "./data/settings";
 import { widgetCatalog, widgetDefinitionById } from "./widgets/widgetCatalog";
-import { widgetRefreshGroup } from "./widgets/widgetRegistry";
+import { widgetRefreshGroup, widgetSupportsSurface } from "./widgets/widgetRegistry";
 import type { WidgetSize } from "./widgets/widgetRegistry";
 
 type Dashboard = { id: string; name: string; theme: "light" | "dark" | "system"; layout: LayoutItem[]; createdAt: string; updatedAt: string };
 type Device = { id: string; name: string; dashboardId: string | null; dashboardName: string | null; createdAt: string; lastSeenAt: string };
 
-/** Paired displays only receive these sources through the display data alias. */
-const DISPLAY_GROUPS = new Set(["Strøm", "Vejr", "Kalender", "MELCloud"]);
-const displayWidgets = widgetCatalog.filter((widget) => DISPLAY_GROUPS.has(widget.group));
+const displayWidgets = widgetCatalog.filter((widget) => widgetSupportsSurface(widget, "display"));
 
 export default function DisplaysPage() {
   const [dashboards, setDashboards] = useState<Dashboard[]>([]);
@@ -106,7 +104,7 @@ export default function DisplaysPage() {
           <div className="home-editor-copy"><strong>Layout</strong><span>Træk kortene rundt direkte her. Brug −/+ til størrelse og × til at fjerne. Et display fylder skærmen: fire kolonner på en liggende tablet, og rækkerne deler højden.</span></div>
           {draft.layout.length === 0 ? <div className="home-empty"><strong>Displayet er tomt.</strong><span>Tilføj widgets nedenfor.</span></div> : <div className="home-widget-grid display-dashboard-grid display-dashboard-grid--editing">
             {draft.layout.map((item, index) => {
-              const widget = widgetDefinitionById(item.id);
+              const widget = widgetDefinitionById(item.type ?? item.id);
               if (!widget) return null;
               const Widget = widget.component;
               const currentSize = sizeIndex(item, widget);
