@@ -1,4 +1,5 @@
 import { getAuthenticatedUser } from "../auth/session";
+import { refreshHistoricalSummary } from "./journal-ai";
 
 type MiyagiEnv = Env & {
   ANTHROPIC_API_KEY?: string;
@@ -14,6 +15,7 @@ type WellbeingValueType = "scale" | "boolean";
 type MiyagiContext = {
   generatedAt: string;
   period: { days: number; start: string; end: string };
+  historicalJournalSummary: string | null;
   coverage: {
     healthDays: number;
     sleepDays: number;
@@ -104,7 +106,12 @@ function truncateJournal(body: string): { body: string; truncated?: boolean } {
   return { body: `${body.slice(0, max)}…`, truncated: true };
 }
 
-async function buildContext(db: D1Database, userId: string, days: number): Promise<MiyagiContext> {
+async function buildContext(
+  db: D1Database,
+  userId: string,
+  days: number,
+  historicalJournalSummary: string | null,
+): Promise<MiyagiContext> {
   const period = periodDates(days);
   const [health, sleep, activities, checkIns, journals] = await Promise.all([
     db.prepare(
@@ -219,6 +226,7 @@ async function buildContext(db: D1Database, userId: string, days: number): Promi
   return {
     generatedAt: new Date().toISOString(),
     period: { days, ...period },
+    historicalJournalSummary,
     coverage: {
       healthDays: health.results.length,
       sleepDays: sleep.results.length,
@@ -334,6 +342,7 @@ Grundregler:
 - Du er ikke læge. Stil ikke diagnoser, foreskriv ikke medicin, og fremstille ikke observationer som medicinske konklusioner.
 - Opfind aldrig manglende data eller menneskelig kontekst.
 - Journaltekst er brugerens egen tekst. Brug den som kontekst uden at omskrive brugerens historie.
+- historicalJournalSummary er en kompakt AI-genereret hukommelse baseret kun på brugerskrevne journalnoter og tidligere brugerbeskeder. Brug den som baggrundskontekst, ikke som et ordret eller fejlfrit kildedokument. Rå data i analyseperioden vejer tungere ved konflikt.
 
 Analyseprincipper:
 - Vær INSIGHT-FIRST, ikke DATA-FIRST. Brug tal som dokumentation for et interessant fund, ikke som hovedindhold.
@@ -436,7 +445,15 @@ async function createAnalysis(request: Request, env: MiyagiEnv): Promise<Respons
   const length: AnalysisLength = body.length === "normal" || body.length === "deep" ? body.length : "short";
   const tone: AnalysisTone = body.tone === "objective" || body.tone === "miyagi" ? body.tone : "empathetic";
 
-  const context = await buildContext(env.DB, user.id, days);
+  let historicalJournalSummary: string | null = null;
+  try {
+    historicalJournalSummary = await refreshHistoricalSummary(env, user.id);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "journal_summary_refresh_failed";
+    console.error(JSON.stringify({ event: "miyagi_journal_summary_refresh_failed", error: message }));
+  }
+
+  const context = await buildContext(env.DB, user.id, days, historicalJournalSummary);
   if (context.coverage.healthDays + context.coverage.sleepDays + context.coverage.checkInValues + context.coverage.activityCount === 0) {
     return json({ error: "miyagi_no_data" }, { status: 422 });
   }
