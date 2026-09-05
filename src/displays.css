@@ -52,15 +52,18 @@
   max-width: 1600px;
   min-height: 0;
   margin: 0 auto;
-  grid-auto-rows: minmax(var(--card-row), 1fr);
+  grid-auto-rows: minmax(var(--card-row), auto);
+  align-content: start;
 }
 
 .display-dashboard-shell .home-widget { overflow: hidden; }
 
-/* A two-row kiosk card may be tall, but its chart should not stretch with the
-   spare viewport height. ChartFrame keeps the width-derived dashboard height
-   (120/150/170px); centre the chart block inside the taller card instead. */
-.display-dashboard-shell .widget-fill:has(> .chart-frame) { justify-content: center; }
+/* Kiosk rows are content-driven. The registry's rows:2 hint is for the app
+   dashboard/editor and must not double card height on a fixed display. */
+.display-dashboard-shell .home-widget--rows-2 { grid-row: auto; }
+
+/* ChartFrame keeps its width-derived dashboard height instead of growing just
+   because another card in the same row is taller. */
 .display-dashboard-shell .widget-fill > .chart-frame { flex: 0 0 var(--chart-h, 150px); }
 
 .display-dashboard-shell .home-metric > strong,
