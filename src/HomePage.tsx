@@ -7,6 +7,8 @@ import { useSettings } from "./data/settings";
 import { discoverUnraidWidgets, widgetCatalog, widgetDefinitionById } from "./widgets/widgetCatalog";
 import type { UnraidOverview } from "./widgets/widgetCatalog";
 import { isUnraidContainerWidgetId, SelectedContainersWidget } from "./widgets/unraidWidgets";
+import { createLinkCollectionConfig, LINK_COLLECTION_TYPE, LinkCollectionEditor } from "./widgets/LinkCollectionWidget";
+import type { LinkCollectionConfig } from "./widgets/LinkCollectionWidget";
 import { widgetRefreshGroup } from "./widgets/widgetRegistry";
 import type { WidgetDefinition, WidgetSize, WidgetTargetPage } from "./widgets/widgetRegistry";
 
@@ -77,6 +79,7 @@ export default function HomePage({ onOpenPage }: { onOpenPage: (page: WidgetTarg
   const grouped = useMemo(() => {
     const groups = new Map<string, WidgetDefinition[]>();
     for (const widget of availableWidgets) {
+      if (widget.repeatable) continue;
       const list = groups.get(widget.group) ?? [];
       list.push(widget);
       groups.set(widget.group, list);
@@ -130,6 +133,19 @@ export default function HomePage({ onOpenPage }: { onOpenPage: (page: WidgetTarg
     });
   }
 
+  function addLinkCollection() {
+    setDraft((current) => [...current, {
+      id: `${LINK_COLLECTION_TYPE}.${crypto.randomUUID()}`,
+      type: LINK_COLLECTION_TYPE,
+      size: "small",
+      config: createLinkCollectionConfig(),
+    }]);
+  }
+
+  function updateLinkCollection(id: string, config: LinkCollectionConfig) {
+    setDraft((current) => current.map((item) => item.id === id ? { ...item, config } : item));
+  }
+
   async function save() {
     setSaving(true);
     setMessage(null);
@@ -177,6 +193,19 @@ export default function HomePage({ onOpenPage }: { onOpenPage: (page: WidgetTarg
         <div className="home-editor-copy"><strong>Vælg moduler</strong><span>Tilføj og fjern widgets her. Rækkefølge og størrelse kan også ændres direkte på dashboardet nedenunder.</span></div>
         {unraidCatalogLoading && <p className="home-layout-note">Henter containere og VM'er fra UnraidWatch…</p>}
         <div className="home-editor-groups">
+          <fieldset className="link-collection-editor-group">
+            <legend>Links</legend>
+            <div className="link-collection-editor-group-heading">
+              <span>Lav små, personlige samlinger med op til fem links.</span>
+              <button type="button" className="secondary-action" onClick={addLinkCollection}>+ Ny linksamling</button>
+            </div>
+            {draft.filter((item) => item.type === LINK_COLLECTION_TYPE).length === 0
+              ? <p className="link-collection-editor-empty">Ingen linksamlinger endnu.</p>
+              : draft.filter((item) => item.type === LINK_COLLECTION_TYPE).map((item) => <div className="link-collection-editor-card" key={item.id}>
+                  <LinkCollectionEditor config={item.config} onChange={(config) => updateLinkCollection(item.id, config)} />
+                  <button type="button" className="link-collection-remove-collection" onClick={() => setDraft((current) => removeWidget(current, item.id))}>Fjern samling</button>
+                </div>)}
+          </fieldset>
           {grouped.map(([group, widgets]) => <fieldset key={group}><legend>{group}</legend>{widgets.map((widget) => {
             const selected = selectedIds.has(widget.id);
             const item = draft.find((candidate) => candidate.id === widget.id);
@@ -222,8 +251,9 @@ export default function HomePage({ onOpenPage }: { onOpenPage: (page: WidgetTarg
           const Widget = widget.component;
           const refreshClass = resolveDashboardRefreshClass(widgetRefreshGroup(widget), refreshSettings);
           const currentSize = sizeIndex(item, widget);
-          return <WidgetCard key={item.id} id={item.id} title={widget.title} kicker={widget.group} size={item.size} rows={widget.rows} compact={isCompactEntityWidget(item.id)} refreshClass={refreshClass}
-            link={{ label: widget.page, onClick: () => onOpenPage(widget.page) }}
+          const title = widget.resolveTitle?.(item.config) ?? widget.title;
+          return <WidgetCard key={item.id} id={item.id} title={title} kicker={widget.group} size={item.size} rows={widget.rows} compact={isCompactEntityWidget(item.id)} refreshClass={refreshClass}
+            link={widget.page ? { label: widget.page, onClick: () => onOpenPage(widget.page!) } : undefined}
             edit={editing ? {
               canShrink: currentSize > 0,
               canGrow: currentSize >= 0 && currentSize < widget.supportedSizes.length - 1,
@@ -235,7 +265,7 @@ export default function HomePage({ onOpenPage }: { onOpenPage: (page: WidgetTarg
               onMoveLater: () => setDraft((current) => moveWidget(current, item.id, 1)),
               onRemove: () => setDraft((current) => removeWidget(current, item.id)),
             } : undefined}>
-            <Widget />
+            <Widget config={item.config} />
           </WidgetCard>;
         })}</div>}
     </section>
