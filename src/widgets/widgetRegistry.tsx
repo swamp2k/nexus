@@ -17,6 +17,10 @@ export type WidgetSize = "small" | "medium" | "wide";
 export type WidgetSurface = "home" | "display";
 export type WidgetTargetPage = "Garmin" | "Velbefindende" | "Vejr" | "Strøm" | "Kalender" | "Varmepumpe" | "Unraid" | "DBA" | "PC Watch" | "Motion";
 
+export type WidgetRuntimeProps = {
+  config?: Record<string, unknown>;
+};
+
 export type WidgetDefinition = {
   id: string;
   title: string;
@@ -25,14 +29,19 @@ export type WidgetDefinition = {
   group: string;
   /** Key used to look up the refresh class in settings. Defaults to `group`. */
   refreshGroup?: string;
-  page: WidgetTargetPage;
+  /** Optional drill-down page. Utility widgets can omit this. */
+  page?: WidgetTargetPage;
+  /** Repeatable definitions create stable instances with `type` + per-instance config. */
+  repeatable?: boolean;
+  /** Resolve a per-instance card title from config. */
+  resolveTitle?: (config?: Record<string, unknown>) => string;
   /** Surfaces where this widget is safe to offer. Defaults to Home only. */
   surfaces?: WidgetSurface[];
   defaultSize: WidgetSize;
   supportedSizes: WidgetSize[];
   /** Grid rows the card claims on desktop. 2 for charts and lists; 1 (default) for numbers. */
   rows?: 1 | 2;
-  component: ComponentType;
+  component: ComponentType<WidgetRuntimeProps>;
 };
 
 export function widgetRefreshGroup(widget: Pick<WidgetDefinition, "group" | "refreshGroup">): string {

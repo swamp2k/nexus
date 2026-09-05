@@ -114,3 +114,180 @@
   .home-three-stats > small { grid-column: 1; }
   .home-weather-week { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
+
+
+/* --- Personal link collections ------------------------------------------- */
+
+.link-collection {
+  width: 100%;
+  display: grid;
+  align-content: start;
+  gap: 4px;
+}
+
+.link-collection-row {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 27px;
+  padding: 4px 7px;
+  border-radius: 8px;
+  color: var(--text);
+  text-decoration: none;
+}
+
+.link-collection-row:hover,
+.link-collection-row:focus-visible {
+  background: var(--surface-soft);
+  color: var(--accent);
+  outline: none;
+}
+
+.link-collection-icon {
+  flex: 0 0 20px;
+  width: 20px;
+  height: 20px;
+  display: grid;
+  place-items: center;
+  color: var(--muted);
+  font-size: .78rem;
+}
+
+.link-collection-icon img {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+}
+
+.link-collection-icon-fallback {
+  line-height: 1;
+}
+
+.link-collection-label {
+  min-width: 0;
+  overflow: hidden;
+  font-size: .84rem;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.link-collection-editor-group {
+  grid-column: 1 / -1;
+}
+
+.link-collection-editor-group-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.link-collection-editor-group-heading > span,
+.link-collection-editor-empty {
+  color: var(--muted);
+  font-size: .78rem;
+}
+
+.link-collection-editor-empty {
+  margin: 8px 0 0;
+}
+
+.link-collection-editor-card {
+  display: grid;
+  gap: 10px;
+  padding: 12px 0;
+  border-top: 1px solid var(--border);
+}
+
+.link-collection-editor {
+  display: grid;
+  gap: 9px;
+}
+
+.link-collection-title-field {
+  display: grid;
+  grid-template-columns: 70px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+}
+
+.link-collection-title-field > span {
+  color: var(--muted-strong);
+  font-size: .76rem;
+  font-weight: 800;
+}
+
+.link-collection-editor input {
+  min-width: 0;
+  height: 34px;
+  padding: 0 9px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-soft);
+  color: var(--text);
+  font: inherit;
+  font-size: .8rem;
+}
+
+.link-collection-editor-links {
+  display: grid;
+  gap: 6px;
+}
+
+.link-collection-editor-row {
+  display: grid;
+  grid-template-columns: 44px minmax(110px, .7fr) minmax(180px, 1.4fr) 32px;
+  gap: 6px;
+}
+
+.link-collection-editor-row .link-collection-icon-input {
+  padding: 0 5px;
+  text-align: center;
+}
+
+.link-collection-remove-link,
+.link-collection-remove-collection {
+  border: 0;
+  background: transparent;
+  color: var(--danger);
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.link-collection-remove-link {
+  width: 32px;
+  height: 34px;
+  font-size: 1rem;
+}
+
+.link-collection-add-link {
+  justify-self: start;
+  min-height: 34px;
+  padding: 6px 10px;
+  font-size: .78rem;
+}
+
+.link-collection-remove-collection {
+  justify-self: start;
+  padding: 3px 0;
+  font-size: .76rem;
+}
+
+@media (max-width: 760px) {
+  .link-collection-editor-group-heading {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .link-collection-editor-row {
+    grid-template-columns: 44px minmax(0, 1fr) 32px;
+  }
+
+  .link-collection-editor-row input:nth-of-type(3) {
+    grid-column: 1 / -1;
+    grid-row: 2;
+  }
+}

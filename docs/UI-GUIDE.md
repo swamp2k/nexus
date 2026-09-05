@@ -157,6 +157,10 @@ Home and Displays use the same pure edit functions (`src/dashboard/layoutEditing
 - The catalogue offers the same widgets grouped by source, with a size select and up/down for keyboard and touch users. Display availability is declared by each widget through its `surfaces` capability; only widgets marked for `display` may be offered, and that capability must match what the display data alias can actually serve.
 - The Displays preview is drag-and-drop on desktop with the same buttons as fallback. The preview renders the same grid the kiosk will show.
 
+### Repeatable utility widgets
+
+Repeatable widgets use a stable instance `id`, a reusable definition in `type`, and per-instance `config`. They do not need a feature-page drill-down. The first implementation is `links.collection`: Home can contain any number of small link collections, each with its own title and up to five HTTP/HTTPS links. Link collections are Home-only and deliberately do not add a separate database or global link catalogue; their configuration is stored with the Home layout.
+
 ## 8. Paired displays (kiosk)
 
 `/display` is for a tablet on a wall or a kitchen counter, paired with an 8-digit code and no login.
