@@ -69,6 +69,7 @@ export default function MiyagiWorkspace() {
   const [analysisDialogOpen, setAnalysisDialogOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [focus, setFocus] = useState("");
+  const [analysisDays, setAnalysisDays] = useState<30 | 60 | 90 | 180>(90);
   const [analysisLength, setAnalysisLength] = useState<AnalysisLength>("short");
   const [analysisTone, setAnalysisTone] = useState<AnalysisTone>("empathetic");
 
@@ -102,6 +103,7 @@ export default function MiyagiWorkspace() {
 
   function openAnalysisDialog() {
     setFocus("");
+    setAnalysisDays(90);
     setAnalysisLength("short");
     setAnalysisTone("empathetic");
     setAnalysisDialogOpen(true);
@@ -117,7 +119,7 @@ export default function MiyagiWorkspace() {
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          days: 90,
+          days: analysisDays,
           focus: focus.trim(),
           length: analysisLength,
           tone: analysisTone,
@@ -216,6 +218,16 @@ export default function MiyagiWorkspace() {
           <textarea rows={3} maxLength={1200} value={focus} onChange={(event) => setFocus(event.target.value)} placeholder="Tomt felt = generel analyse. Eller fx: Kig især på søvn, energi og perioder med høj hvilepuls." />
         </label>
 
+        <fieldset className="miyagi-option-group miyagi-period-group">
+          <legend>Periode</legend>
+          <div>
+            {([30, 60, 90, 180] as const).map((value) => <button type="button" className={analysisDays === value ? "active" : ""} key={value} onClick={() => setAnalysisDays(value)}>
+              <strong>{value} dage</strong>
+              <small>{value === 30 ? "Seneste" : value === 60 ? "Kort sigt" : value === 90 ? "Standard" : "Langt blik"}</small>
+            </button>)}
+          </div>
+        </fieldset>
+
         <fieldset className="miyagi-option-group">
           <legend>Længde</legend>
           <div>
@@ -237,7 +249,7 @@ export default function MiyagiWorkspace() {
         </fieldset>
 
         <div className="miyagi-analysis-dialog-actions">
-          <span>Standard: <strong>Kort · Empatisk</strong></span>
+          <span>Valgt: <strong>{analysisDays} dage · {analysisLength === "short" ? "Kort" : analysisLength === "normal" ? "Normal" : "Grundig"} · {analysisTone === "objective" ? "Objektiv" : analysisTone === "empathetic" ? "Empatisk" : "Mr. Miyagi"}</strong></span>
           <button className="primary-action" type="button" onClick={() => void runAnalysis()}>Start analyse</button>
         </div>
       </section>
