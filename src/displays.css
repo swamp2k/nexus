@@ -56,6 +56,13 @@
 }
 
 .display-dashboard-shell .home-widget { overflow: hidden; }
+
+/* A two-row kiosk card may be tall, but its chart should not stretch with the
+   spare viewport height. ChartFrame keeps the width-derived dashboard height
+   (120/150/170px); centre the chart block inside the taller card instead. */
+.display-dashboard-shell .widget-fill:has(> .chart-frame) { justify-content: center; }
+.display-dashboard-shell .widget-fill > .chart-frame { flex: 0 0 var(--chart-h, 150px); }
+
 .display-dashboard-shell .home-metric > strong,
 .display-dashboard-shell .home-weather strong { font-size: clamp(2rem, 3.4vw, 3rem); }
 
