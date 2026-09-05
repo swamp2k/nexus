@@ -60,6 +60,27 @@ function safeHref(value: string): string | null {
   }
 }
 
+function faviconHref(href: string): string {
+  const url = new URL(href);
+  return new URL("/favicon.ico", url.origin).href;
+}
+
+function LinkFavicon({ href, fallback }: { href: string; fallback?: string }) {
+  return <span className="link-collection-icon" aria-hidden="true">
+    <img
+      src={faviconHref(href)}
+      alt=""
+      loading="lazy"
+      onError={(event) => {
+        event.currentTarget.hidden = true;
+        const fallbackNode = event.currentTarget.nextElementSibling as HTMLElement | null;
+        if (fallbackNode) fallbackNode.hidden = false;
+      }}
+    />
+    <span className="link-collection-icon-fallback" hidden>{fallback?.trim() || "↗"}</span>
+  </span>;
+}
+
 export function LinkCollectionWidget({ config }: { config?: WidgetConfig }) {
   const parsed = readLinkCollectionConfig(config);
   const links = parsed.links
@@ -70,7 +91,7 @@ export function LinkCollectionWidget({ config }: { config?: WidgetConfig }) {
 
   return <div className="link-collection widget-fill">
     {links.map((link, index) => <a className="link-collection-row" href={link.href} target="_blank" rel="noreferrer" key={`${link.href}-${index}`}>
-      <span className="link-collection-icon" aria-hidden="true">{link.icon?.trim() || "↗"}</span>
+      <LinkFavicon href={link.href} fallback={link.icon} />
       <span className="link-collection-label">{link.label.trim()}</span>
     </a>)}
   </div>;
@@ -109,7 +130,7 @@ export function LinkCollectionEditor({
 
     <div className="link-collection-editor-links">
       {parsed.links.map((link, index) => <div className="link-collection-editor-row" key={index}>
-        <input className="link-collection-icon-input" aria-label={`Ikon for link ${index + 1}`} value={link.icon ?? ""} maxLength={4} onChange={(event) => updateLink(index, { icon: event.target.value })} placeholder="↗" />
+        <input className="link-collection-icon-input" aria-label={`Fallback-ikon for link ${index + 1}`} title="Bruges kun hvis sitets favicon ikke kan hentes" value={link.icon ?? ""} maxLength={4} onChange={(event) => updateLink(index, { icon: event.target.value })} placeholder="↗" />
         <input aria-label={`Navn for link ${index + 1}`} value={link.label} maxLength={60} onChange={(event) => updateLink(index, { label: event.target.value })} placeholder="YouTube" />
         <input aria-label={`URL for link ${index + 1}`} value={link.url} maxLength={500} onChange={(event) => updateLink(index, { url: event.target.value })} placeholder="https://…" />
         <button type="button" className="link-collection-remove-link" aria-label={`Fjern link ${index + 1}`} onClick={() => removeLink(index)}>×</button>
