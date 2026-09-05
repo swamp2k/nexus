@@ -77,6 +77,7 @@ export const electricityUsageWidgetDefinitions: WidgetDefinition[] = [
     description: "Seneste døgn, 7-dages gennemsnit og dagligt forbrug",
     group: "Strøm",
     page: "Strøm",
+    surfaces: ["home", "display"],
     defaultSize: "medium",
     supportedSizes: ["small", "medium", "wide"],
     rows: 2,
