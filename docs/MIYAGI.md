@@ -135,8 +135,9 @@ Current implementation limits include:
 - recent raw journal window: 30 days, maximum 12 entries
 - each recent journal entry: maximum 800 context characters
 - current entry: maximum 4,000 context characters
-- older rolling-summary input: maximum 60,000 characters per refresh
-- summary progress advances only through source rows actually included in the refresh input
+- older rolling-summary input: maximum 60,000 characters per pass
+- a refresh may run up to 3 passes so a large imported backlog can be bootstrapped immediately
+- summary progress advances only through source rows actually included in a pass
 - refresh runs when older unsummarized user-authored history exists
 - maximum 3 AI follow-up rounds per journal entry
 
