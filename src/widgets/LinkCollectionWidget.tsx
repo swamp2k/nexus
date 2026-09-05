@@ -20,7 +20,7 @@ function stringValue(value: unknown): string {
 }
 
 export function readLinkCollectionConfig(config?: WidgetConfig): LinkCollectionConfig {
-  const source = config && typeof config === "object" ? config : {};
+  const source: WidgetConfig = config && typeof config === "object" ? config : {};
   const rawLinks = Array.isArray(source.links) ? source.links : [];
   const links = rawLinks.slice(0, LINK_COLLECTION_MAX_LINKS).flatMap((entry) => {
     if (!entry || typeof entry !== "object" || Array.isArray(entry)) return [];
