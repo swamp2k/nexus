@@ -62,7 +62,7 @@ export default function DisplayDashboard({ dashboard, theme, onThemeChange }: Pr
     {dashboard.layout.length === 0 ? <div className="home-empty"><strong>Displayet er tomt.</strong><span>Tilføj widgets fra Displays i Nexus.</span></div> :
       <main className="home-widget-grid display-dashboard-grid">
         {dashboard.layout.map((item) => {
-          const widget = widgetDefinitionById(item.id);
+          const widget = widgetDefinitionById(item.type ?? item.id);
           if (!widget) return null;
           const Widget = widget.component;
           const refreshClass = resolveDashboardRefreshClass(widgetRefreshGroup(widget), refreshSettings);
