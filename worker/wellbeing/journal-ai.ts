@@ -92,63 +92,78 @@ export async function refreshHistoricalSummary(env: AiEnv, userId: string): Prom
      FROM journal_ai_state WHERE user_id = ?`,
   ).bind(userId).first<{ contextSummary: string | null; coversUntil: string | null; updatedAt: string | null }>();
 
-  const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-  const rows = await env.DB.prepare(
-    `SELECT body, entryDate, createdAt FROM (
-       SELECT body, entry_date AS entryDate, created_at AS createdAt
-       FROM journal_entries
-       WHERE user_id = ? AND entry_date < ?
-         AND (? IS NULL OR created_at > ?)
-       UNION ALL
-       SELECT body, substr(created_at, 1, 10) AS entryDate, created_at AS createdAt
-       FROM journal_legacy_messages
-       WHERE user_id = ? AND role = 'user' AND substr(created_at, 1, 10) < ?
-         AND (? IS NULL OR created_at > ?)
-     )
-     ORDER BY createdAt
-     LIMIT 250`,
-  ).bind(
-    userId, cutoff, state?.coversUntil ?? null, state?.coversUntil ?? null,
-    userId, cutoff, state?.coversUntil ?? null, state?.coversUntil ?? null,
-  ).all<{ body: string; entryDate: string; createdAt: string }>();
-
-  if (!rows.results.length) return state?.contextSummary ?? null;
   if (!configured(env)) return state?.contextSummary ?? null;
 
+  const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
   const maxInputCharacters = 60_000;
-  const additions: string[] = [];
-  let inputCharacters = 0;
+  const maxPasses = 3;
+  let contextSummary = state?.contextSummary ?? null;
   let coversUntil = state?.coversUntil ?? null;
 
-  for (const row of rows.results) {
-    const addition = `${row.entryDate}: ${row.body.slice(0, 900)}`;
-    const extra = addition.length + (additions.length ? 1 : 0);
-    if (additions.length && inputCharacters + extra > maxInputCharacters) break;
-    additions.push(addition);
-    inputCharacters += extra;
-    coversUntil = row.createdAt;
+  for (let pass = 0; pass < maxPasses; pass += 1) {
+    const rows = await env.DB.prepare(
+      `SELECT body, entryDate, createdAt FROM (
+         SELECT body, entry_date AS entryDate, created_at AS createdAt
+         FROM journal_entries
+         WHERE user_id = ? AND entry_date < ?
+           AND (? IS NULL OR created_at > ?)
+         UNION ALL
+         SELECT body, substr(created_at, 1, 10) AS entryDate, created_at AS createdAt
+         FROM journal_legacy_messages
+         WHERE user_id = ? AND role = 'user' AND substr(created_at, 1, 10) < ?
+           AND (? IS NULL OR created_at > ?)
+       )
+       ORDER BY createdAt
+       LIMIT 250`,
+    ).bind(
+      userId, cutoff, coversUntil, coversUntil,
+      userId, cutoff, coversUntil, coversUntil,
+    ).all<{ body: string; entryDate: string; createdAt: string }>();
+
+    if (!rows.results.length) break;
+
+    const additions: string[] = [];
+    let inputCharacters = 0;
+    let nextCoversUntil = coversUntil;
+
+    for (const row of rows.results) {
+      const addition = `${row.entryDate}: ${row.body.slice(0, 900)}`;
+      const extra = addition.length + (additions.length ? 1 : 0);
+      if (
+        additions.length
+        && inputCharacters + extra > maxInputCharacters
+        && row.createdAt !== nextCoversUntil
+      ) break;
+      additions.push(addition);
+      inputCharacters += extra;
+      nextCoversUntil = row.createdAt;
+    }
+
+    if (!additions.length || !nextCoversUntil) break;
+
+    const previous = contextSummary ? `EKSISTERENDE SUMMARY:\n${contextSummary}\n\n` : "";
+    contextSummary = await callAnthropic(
+      env,
+      SUMMARY_SYSTEM,
+      `${previous}NYE ÆLDRE BRUGERSKREVNE JOURNALDATA:\n${additions.join("\n")}\n\nSkriv en ny samlet kompakt summary. Legacy AI-svar er bevidst udeladt; materialet ovenfor er brugerens egne journalnoter og egne beskeder.`,
+      650,
+    );
+
+    coversUntil = nextCoversUntil;
+    const timestamp = new Date().toISOString();
+    await env.DB.prepare(
+      `INSERT INTO journal_ai_state (user_id, context_summary, summary_covers_until, summary_updated_at)
+       VALUES (?, ?, ?, ?)
+       ON CONFLICT(user_id) DO UPDATE SET
+         context_summary = excluded.context_summary,
+         summary_covers_until = excluded.summary_covers_until,
+         summary_updated_at = excluded.summary_updated_at`,
+    ).bind(userId, contextSummary, coversUntil, timestamp).run();
+
+    if (additions.length === rows.results.length && rows.results.length < 250) break;
   }
 
-  if (!additions.length || !coversUntil) return state?.contextSummary ?? null;
-
-  const previous = state?.contextSummary ? `EKSISTERENDE SUMMARY:\n${state.contextSummary}\n\n` : "";
-  const summary = await callAnthropic(
-    env,
-    SUMMARY_SYSTEM,
-    `${previous}NYE ÆLDRE BRUGERSKREVNE JOURNALDATA:\n${additions.join("\n")}\n\nSkriv en ny samlet kompakt summary. Legacy AI-svar er bevidst udeladt; materialet ovenfor er brugerens egne journalnoter og egne beskeder.`,
-    650,
-  );
-
-  const timestamp = new Date().toISOString();
-  await env.DB.prepare(
-    `INSERT INTO journal_ai_state (user_id, context_summary, summary_covers_until, summary_updated_at)
-     VALUES (?, ?, ?, ?)
-     ON CONFLICT(user_id) DO UPDATE SET
-       context_summary = excluded.context_summary,
-       summary_covers_until = excluded.summary_covers_until,
-       summary_updated_at = excluded.summary_updated_at`,
-  ).bind(userId, summary, coversUntil, timestamp).run();
-  return summary;
+  return contextSummary;
 }
 
 async function buildJournalContext(env: AiEnv, userId: string, journal: { id: string; entryDate: string; body: string }): Promise<string> {
