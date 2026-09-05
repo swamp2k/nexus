@@ -85,44 +85,60 @@ Regler:
 const FOLLOWUP_SYSTEM = `Du er Nexus' journal-assistent og fortsætter en kort refleksion om ét bestemt journalnotat.
 Svar på dansk. Brug journalnotatet, dagens Nexus-kontekst og den korte samtale hidtil. Reager på brugerens svar og stil højst ét nyt spørgsmål, hvis der stadig er noget konkret og nyttigt at uddybe. Undgå at trække samtalen ud bare for at fortsætte. Maks ca. 140 ord.`;
 
-async function refreshHistoricalSummary(env: AiEnv, userId: string): Promise<string | null> {
+export async function refreshHistoricalSummary(env: AiEnv, userId: string): Promise<string | null> {
   const state = await env.DB.prepare(
     `SELECT context_summary AS contextSummary, summary_covers_until AS coversUntil,
             summary_updated_at AS updatedAt
      FROM journal_ai_state WHERE user_id = ?`,
   ).bind(userId).first<{ contextSummary: string | null; coversUntil: string | null; updatedAt: string | null }>();
 
-  const now = Date.now();
-  const updatedAt = state?.updatedAt ? Date.parse(state.updatedAt) : 0;
-  const week = 7 * 24 * 60 * 60 * 1000;
-  if (state?.contextSummary && updatedAt && now - updatedAt < week) return state.contextSummary;
-
-  const cutoff = new Date(now - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  const cutoff = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
   const rows = await env.DB.prepare(
-    `SELECT body, entry_date AS entryDate, created_at AS createdAt
-     FROM journal_entries
-     WHERE user_id = ? AND entry_date < ?
-       AND (? IS NULL OR created_at > ?)
-     ORDER BY created_at
-     LIMIT 40`,
-  ).bind(userId, cutoff, state?.coversUntil ?? null, state?.coversUntil ?? null).all<{ body: string; entryDate: string; createdAt: string }>();
+    `SELECT body, entryDate, createdAt FROM (
+       SELECT body, entry_date AS entryDate, created_at AS createdAt
+       FROM journal_entries
+       WHERE user_id = ? AND entry_date < ?
+         AND (? IS NULL OR created_at > ?)
+       UNION ALL
+       SELECT body, substr(created_at, 1, 10) AS entryDate, created_at AS createdAt
+       FROM journal_legacy_messages
+       WHERE user_id = ? AND role = 'user' AND substr(created_at, 1, 10) < ?
+         AND (? IS NULL OR created_at > ?)
+     )
+     ORDER BY createdAt
+     LIMIT 250`,
+  ).bind(
+    userId, cutoff, state?.coversUntil ?? null, state?.coversUntil ?? null,
+    userId, cutoff, state?.coversUntil ?? null, state?.coversUntil ?? null,
+  ).all<{ body: string; entryDate: string; createdAt: string }>();
 
   if (!rows.results.length) return state?.contextSummary ?? null;
   if (!configured(env)) return state?.contextSummary ?? null;
 
-  const additions = rows.results
-    .map((row) => `${row.entryDate}: ${row.body.slice(0, 900)}`)
-    .join("\n")
-    .slice(0, 12_000);
+  const maxInputCharacters = 60_000;
+  const additions: string[] = [];
+  let inputCharacters = 0;
+  let coversUntil = state?.coversUntil ?? null;
+
+  for (const row of rows.results) {
+    const addition = `${row.entryDate}: ${row.body.slice(0, 900)}`;
+    const extra = addition.length + (additions.length ? 1 : 0);
+    if (additions.length && inputCharacters + extra > maxInputCharacters) break;
+    additions.push(addition);
+    inputCharacters += extra;
+    coversUntil = row.createdAt;
+  }
+
+  if (!additions.length || !coversUntil) return state?.contextSummary ?? null;
+
   const previous = state?.contextSummary ? `EKSISTERENDE SUMMARY:\n${state.contextSummary}\n\n` : "";
   const summary = await callAnthropic(
     env,
     SUMMARY_SYSTEM,
-    `${previous}NYE ÆLDRE JOURNALNOTER:\n${additions}\n\nSkriv en ny samlet kompakt summary.`,
+    `${previous}NYE ÆLDRE BRUGERSKREVNE JOURNALDATA:\n${additions.join("\n")}\n\nSkriv en ny samlet kompakt summary. Legacy AI-svar er bevidst udeladt; materialet ovenfor er brugerens egne journalnoter og egne beskeder.`,
     650,
   );
 
-  const coversUntil = rows.results[rows.results.length - 1].createdAt;
   const timestamp = new Date().toISOString();
   await env.DB.prepare(
     `INSERT INTO journal_ai_state (user_id, context_summary, summary_covers_until, summary_updated_at)
