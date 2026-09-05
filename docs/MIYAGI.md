@@ -14,7 +14,9 @@ D1 normalized data
   ├─ garmin_sleep
   ├─ garmin_activities
   ├─ wellbeing_entries + wellbeing_metrics
-  └─ journal_entries
+  ├─ journal_entries
+  ├─ journal_legacy_messages (user-authored legacy context only)
+  └─ journal_ai_state (rolling long-term summary)
           ↓
 worker/wellbeing/miyagi.ts
           ↓
@@ -42,6 +44,7 @@ Context includes:
 - Motion activities with duration, distance, heart rate, elevation, calories, and type
 - daily subjective metrics with their configured direction
 - journal entries
+- a compact long-term journal summary built from older user-authored journal entries and legacy user messages
 - deterministic aggregate values such as average sleep, steps, resting heart rate, stress, activity volume, and per-metric averages
 
 Journal text is bounded before it is sent to the provider to prevent pathological context growth. Source entries in D1 remain untouched.
@@ -122,6 +125,7 @@ The journal assistant borrows the useful parts of the NoteFlow tracker strategy:
 
 - recent entries remain raw but bounded
 - older history is compressed into a rolling summary
+- imported legacy user messages can contribute to the rolling summary; legacy assistant/AI messages are retained separately but excluded from AI memory
 - current structured Nexus data is reduced to a small set of relevant fields
 - journal bodies are clipped in AI context while source text remains intact in D1
 - follow-up conversations are bounded
@@ -131,11 +135,16 @@ Current implementation limits include:
 - recent raw journal window: 30 days, maximum 12 entries
 - each recent journal entry: maximum 800 context characters
 - current entry: maximum 4,000 context characters
-- older rolling-summary input: maximum 12,000 characters per refresh
-- rolling summary refresh: at most weekly when older unsummarized entries exist
+- older rolling-summary input: maximum 60,000 characters per refresh
+- summary progress advances only through source rows actually included in the refresh input
+- refresh runs when older unsummarized user-authored history exists
 - maximum 3 AI follow-up rounds per journal entry
 
 The rolling summary lives in `journal_ai_state`. Individual AI prompts and user responses remain in `journal_followups` linked to the original `journal_entries` row.
+
+Legacy imports may use `journal_legacy_messages`. Only rows with `role = 'user'` are eligible for the rolling summary. Legacy assistant output is preserved for archival/history purposes but is never treated as user-authored journal evidence.
+
+Miyagi analyses include the current compact `historicalJournalSummary` alongside their bounded raw analysis window. The summary is explicitly treated as compressed background context; raw journal and structured Nexus data in the active period take precedence if they conflict.
 
 Journal AI must never block or roll back the journal save itself. Source text is saved first; AI is a secondary layer.
 
