@@ -52,9 +52,9 @@ def sql_string(value: str | None) -> str:
     return "'" + value.replace("'", "''") + "'"
 
 
-def deterministic_id(prefix: str, *parts: str) -> str:
-    digest = hashlib.sha256("\x1f".join(parts).encode("utf-8")).hexdigest()[:32]
-    return f"{prefix}_{digest}"
+def deterministic_id(namespace: str, *parts: str) -> str:
+    digest = hashlib.sha256((namespace + "\x1f" + "\x1f".join(parts)).encode("utf-8")).hexdigest()[:32]
+    return f"{digest[:8]}-{digest[8:12]}-{digest[12:16]}-{digest[16:20]}-{digest[20:32]}"
 
 
 def load_export(path: Path) -> sqlite3.Connection:
