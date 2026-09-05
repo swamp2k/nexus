@@ -34,6 +34,10 @@ function localDate(): string {
   return new Date(now.getTime() - offset).toISOString().slice(0, 10);
 }
 
+function kr(value: number): string {
+  return value.toFixed(2).replace(".", ",");
+}
+
 function price(point: EnergyPricePoint): number {
   return point.totalDkkPerKwh ?? point.approxDkkPerKwh;
 }
@@ -128,12 +132,13 @@ export function EnergyPriceChartWidget() {
   const min = Math.min(...values), max = Math.max(...values);
 
   return <div className="widget-fill">
-    <div className="chart-summary"><span>Lavest <strong>{min.toFixed(2).replace(".", ",")} kr</strong></span><span>Højest <strong>{max.toFixed(2).replace(".", ",")} kr</strong></span><small>Fast skala 0–6 kr/kWh</small></div>
+    <div className="chart-summary"><span>Lavest <strong>{kr(min)} kr</strong></span><span>Højest <strong>{kr(max)} kr</strong></span><small>Fast skala 0–6 kr/kWh</small></div>
+    <div className="band-legend" aria-label="Prisgrænser"><span className="low">Lav ≤ {kr(bands.low)}</span><span className="medium">Middel</span><span className="high">Høj ≥ {kr(bands.high)} kr</span></div>
     <ChartFrame label="Elpris næste 24 timer, fast skala 0 til 6 kroner pr. kWh">{({ width, height }) => {
       const left = 22, right = 4, top = 8, bottom = 18;
       const plotW = width - left - right, plotH = height - top - bottom;
       const slot = plotW / bars.length;
-      const barWidth = Math.max(3, slot * 0.68);
+      const barWidth = Math.max(3, Math.min(26, slot * 0.68));
       const baseline = height - bottom;
       const y = (value: number) => top + (1 - Math.max(0, Math.min(ENERGY_MAX, value)) / ENERGY_MAX) * plotH;
       // Label every n-th hour so labels never collide: ~40px per label.
