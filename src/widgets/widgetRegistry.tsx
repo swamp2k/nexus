@@ -14,6 +14,7 @@ import {
 } from "./extendedWidgets";
 
 export type WidgetSize = "small" | "medium" | "wide";
+export type WidgetSurface = "home" | "display";
 export type WidgetTargetPage = "Garmin" | "Velbefindende" | "Vejr" | "Strøm" | "Kalender" | "Varmepumpe" | "Unraid" | "DBA" | "PC Watch" | "Motion";
 
 export type WidgetDefinition = {
@@ -25,6 +26,8 @@ export type WidgetDefinition = {
   /** Key used to look up the refresh class in settings. Defaults to `group`. */
   refreshGroup?: string;
   page: WidgetTargetPage;
+  /** Surfaces where this widget is safe to offer. Defaults to Home only. */
+  surfaces?: WidgetSurface[];
   defaultSize: WidgetSize;
   supportedSizes: WidgetSize[];
   /** Grid rows the card claims on desktop. 2 for charts and lists; 1 (default) for numbers. */
@@ -34,6 +37,10 @@ export type WidgetDefinition = {
 
 export function widgetRefreshGroup(widget: Pick<WidgetDefinition, "group" | "refreshGroup">): string {
   return widget.refreshGroup ?? widget.group;
+}
+
+export function widgetSupportsSurface(widget: Pick<WidgetDefinition, "surfaces">, surface: WidgetSurface): boolean {
+  return (widget.surfaces ?? ["home"]).includes(surface);
 }
 
 type GarminOverview = {
@@ -172,14 +179,14 @@ export const widgetRegistry: WidgetDefinition[] = [
   { id: "garmin.sleep.lastNight", title: "Søvn", description: "Seneste nats søvn", group: "Garmin", page: "Garmin", defaultSize: "small", supportedSizes: ["small", "medium"], component: GarminSleepWidget },
   { id: "garmin.sleep.week", rows: 2, title: "Søvn · 7 dage", description: "Søvnvarighed de seneste 7 nætter", group: "Garmin", page: "Garmin", defaultSize: "medium", supportedSizes: FLEX_SIZES, component: GarminSleepWeekWidget },
   { id: "garmin.bodyBattery.today", title: "Body Battery", description: "Seneste Body Battery", group: "Garmin", page: "Garmin", defaultSize: "small", supportedSizes: ["small", "medium"], component: GarminBodyBatteryWidget },
-  { id: "energy.price.current", title: "Elpris", description: "Samlet pris lige nu", group: "Strøm", page: "Strøm", defaultSize: "small", supportedSizes: ["small", "medium"], component: EnergyCurrentWidget },
-  { id: "energy.price.todayRange", title: "Elpris · i dag", description: "Laveste, gennemsnit og højeste pris i dag", group: "Strøm", page: "Strøm", defaultSize: "small", supportedSizes: FLEX_SIZES, component: EnergyTodayRangeWidget },
-  { id: "energy.price.next24h", rows: 2, title: "Elpris · næste døgn", description: "Prisgraf for de næste 24 timer", group: "Strøm", page: "Strøm", defaultSize: "medium", supportedSizes: FLEX_SIZES, component: EnergyPriceChartWidget },
-  { id: "weather.current", title: "Vejr", description: "Vejret lige nu", group: "Vejr", page: "Vejr", defaultSize: "medium", supportedSizes: ["small", "medium"], component: WeatherCurrentWidget },
-  { id: "weather.nextHours", title: "Vejr · næste timer", description: "Temperatur, vind og nedbør de næste timer", group: "Vejr", page: "Vejr", defaultSize: "medium", supportedSizes: FLEX_SIZES, component: WeatherNextHoursWidget },
-  { id: "weather.week", title: "Vejr · 7 dage", description: "Kort 7-dages vejrudsigt", group: "Vejr", page: "Vejr", defaultSize: "medium", supportedSizes: FLEX_SIZES, component: WeatherWeekWidget },
-  { id: "calendar.waste.next", rows: 2, title: "Affald", description: "Næste tømning af rest, plast og papir", group: "Kalender", page: "Kalender", defaultSize: "medium", supportedSizes: FLEX_SIZES, component: CalendarWasteWidget },
-  { id: "melcloud.atw.current", title: "Varmepumpe", description: "Rum, tank, ude og driftsstatus", group: "MELCloud", page: "Varmepumpe", defaultSize: "medium", supportedSizes: FLEX_SIZES, component: MelCloudWidget },
+  { id: "energy.price.current", title: "Elpris", description: "Samlet pris lige nu", group: "Strøm", page: "Strøm", surfaces: ["home", "display"], defaultSize: "small", supportedSizes: ["small", "medium"], component: EnergyCurrentWidget },
+  { id: "energy.price.todayRange", title: "Elpris · i dag", description: "Laveste, gennemsnit og højeste pris i dag", group: "Strøm", page: "Strøm", surfaces: ["home", "display"], defaultSize: "small", supportedSizes: FLEX_SIZES, component: EnergyTodayRangeWidget },
+  { id: "energy.price.next24h", rows: 2, title: "Elpris · næste døgn", description: "Prisgraf for de næste 24 timer", group: "Strøm", page: "Strøm", surfaces: ["home", "display"], defaultSize: "medium", supportedSizes: FLEX_SIZES, component: EnergyPriceChartWidget },
+  { id: "weather.current", title: "Vejr", description: "Vejret lige nu", group: "Vejr", page: "Vejr", surfaces: ["home", "display"], defaultSize: "medium", supportedSizes: ["small", "medium"], component: WeatherCurrentWidget },
+  { id: "weather.nextHours", title: "Vejr · næste timer", description: "Temperatur, vind og nedbør de næste timer", group: "Vejr", page: "Vejr", surfaces: ["home", "display"], defaultSize: "medium", supportedSizes: FLEX_SIZES, component: WeatherNextHoursWidget },
+  { id: "weather.week", title: "Vejr · 7 dage", description: "Kort 7-dages vejrudsigt", group: "Vejr", page: "Vejr", surfaces: ["home", "display"], defaultSize: "medium", supportedSizes: FLEX_SIZES, component: WeatherWeekWidget },
+  { id: "calendar.waste.next", rows: 2, title: "Affald", description: "Næste tømning af rest, plast og papir", group: "Kalender", page: "Kalender", surfaces: ["home", "display"], defaultSize: "medium", supportedSizes: FLEX_SIZES, component: CalendarWasteWidget },
+  { id: "melcloud.atw.current", title: "Varmepumpe", description: "Rum, tank, ude og driftsstatus", group: "MELCloud", page: "Varmepumpe", surfaces: ["home", "display"], defaultSize: "medium", supportedSizes: FLEX_SIZES, component: MelCloudWidget },
   { id: "wellbeing.today", rows: 2, title: "Velbefindende", description: "Dagens check-in og journal", group: "Velbefindende", page: "Velbefindende", defaultSize: "medium", supportedSizes: FLEX_SIZES, component: WellbeingTodayWidget },
 ];
 
