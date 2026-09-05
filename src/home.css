@@ -146,10 +146,22 @@
 
 .link-collection-icon {
   flex: 0 0 20px;
+  width: 20px;
+  height: 20px;
   display: grid;
   place-items: center;
   color: var(--muted);
   font-size: .78rem;
+}
+
+.link-collection-icon img {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+}
+
+.link-collection-icon-fallback {
+  line-height: 1;
 }
 
 .link-collection-label {
