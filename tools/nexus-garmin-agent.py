@@ -604,6 +604,7 @@ def load_or_create_snapshot(snapshot_path: Path, data_dir: Path) -> dict[str, st
 
 def build_incremental_zip(data_dir: Path, user_id: str, before: dict[str, str]) -> Path:
     changed: list[Path] = []
+    included: set[Path] = set()
     newest: Path | None = None
     for file_path in sorted(data_dir.rglob("*.json")):
         if not nexus_supported_file(data_dir, file_path):
@@ -613,6 +614,23 @@ def build_incremental_zip(data_dir: Path, user_id: str, before: dict[str, str]) 
         relative = file_path.relative_to(data_dir).as_posix()
         if before.get(relative) != sha256_file(file_path):
             changed.append(file_path)
+            included.add(file_path)
+
+    # Sleep can be refined by Garmin after an earlier sync. Always resend today
+    # and yesterday so D1's upsert gets the latest finalized record even when a
+    # reused pre-sync snapshot already contains the same local file hash.
+    today = datetime.date.today()
+    refreshed_sleep = 0
+    for offset in (0, 1):
+        day = today - datetime.timedelta(days=offset)
+        sleep_path = data_dir / "Sleep" / f"sleep_{day.isoformat()}.json"
+        if sleep_path.is_file() and sleep_path not in included:
+            changed.append(sleep_path)
+            included.add(sleep_path)
+            refreshed_sleep += 1
+    if refreshed_sleep:
+        print(f"[nexus] Including {refreshed_sleep} recent sleep file(s) for refresh", flush=True)
+
     if not changed and newest is not None:
         changed.append(newest)
         print("[nexus] No data changed; sending one current file as a no-op sync marker", flush=True)
@@ -624,7 +642,7 @@ def build_incremental_zip(data_dir: Path, user_id: str, before: dict[str, str]) 
     with zipfile.ZipFile(zip_path, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=6) as archive:
         for file_path in changed:
             archive.write(file_path, file_path.relative_to(data_dir).as_posix())
-    print(f"[nexus] Packed {len(changed)} changed Nexus files ({zip_path.stat().st_size / 1024 / 1024:.2f} MB)", flush=True)
+    print(f"[nexus] Packed {len(changed)} Nexus files ({zip_path.stat().st_size / 1024 / 1024:.2f} MB)", flush=True)
     return zip_path
 
 
