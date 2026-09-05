@@ -137,7 +137,6 @@ def render_sql(
         f"-- Source tracker: {tracker['name']} ({tracker['id']})",
         "-- Review this file before executing it against Nexus D1.",
         "PRAGMA foreign_keys = ON;",
-        "BEGIN TRANSACTION;",
         "",
     ]
 
@@ -173,8 +172,6 @@ def render_sql(
 
     lines.extend([
         f"DELETE FROM journal_ai_state WHERE user_id = {sql_string(user_id)};",
-        "",
-        "COMMIT;",
         "",
     ])
     return "\n".join(lines)
