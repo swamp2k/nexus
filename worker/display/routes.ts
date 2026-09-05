@@ -84,18 +84,43 @@ function cleanTheme(value: unknown): "light" | "dark" | "system" {
   return value === "light" || value === "dark" ? value : "system";
 }
 
-function cleanLayout(value: unknown): Array<{ id: string; size: "small" | "medium" | "wide" }> {
+type DisplayLayoutItem = {
+  id: string;
+  size: "small" | "medium" | "wide";
+  type?: string;
+  config?: Record<string, unknown>;
+};
+
+function cleanConfig(value: unknown): Record<string, unknown> | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined;
+  try {
+    const serialized = JSON.stringify(value);
+    if (serialized.length > 4096) return undefined;
+    return JSON.parse(serialized) as Record<string, unknown>;
+  } catch {
+    return undefined;
+  }
+}
+
+function cleanLayout(value: unknown): DisplayLayoutItem[] {
   if (!Array.isArray(value)) return [];
   const seen = new Set<string>();
-  const output: Array<{ id: string; size: "small" | "medium" | "wide" }> = [];
+  const output: DisplayLayoutItem[] = [];
   for (const item of value.slice(0, 30)) {
     if (!item || typeof item !== "object") continue;
-    const row = item as { id?: unknown; size?: unknown };
-    const id = typeof row.id === "string" ? row.id.slice(0, 100) : "";
+    const row = item as { id?: unknown; size?: unknown; type?: unknown; config?: unknown };
+    const id = typeof row.id === "string" ? row.id.trim().slice(0, 100) : "";
     if (!id || seen.has(id)) continue;
     const size = row.size === "small" || row.size === "wide" ? row.size : "medium";
+    const type = typeof row.type === "string" ? row.type.trim().slice(0, 100) : "";
+    const config = cleanConfig(row.config);
     seen.add(id);
-    output.push({ id, size });
+    output.push({
+      id,
+      size,
+      ...(type ? { type } : {}),
+      ...(config ? { config } : {}),
+    });
   }
   return output;
 }
