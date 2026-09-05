@@ -163,7 +163,7 @@ Home and Displays use the same pure edit functions (`src/dashboard/layoutEditing
 
 - No sidebar, no user menu, no page heading. One header line: `NEXUS` and the dashboard name on the left, clock and date on the right, theme toggle at the end.
 - The grid keeps 4 columns from 900px up regardless of the app breakpoint, uses 2 columns from 761–899px, and falls to 1 column at 760px and below. A landscape iPad therefore shows the same shape as a desktop without inheriting sidebar-driven app breakpoints.
-- Rows are `minmax(140px, 1fr)`: the grid takes the remaining viewport and shares it between rows, so a display fills the screen. Two-row cards may therefore be tall, but charts keep their normal width-derived `120/150/170px` `ChartFrame` height and the chart block is centred inside the card instead of stretching vertically. If a layout has more rows than fit, the page scrolls rather than clipping; the editor preview is the place to fix that.
+- Kiosk rows are content-driven: `minmax(140px, auto)` with `align-content: start`. The registry's `rows: 2` hint is for Home and the editor preview and is ignored on the paired display, so a chart or list does not become twice as tall merely because the screen has spare height. Charts keep their normal width-derived `120/150/170px` `ChartFrame` height. Extra viewport space stays empty below the grid instead of inflating cards.
 - Big numbers scale up (`clamp(2rem, 3.4vw, 3rem)`) because the reader is further away. Nothing else changes size.
 - Cards show no drill-down links and no kickers. Freshness belongs inside the widget (`Viser seneste kendte data`), not in the chrome.
 - The dashboard's saved theme wins over the device preference. Auto-refresh follows the refresh classes in Settings.
