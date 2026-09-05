@@ -368,4 +368,213 @@
   .miyagi-analysis-dialog-actions > * {
     flex: 1;
   }
+
+  .miyagi-chat-launcher {
+    right: 14px;
+    bottom: 14px;
+  }
+
+  .miyagi-chat-popout {
+    inset: 8px;
+    width: auto;
+    height: auto;
+    border-radius: 16px;
+  }
+
+  .miyagi-chat-popout .miyagi-message {
+    width: 94%;
+  }
+
+  .miyagi-chat-compose-actions small {
+    display: none;
+  }
+}
+
+
+.miyagi-chat-launcher {
+  position: fixed;
+  right: 22px;
+  bottom: 22px;
+  z-index: 82;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 46px;
+  padding: 0 16px 0 11px;
+  border: 1px solid color-mix(in srgb, var(--accent) 55%, var(--border));
+  border-radius: 999px;
+  background: var(--accent);
+  color: white;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.22);
+  font: inherit;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.miyagi-chat-launcher:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 16px 38px rgba(0, 0, 0, 0.26);
+}
+
+.miyagi-chat-launcher.open {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.miyagi-chat-launcher-icon {
+  display: grid;
+  width: 28px;
+  height: 28px;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.16);
+  font-size: 1rem;
+}
+
+.miyagi-chat-popout {
+  position: fixed;
+  right: 22px;
+  bottom: 22px;
+  z-index: 84;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  width: min(430px, calc(100vw - 32px));
+  height: min(650px, calc(100vh - 44px));
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 18px;
+  background: var(--surface);
+  box-shadow: 0 24px 70px rgba(0, 0, 0, 0.3);
+}
+
+.miyagi-chat-popout-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 15px 15px 13px;
+  border-bottom: 1px solid var(--border);
+  background: color-mix(in srgb, var(--surface) 88%, var(--accent-soft));
+}
+
+.miyagi-chat-popout-header > div {
+  display: grid;
+  gap: 2px;
+}
+
+.miyagi-chat-popout-header strong {
+  font-size: 0.98rem;
+}
+
+.miyagi-chat-popout-header span {
+  color: var(--muted);
+  font-size: 0.78rem;
+  line-height: 1.35;
+}
+
+.miyagi-chat-popout-messages {
+  display: grid;
+  align-content: start;
+  gap: 9px;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 14px;
+  overscroll-behavior: contain;
+  scroll-behavior: smooth;
+}
+
+.miyagi-chat-popout .miyagi-message {
+  width: min(88%, 360px);
+}
+
+.miyagi-chat-empty {
+  display: grid;
+  gap: 5px;
+  margin: auto 0;
+  padding: 18px 12px;
+  color: var(--muted);
+  text-align: center;
+}
+
+.miyagi-chat-empty strong {
+  color: var(--text);
+}
+
+.miyagi-chat-typing {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  width: fit-content;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface-soft);
+  color: var(--muted-strong);
+  font-size: 0.8rem;
+}
+
+.miyagi-chat-typing .miyagi-thinking-dot {
+  width: 8px;
+  height: 8px;
+}
+
+.miyagi-chat-compose {
+  display: grid;
+  gap: 8px;
+  padding: 12px;
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.miyagi-chat-compose textarea {
+  width: 100%;
+  min-height: 76px;
+  max-height: 150px;
+  resize: vertical;
+  padding: 10px 11px;
+  border: 1px solid var(--border);
+  border-radius: 11px;
+  outline: none;
+  background: var(--surface-soft);
+  color: var(--text);
+  font: inherit;
+  line-height: 1.4;
+}
+
+.miyagi-chat-compose textarea:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-soft);
+}
+
+.miyagi-chat-compose textarea:disabled {
+  opacity: 0.72;
+}
+
+.miyagi-chat-compose-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.miyagi-chat-compose-actions small {
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+
+.miyagi-chat-compose-actions button {
+  min-width: 78px;
+  padding: 8px 14px;
+  border: 1px solid var(--accent);
+  border-radius: 9px;
+  background: var(--accent);
+  color: white;
+  font: inherit;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.miyagi-chat-compose-actions button:disabled {
+  opacity: 0.52;
+  cursor: default;
 }
