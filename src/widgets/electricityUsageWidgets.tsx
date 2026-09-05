@@ -78,7 +78,7 @@ export const electricityUsageWidgetDefinitions: WidgetDefinition[] = [
     group: "Strøm",
     page: "Strøm",
     defaultSize: "medium",
-    supportedSizes: ["medium", "wide"],
+    supportedSizes: ["small", "medium", "wide"],
     rows: 2,
     component: ElectricityUsageWeekWidget,
   },
