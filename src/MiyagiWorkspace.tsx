@@ -199,7 +199,7 @@ export default function MiyagiWorkspace({ expanded = true }: MiyagiWorkspaceProp
     }
   }
 
-  return <section className="miyagi-workspace" aria-label="Mr. Miyagi analyse">
+  return <section className={`miyagi-workspace${expanded ? "" : " miyagi-workspace--collapsed"}`} aria-label="Mr. Miyagi analyse">
     {expanded && <>
     <div className="miyagi-workspace-actions">
       <button className="secondary-action" type="button" onClick={() => setHistoryOpen(true)}>Historik</button>
