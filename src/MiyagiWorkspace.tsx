@@ -37,9 +37,15 @@ type LatestResponse = { analysis: Analysis | null; messages: Message[] };
 type AnalysisLength = "short" | "normal" | "deep";
 type AnalysisTone = "objective" | "empathetic" | "miyagi";
 
+type PendingJournal = {
+  id: string;
+  body: string;
+  createdAt: string;
+};
+
 type MiyagiWorkspaceProps = {
   expanded?: boolean;
-  pendingJournalId?: string | null;
+  pendingJournal?: PendingJournal | null;
   onPendingJournalHandled?: () => void;
 };
 
@@ -79,7 +85,7 @@ function mergeMessages(current: Message[], incoming: Message[]): Message[] {
 
 export default function MiyagiWorkspace({
   expanded = true,
-  pendingJournalId = null,
+  pendingJournal = null,
   onPendingJournalHandled,
 }: MiyagiWorkspaceProps) {
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
@@ -119,8 +125,20 @@ export default function MiyagiWorkspace({
   }, []);
 
   useEffect(() => {
-    if (!pendingJournalId) return;
+    if (!pendingJournal) return;
     let cancelled = false;
+    const pendingId = `pending-journal-${pendingJournal.id}`;
+    const optimisticMessage: Message = {
+      id: pendingId,
+      role: "user",
+      body: pendingJournal.body,
+      kind: "checkin",
+      analysisId: analysis?.id ?? null,
+      journalEntryId: pendingJournal.id,
+      createdAt: pendingJournal.createdAt,
+    };
+
+    setMessages((current) => mergeMessages(current, [optimisticMessage]));
     setChatOpen(true);
     setChatBusy(true);
     setError(null);
@@ -129,7 +147,7 @@ export default function MiyagiWorkspace({
       method: "POST",
       credentials: "same-origin",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ journalId: pendingJournalId }),
+      body: JSON.stringify({ journalId: pendingJournal.id }),
     })
       .then(async (response) => {
         if (!response.ok) throw new Error(await errorText(response));
@@ -137,7 +155,10 @@ export default function MiyagiWorkspace({
       })
       .then((body) => {
         if (cancelled) return;
-        setMessages((current) => mergeMessages(current, body.messages ?? []));
+        setMessages((current) => mergeMessages(
+          current.filter((message) => message.id !== pendingId),
+          body.messages ?? [],
+        ));
       })
       .catch((caught: Error) => {
         if (!cancelled) setError(caught.message);
@@ -149,7 +170,7 @@ export default function MiyagiWorkspace({
       });
 
     return () => { cancelled = true; };
-  }, [pendingJournalId]);
+  }, [pendingJournal?.id]);
 
   useEffect(() => {
     if (!analysisDialogOpen) return;
@@ -212,6 +233,25 @@ export default function MiyagiWorkspace({
     }
   }
 
+  async function exportWellbeing() {
+    setError(null);
+    try {
+      const response = await fetch("/api/wellbeing/export", { credentials: "same-origin", cache: "no-store" });
+      if (!response.ok) throw new Error(await errorText(response));
+      const payload = await response.blob();
+      const url = URL.createObjectURL(payload);
+      const anchor = document.createElement("a");
+      anchor.href = url;
+      anchor.download = `nexus-wellbeing-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      URL.revokeObjectURL(url);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Kunne ikke eksportere velbefindende-data.");
+    }
+  }
+
   async function sendMessage() {
     if (!chatText.trim() || chatBusy) return;
     const text = chatText.trim();
@@ -256,6 +296,7 @@ export default function MiyagiWorkspace({
   return <section className={`miyagi-workspace${expanded ? "" : " miyagi-workspace--collapsed"}`} aria-label="Mr. Miyagi analyse">
     {expanded && <>
     <div className="miyagi-workspace-actions">
+      <button className="secondary-action" type="button" onClick={() => void exportWellbeing()}>Eksportér</button>
       <button className="secondary-action" type="button" onClick={() => setHistoryOpen(true)}>Historik</button>
       <button className="primary-action" type="button" disabled={state === "loading" || state === "analyzing"} onClick={openAnalysisDialog}>
         {state === "analyzing" ? "Miyagi tænker…" : analysis ? "Analysér igen" : "Start analyse"}
