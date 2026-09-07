@@ -34,6 +34,10 @@ type LatestResponse = { analysis: Analysis | null; messages: Message[] };
 type AnalysisLength = "short" | "normal" | "deep";
 type AnalysisTone = "objective" | "empathetic" | "miyagi";
 
+type MiyagiWorkspaceProps = {
+  expanded?: boolean;
+};
+
 async function errorText(response: Response): Promise<string> {
   try {
     const body = await response.json() as { error?: string; detail?: string };
@@ -59,7 +63,7 @@ function formatTimestamp(value: string): string {
   return new Intl.DateTimeFormat("da-DK", { dateStyle: "medium", timeStyle: "short" }).format(parsed);
 }
 
-export default function MiyagiWorkspace() {
+export default function MiyagiWorkspace({ expanded = true }: MiyagiWorkspaceProps) {
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [state, setState] = useState<"loading" | "ready" | "analyzing" | "error">("loading");
@@ -196,6 +200,7 @@ export default function MiyagiWorkspace() {
   }
 
   return <section className="miyagi-workspace" aria-label="Mr. Miyagi analyse">
+    {expanded && <>
     <div className="miyagi-workspace-actions">
       <button className="secondary-action" type="button" onClick={() => setHistoryOpen(true)}>Historik</button>
       <button className="primary-action" type="button" disabled={state === "loading" || state === "analyzing"} onClick={openAnalysisDialog}>
@@ -225,6 +230,7 @@ export default function MiyagiWorkspace() {
       <strong>Ingen analyse endnu</strong>
       <p>Start en analyse. Standard er kort og empatisk; du kan vælge fokus eller en anden svarstil i dialogen.</p>
     </div>}
+    </>}
 
     {analysis && <>
       <button
@@ -287,7 +293,7 @@ export default function MiyagiWorkspace() {
     </>}
 
     {error && <p className="settings-feedback error">{error}</p>}
-    <small className="miyagi-disclaimer">Miyagi er et analyseværktøj i et privat hobbyprojekt. Han kan hjælpe med mønstre og refleksion, men er ikke læge og erstatter ikke faglig vurdering.</small>
+    {expanded && <small className="miyagi-disclaimer">Miyagi er et analyseværktøj i et privat hobbyprojekt. Han kan hjælpe med mønstre og refleksion, men er ikke læge og erstatter ikke faglig vurdering.</small>}
 
     {analysisDialogOpen && <div className="miyagi-analysis-overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setAnalysisDialogOpen(false); }}>
       <section className="miyagi-analysis-dialog" role="dialog" aria-modal="true" aria-labelledby="miyagi-analysis-title">
