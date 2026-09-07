@@ -351,8 +351,8 @@ export default function MiyagiWorkspace({
 
         <div className="miyagi-chat-popout-messages" ref={chatMessagesRef}>
           {messages.length === 0 && <div className="miyagi-chat-empty">
-            <strong>Analysen er klar.</strong>
-            <span>Svar på et af Miyagis spørgsmål eller spørg ind til noget, han fandt.</span>
+            <strong>Miyagi er klar.</strong>
+            <span>Skriv om dagens check-in, spørg ind til en analyse eller giv ham mere kontekst.</span>
           </div>}
           {messages.map((message, index) => <article className={`miyagi-message ${message.role}`} key={message.id ?? `${message.createdAt}-${index}`}>
             <strong>{message.role === "assistant" ? "Miyagi" : "Dig"}</strong>
