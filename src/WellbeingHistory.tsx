@@ -21,6 +21,47 @@ type HistoryDay = {
   journals: Journal[];
 };
 
+function isMetricEntry(value: unknown): value is MetricEntry {
+  if (!value || typeof value !== "object") return false;
+  const row = value as Record<string, unknown>;
+  return typeof row.metricId === "string"
+    && typeof row.name === "string"
+    && typeof row.emoji === "string"
+    && (row.direction === "high_good" || row.direction === "high_bad")
+    && (row.valueType === "scale" || row.valueType === "boolean")
+    && typeof row.value === "number";
+}
+
+function isJournal(value: unknown): value is Journal {
+  if (!value || typeof value !== "object") return false;
+  const row = value as Record<string, unknown>;
+  return typeof row.id === "string"
+    && typeof row.body === "string"
+    && typeof row.createdAt === "string";
+}
+
+function parseHistoryDays(value: unknown): HistoryDay[] {
+  if (!value || typeof value !== "object") throw new Error("Ugyldigt historik-svar.");
+  const body = value as Record<string, unknown>;
+  if (!Array.isArray(body.days)) throw new Error("Ugyldigt historik-svar.");
+
+  return body.days.map((item) => {
+    if (!item || typeof item !== "object") throw new Error("Ugyldig historik-række.");
+    const row = item as Record<string, unknown>;
+    if (typeof row.date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(row.date)) {
+      throw new Error("Historikken indeholder en ugyldig dato.");
+    }
+    if (!Array.isArray(row.metrics) || !Array.isArray(row.journals)) {
+      throw new Error("Historikken mangler målepunkter eller kommentarer.");
+    }
+    return {
+      date: row.date,
+      metrics: row.metrics.filter(isMetricEntry),
+      journals: row.journals.filter(isJournal),
+    };
+  });
+}
+
 function formatDate(value: string): string {
   const date = new Date(`${value}T12:00:00`);
   return new Intl.DateTimeFormat("da-DK", { weekday: "short", day: "numeric", month: "long", year: "numeric" }).format(date);
@@ -54,9 +95,9 @@ export default function WellbeingHistory({ onClose }: { onClose: () => void }) {
     void fetch("/api/wellbeing/history?limit=180", { credentials: "same-origin", cache: "no-store" })
       .then(async (response) => {
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
-        return response.json() as Promise<{ days: HistoryDay[] }>;
+        return response.json() as Promise<unknown>;
       })
-      .then((body) => { if (!cancelled) setDays(body.days ?? []); })
+      .then((body) => { if (!cancelled) setDays(parseHistoryDays(body)); })
       .catch((caught: Error) => { if (!cancelled) setError(caught.message); })
       .finally(() => { if (!cancelled) setLoading(false); });
     return () => { cancelled = true; };
