@@ -55,7 +55,7 @@ export default function WellbeingPage() {
   const [journalText, setJournalText] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [pendingJournalId, setPendingJournalId] = useState<string | null>(null);
+  const [pendingJournal, setPendingJournal] = useState<Journal | null>(null);
   const [checkInOpen, setCheckInOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [miyagiOpen, setMiyagiOpen] = useState(false);
@@ -144,7 +144,7 @@ export default function WellbeingPage() {
         const journal = body.journal;
         setJournals((current) => [journal, ...current]);
         setJournalText("");
-        setPendingJournalId(journal.id);
+        setPendingJournal(journal);
         setCheckInOpen(false);
       }
 
@@ -202,8 +202,8 @@ export default function WellbeingPage() {
 
     <MiyagiWorkspace
       expanded={miyagiOpen}
-      pendingJournalId={pendingJournalId}
-      onPendingJournalHandled={() => setPendingJournalId(null)}
+      pendingJournal={pendingJournal}
+      onPendingJournalHandled={() => setPendingJournal(null)}
     />
     {historyOpen && <WellbeingHistory onClose={() => setHistoryOpen(false)} />}
 
