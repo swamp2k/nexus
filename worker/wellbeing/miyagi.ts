@@ -604,6 +604,15 @@ async function respondToCheckin(request: Request, env: MiyagiEnv): Promise<Respo
      LIMIT 1`,
   ).bind(user.id).first<{ id: string; contextJson: string; analysis: string }>();
 
+  if (analysis && !userMessage.analysisId) {
+    await env.DB.prepare(
+      `UPDATE miyagi_conversation_messages
+       SET analysis_id = ?
+       WHERE id = ? AND user_id = ?`,
+    ).bind(analysis.id, userMessage.id, user.id).run();
+    userMessage = { ...userMessage, analysisId: analysis.id };
+  }
+
   const historyRows = await env.DB.prepare(
     `SELECT role, body
      FROM (
