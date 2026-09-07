@@ -166,7 +166,7 @@ export async function refreshHistoricalSummary(env: AiEnv, userId: string): Prom
   return contextSummary;
 }
 
-async function buildJournalContext(env: AiEnv, userId: string, journal: { id: string; entryDate: string; body: string }): Promise<string> {
+export async function buildJournalContext(env: AiEnv, userId: string, journal: { id: string; entryDate: string; body: string }): Promise<string> {
   const [health, sleep, activities, metrics, recent, historicalSummary, followups] = await Promise.all([
     env.DB.prepare(
       `SELECT steps, resting_hr AS restingHr, avg_stress AS avgStress,
