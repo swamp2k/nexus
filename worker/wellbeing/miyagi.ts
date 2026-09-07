@@ -1,5 +1,5 @@
 import { getAuthenticatedUser } from "../auth/session";
-import { refreshHistoricalSummary } from "./journal-ai";
+import { buildJournalContext, refreshHistoricalSummary } from "./journal-ai";
 
 type MiyagiEnv = Env & {
   ANTHROPIC_API_KEY?: string;
@@ -7,7 +7,15 @@ type MiyagiEnv = Env & {
 };
 
 type DataRow = Record<string, unknown>;
-type ChatMessage = { role: "user" | "assistant"; body: string; createdAt: string };
+type ChatMessage = {
+  id: string;
+  role: "user" | "assistant";
+  body: string;
+  kind: "chat" | "checkin" | "legacy";
+  analysisId: string | null;
+  journalEntryId: string | null;
+  createdAt: string;
+};
 type AnalysisLength = "short" | "normal" | "deep";
 type AnalysisTone = "objective" | "empathetic" | "miyagi";
 type WellbeingValueType = "scale" | "boolean";
@@ -58,6 +66,24 @@ function json(body: unknown, init: ResponseInit = {}): Response {
   const headers = new Headers(init.headers);
   headers.set("Cache-Control", "no-store");
   return Response.json(body, { ...init, headers });
+}
+
+async function recentConversation(db: D1Database, userId: string, limit = 50): Promise<ChatMessage[]> {
+  const rows = await db.prepare(
+    `SELECT id, role, body, kind, analysisId, journalEntryId, createdAt
+     FROM (
+       SELECT id, role, body, kind,
+              analysis_id AS analysisId,
+              journal_entry_id AS journalEntryId,
+              created_at AS createdAt
+       FROM miyagi_conversation_messages
+       WHERE user_id = ? AND kind <> 'legacy'
+       ORDER BY created_at DESC
+       LIMIT ?
+     )
+     ORDER BY createdAt`,
+  ).bind(userId, limit).all<ChatMessage>();
+  return rows.results;
 }
 
 function localIsoDate(date: Date): string {
@@ -372,18 +398,34 @@ Kun når det er nyttigt: 1-3 konkrete spørgsmål til brugeren, der kan forklare
 ## Datagrundlag
 Meget kort. Kun dækning og væsentlige huller; ingen lang datarapport.`;
 
-const CHAT_SYSTEM = `Du er Mr. Miyagi i Nexus. Du svarer på opfølgende spørgsmål til en allerede gennemført personlig dataanalyse.
+const CHAT_SYSTEM = `Du er Mr. Miyagi i Nexus og deltager i brugerens ene løbende samtale om velbefindende.
+
+Den seneste gemte analyse er din primære analytiske kontekst. Samtalen kan også indeholde brugerens check-in kommentarer og dine tidligere refleksioner. Brug dem som menneskelig kontekst, men behandl aldrig AI-svar som brugerens egne fakta.
 
 Regler:
-- Svar på dansk og hold dig til det gemte datasæt og den gemte analyse.
+- Svar på dansk.
 - Skeln fakta, sammenfald og hypotese.
-- Opfind aldrig manglende data.
+- Opfind aldrig manglende data eller menneskelig kontekst.
 - Check-ins med valueType=boolean er Ja/Nej-data (1=Ja, 0=Nej); manglende entry er ikke registreret, ikke Nej. Behandl yesRate som en andel og aldrig som en 1–5-score.
 - Du er ikke læge og må ikke stille diagnoser eller ordinere behandling.
 - Praktiske, lavrisiko refleksioner og forslag til ting brugeren kan observere eller afprøve er fine.
 - Stil gerne ét relevant opfølgende spørgsmål, hvis brugerens svar kan forklare et fund eller gøre analysen bedre.
-- Hvis spørgsmålet kræver data, som ikke findes i context, sig det direkte.
+- Hvis et spørgsmål kræver nyere strukturerede data end den seneste analyse indeholder, sig det direkte.
 - Vær mere interesseret i betydning og sammenhæng end i at gentage rå værdier.`;
+
+const CHECKIN_SYSTEM = `Du er Mr. Miyagi i Nexus. Brugeren har netop gemt en kommentar sammen med sit daglige check-in.
+
+Din opgave er at reagere i den samme løbende Miyagi-samtale som al anden dialog.
+- Svar på dansk.
+- Vær varm, kort og konkret.
+- Reager først på det vigtigste i brugerens egen kommentar.
+- Dagens check-in, søvn, puls, stress, Body Battery, aktivitet og nyere journalhistorik må bruges, når det faktisk er relevant.
+- Den seneste Miyagi-analyse må bruges som baggrund, men dagens rå kontekst vejer tungere, hvis noget har ændret sig siden analysen.
+- Tidligere AI-svar er samtalekontekst, ikke bruger-authored ground truth.
+- Skeln observation fra hypotese. Opfind aldrig hvorfor noget skete.
+- Stil højst ét konkret, åbent opfølgende spørgsmål, hvis det kan gøre kommentaren mere nyttig senere.
+- Du er ikke læge og skal ikke diagnosticere eller ordinere behandling.
+- Hold svaret typisk under 180 ord.`;
 
 function analysisPreferences(length: AnalysisLength, tone: AnalysisTone, focus: string): string {
   const lengthInstruction = length === "short"
@@ -419,15 +461,10 @@ async function latestAnalysis(request: Request, env: MiyagiEnv): Promise<Respons
             focus, response_length AS responseLength, tone
      FROM miyagi_analyses WHERE user_id = ? ORDER BY created_at DESC LIMIT 1`,
   ).bind(user.id).first<DataRow>();
-  if (!analysis) return json({ analysis: null, messages: [] });
+  const messages = await recentConversation(env.DB, user.id, 50);
+  if (!analysis) return json({ analysis: null, messages });
 
-  const messages = await env.DB.prepare(
-    `SELECT id, role, body, created_at AS createdAt
-     FROM miyagi_messages WHERE analysis_id = ? AND user_id = ?
-     ORDER BY created_at LIMIT 50`,
-  ).bind(String(analysis.id), user.id).all<ChatMessage>();
-
-  return json({ analysis, messages: messages.results });
+  return json({ analysis, messages });
 }
 
 async function createAnalysis(request: Request, env: MiyagiEnv): Promise<Response> {
@@ -482,6 +519,7 @@ async function createAnalysis(request: Request, env: MiyagiEnv): Promise<Respons
     focus || null, length, tone,
   ).run();
 
+  const messages = await recentConversation(env.DB, user.id, 50);
   return json({
     analysis: {
       id,
@@ -497,8 +535,130 @@ async function createAnalysis(request: Request, env: MiyagiEnv): Promise<Respons
       tone,
       coverage: context.coverage,
     },
-    messages: [],
+    messages,
   }, { status: 201 });
+}
+
+async function respondToCheckin(request: Request, env: MiyagiEnv): Promise<Response> {
+  const user = await requireUser(request, env);
+  if (!user) return json({ error: "unauthorized" }, { status: 401 });
+  if (user.role === "viewer") return json({ error: "forbidden" }, { status: 403 });
+  if (!configured(env)) return json({ error: "miyagi_not_configured" }, { status: 503 });
+
+  let body: { journalId?: unknown } = {};
+  try { body = await request.json(); } catch { return json({ error: "invalid_json" }, { status: 400 }); }
+  const journalId = typeof body.journalId === "string" ? body.journalId : "";
+  if (!journalId) return json({ error: "invalid_checkin_comment" }, { status: 400 });
+
+  const journal = await env.DB.prepare(
+    `SELECT id, entry_date AS entryDate, body, created_at AS createdAt
+     FROM journal_entries
+     WHERE id = ? AND user_id = ?
+     LIMIT 1`,
+  ).bind(journalId, user.id).first<{ id: string; entryDate: string; body: string; createdAt: string }>();
+  if (!journal) return json({ error: "journal_not_found" }, { status: 404 });
+
+  let userMessage = await env.DB.prepare(
+    `SELECT id, role, body, kind, analysis_id AS analysisId,
+            journal_entry_id AS journalEntryId, created_at AS createdAt
+     FROM miyagi_conversation_messages
+     WHERE user_id = ? AND journal_entry_id = ? AND role = 'user' AND source_ref = ?
+     LIMIT 1`,
+  ).bind(user.id, journal.id, `journal_entries:${journal.id}`).first<ChatMessage>();
+
+  const existingReply = await env.DB.prepare(
+    `SELECT id, role, body, kind, analysis_id AS analysisId,
+            journal_entry_id AS journalEntryId, created_at AS createdAt
+     FROM miyagi_conversation_messages
+     WHERE user_id = ? AND journal_entry_id = ? AND role = 'assistant' AND kind = 'checkin'
+     ORDER BY created_at
+     LIMIT 1`,
+  ).bind(user.id, journal.id).first<ChatMessage>();
+
+  if (existingReply) {
+    return json({ messages: [userMessage, existingReply].filter(Boolean) });
+  }
+
+  if (!userMessage) {
+    userMessage = {
+      id: crypto.randomUUID(),
+      role: "user",
+      body: journal.body,
+      kind: "checkin",
+      analysisId: null,
+      journalEntryId: journal.id,
+      createdAt: journal.createdAt,
+    };
+    await env.DB.prepare(
+      `INSERT INTO miyagi_conversation_messages
+         (id, user_id, role, body, kind, analysis_id, journal_entry_id, source_ref, created_at)
+       VALUES (?, ?, 'user', ?, 'checkin', NULL, ?, ?, ?)`,
+    ).bind(userMessage.id, user.id, userMessage.body, journal.id, `journal_entries:${journal.id}`, journal.createdAt).run();
+  }
+
+  const analysis = await env.DB.prepare(
+    `SELECT id, context_json AS contextJson, analysis
+     FROM miyagi_analyses
+     WHERE user_id = ?
+     ORDER BY created_at DESC
+     LIMIT 1`,
+  ).bind(user.id).first<{ id: string; contextJson: string; analysis: string }>();
+
+  const historyRows = await env.DB.prepare(
+    `SELECT role, body
+     FROM (
+       SELECT role, body, created_at
+       FROM miyagi_conversation_messages
+       WHERE user_id = ? AND kind <> 'legacy' AND created_at < ?
+       ORDER BY created_at DESC
+       LIMIT 20
+     )
+     ORDER BY created_at`,
+  ).bind(user.id, journal.createdAt).all<{ role: "user" | "assistant"; body: string }>();
+
+  const journalContext = await buildJournalContext(env, user.id, journal);
+  const analysisContext = analysis
+    ? `SENESTE MIYAGI-ANALYSE:\n${analysis.analysis}\n\nANALYSENS GEMTE DATASET:\n${analysis.contextJson}`
+    : "SENESTE MIYAGI-ANALYSE:\n(ingen analyse endnu)";
+
+  const prompt: Array<{ role: "user" | "assistant"; content: string }> = [
+    {
+      role: "user",
+      content: `${analysisContext}\n\nKONTEKST FOR DAGENS CHECK-IN:\n${journalContext}`,
+    },
+    {
+      role: "assistant",
+      content: "Forstået. Jeg bruger dagens check-in som den aktuelle kilde og den seneste analyse som baggrund.",
+    },
+    ...historyRows.results.map((entry) => ({ role: entry.role, content: entry.body })),
+    { role: "user", content: journal.body },
+  ];
+
+  const reply = await anthropicMessage(env, CHECKIN_SYSTEM, prompt, 650);
+  const assistantMessage: ChatMessage = {
+    id: crypto.randomUUID(),
+    role: "assistant",
+    body: reply,
+    kind: "checkin",
+    analysisId: analysis?.id ?? null,
+    journalEntryId: journal.id,
+    createdAt: new Date().toISOString(),
+  };
+
+  await env.DB.prepare(
+    `INSERT INTO miyagi_conversation_messages
+       (id, user_id, role, body, kind, analysis_id, journal_entry_id, source_ref, created_at)
+     VALUES (?, ?, 'assistant', ?, 'checkin', ?, ?, NULL, ?)`,
+  ).bind(
+    assistantMessage.id,
+    user.id,
+    assistantMessage.body,
+    assistantMessage.analysisId,
+    journal.id,
+    assistantMessage.createdAt,
+  ).run();
+
+  return json({ messages: [userMessage, assistantMessage] }, { status: 201 });
 }
 
 async function chat(request: Request, env: MiyagiEnv): Promise<Response> {
@@ -519,39 +679,52 @@ async function chat(request: Request, env: MiyagiEnv): Promise<Response> {
   ).bind(analysisId, user.id).first<{ id: string; contextJson: string; analysis: string }>();
   if (!analysis) return json({ error: "analysis_not_found" }, { status: 404 });
 
-  const history = await env.DB.prepare(
-    `SELECT role, body, created_at AS createdAt
-     FROM miyagi_messages WHERE analysis_id = ? AND user_id = ?
-     ORDER BY created_at LIMIT 30`,
-  ).bind(analysisId, user.id).all<ChatMessage>();
-
+  const history = await recentConversation(env.DB, user.id, 30);
   const messages: Array<{ role: "user" | "assistant"; content: string }> = [
     {
       role: "user",
-      content: `Her er det låste datasæt og den analyse samtalen handler om.\n\nDATASET:\n${analysis.contextJson}\n\nANALYSE:\n${analysis.analysis}`,
+      content: `Her er det låste datasæt og den seneste analyse, som er den aktuelle analytiske baggrund.\n\nDATASET:\n${analysis.contextJson}\n\nANALYSE:\n${analysis.analysis}`,
     },
     {
       role: "assistant",
-      content: "Forstået. Jeg holder mig til dette datasæt og denne analyse.",
+      content: "Forstået. Jeg bruger analysen som baggrund og den løbende samtale som menneskelig kontekst.",
     },
-    ...history.results.map((entry) => ({ role: entry.role, content: entry.body })),
+    ...history.map((entry) => ({ role: entry.role, content: entry.body })),
     { role: "user", content: message },
   ];
 
+  const userCreatedAt = new Date().toISOString();
   const reply = await anthropicMessage(env, CHAT_SYSTEM, messages, 1200);
-  const now = new Date().toISOString();
-  const userMessage = { id: crypto.randomUUID(), role: "user" as const, body: message, createdAt: now };
-  const assistantMessage = { id: crypto.randomUUID(), role: "assistant" as const, body: reply, createdAt: new Date().toISOString() };
+  const userMessage: ChatMessage = {
+    id: crypto.randomUUID(),
+    role: "user",
+    body: message,
+    kind: "chat",
+    analysisId,
+    journalEntryId: null,
+    createdAt: userCreatedAt,
+  };
+  const assistantMessage: ChatMessage = {
+    id: crypto.randomUUID(),
+    role: "assistant",
+    body: reply,
+    kind: "chat",
+    analysisId,
+    journalEntryId: null,
+    createdAt: new Date().toISOString(),
+  };
 
   await env.DB.batch([
     env.DB.prepare(
-      `INSERT INTO miyagi_messages (id, analysis_id, user_id, role, body, created_at)
-       VALUES (?, ?, ?, 'user', ?, ?)`,
-    ).bind(userMessage.id, analysisId, user.id, userMessage.body, userMessage.createdAt),
+      `INSERT INTO miyagi_conversation_messages
+         (id, user_id, role, body, kind, analysis_id, journal_entry_id, source_ref, created_at)
+       VALUES (?, ?, 'user', ?, 'chat', ?, NULL, NULL, ?)`,
+    ).bind(userMessage.id, user.id, userMessage.body, analysisId, userMessage.createdAt),
     env.DB.prepare(
-      `INSERT INTO miyagi_messages (id, analysis_id, user_id, role, body, created_at)
-       VALUES (?, ?, ?, 'assistant', ?, ?)`,
-    ).bind(assistantMessage.id, analysisId, user.id, assistantMessage.body, assistantMessage.createdAt),
+      `INSERT INTO miyagi_conversation_messages
+         (id, user_id, role, body, kind, analysis_id, journal_entry_id, source_ref, created_at)
+       VALUES (?, ?, 'assistant', ?, 'chat', ?, NULL, NULL, ?)`,
+    ).bind(assistantMessage.id, user.id, assistantMessage.body, analysisId, assistantMessage.createdAt),
   ]);
 
   return json({ messages: [userMessage, assistantMessage] });
@@ -563,6 +736,7 @@ export async function handleMiyagiRoute(request: Request, env: Env): Promise<Res
   try {
     if (pathname === "/api/wellbeing/miyagi/latest" && request.method === "GET") return latestAnalysis(request, miyagiEnv);
     if (pathname === "/api/wellbeing/miyagi/analyze" && request.method === "POST") return createAnalysis(request, miyagiEnv);
+    if (pathname === "/api/wellbeing/miyagi/checkin" && request.method === "POST") return respondToCheckin(request, miyagiEnv);
     if (pathname === "/api/wellbeing/miyagi/chat" && request.method === "POST") return chat(request, miyagiEnv);
     return null;
   } catch (error) {
