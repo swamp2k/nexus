@@ -669,25 +669,34 @@ async function chat(request: Request, env: MiyagiEnv): Promise<Response> {
 
   let body: { analysisId?: unknown; message?: unknown } = {};
   try { body = await request.json(); } catch { return json({ error: "invalid_json" }, { status: 400 }); }
-  const analysisId = typeof body.analysisId === "string" ? body.analysisId : "";
+  const requestedAnalysisId = typeof body.analysisId === "string" ? body.analysisId : "";
   const message = typeof body.message === "string" ? body.message.trim().slice(0, 4000) : "";
-  if (!analysisId || !message) return json({ error: "invalid_chat" }, { status: 400 });
+  if (!message) return json({ error: "invalid_chat" }, { status: 400 });
 
-  const analysis = await env.DB.prepare(
-    `SELECT id, context_json AS contextJson, analysis
-     FROM miyagi_analyses WHERE id = ? AND user_id = ? LIMIT 1`,
-  ).bind(analysisId, user.id).first<{ id: string; contextJson: string; analysis: string }>();
-  if (!analysis) return json({ error: "analysis_not_found" }, { status: 404 });
+  const analysis = requestedAnalysisId
+    ? await env.DB.prepare(
+        `SELECT id, context_json AS contextJson, analysis
+         FROM miyagi_analyses WHERE id = ? AND user_id = ? LIMIT 1`,
+      ).bind(requestedAnalysisId, user.id).first<{ id: string; contextJson: string; analysis: string }>()
+    : await env.DB.prepare(
+        `SELECT id, context_json AS contextJson, analysis
+         FROM miyagi_analyses WHERE user_id = ? ORDER BY created_at DESC LIMIT 1`,
+      ).bind(user.id).first<{ id: string; contextJson: string; analysis: string }>();
+
+  if (requestedAnalysisId && !analysis) return json({ error: "analysis_not_found" }, { status: 404 });
 
   const history = await recentConversation(env.DB, user.id, 30);
+  const analysisContext = analysis
+    ? `Her er det låste datasæt og den seneste analyse, som er den aktuelle analytiske baggrund.\n\nDATASET:\n${analysis.contextJson}\n\nANALYSE:\n${analysis.analysis}`
+    : "Der er endnu ingen gemt Miyagi-analyse. Brug kun den løbende samtale som kontekst og sig tydeligt, hvis et spørgsmål kræver strukturerede Nexus-data, du ikke har i denne samtale.";
+
   const messages: Array<{ role: "user" | "assistant"; content: string }> = [
-    {
-      role: "user",
-      content: `Her er det låste datasæt og den seneste analyse, som er den aktuelle analytiske baggrund.\n\nDATASET:\n${analysis.contextJson}\n\nANALYSE:\n${analysis.analysis}`,
-    },
+    { role: "user", content: analysisContext },
     {
       role: "assistant",
-      content: "Forstået. Jeg bruger analysen som baggrund og den løbende samtale som menneskelig kontekst.",
+      content: analysis
+        ? "Forstået. Jeg bruger analysen som baggrund og den løbende samtale som menneskelig kontekst."
+        : "Forstået. Jeg holder mig til samtalen og foregiver ikke at have en analyse, der ikke findes.",
     },
     ...history.map((entry) => ({ role: entry.role, content: entry.body })),
     { role: "user", content: message },
@@ -695,12 +704,13 @@ async function chat(request: Request, env: MiyagiEnv): Promise<Response> {
 
   const userCreatedAt = new Date().toISOString();
   const reply = await anthropicMessage(env, CHAT_SYSTEM, messages, 1200);
+  const activeAnalysisId = analysis?.id ?? null;
   const userMessage: ChatMessage = {
     id: crypto.randomUUID(),
     role: "user",
     body: message,
     kind: "chat",
-    analysisId,
+    analysisId: activeAnalysisId,
     journalEntryId: null,
     createdAt: userCreatedAt,
   };
@@ -709,7 +719,7 @@ async function chat(request: Request, env: MiyagiEnv): Promise<Response> {
     role: "assistant",
     body: reply,
     kind: "chat",
-    analysisId,
+    analysisId: activeAnalysisId,
     journalEntryId: null,
     createdAt: new Date().toISOString(),
   };
@@ -719,12 +729,12 @@ async function chat(request: Request, env: MiyagiEnv): Promise<Response> {
       `INSERT INTO miyagi_conversation_messages
          (id, user_id, role, body, kind, analysis_id, journal_entry_id, source_ref, created_at)
        VALUES (?, ?, 'user', ?, 'chat', ?, NULL, NULL, ?)`,
-    ).bind(userMessage.id, user.id, userMessage.body, analysisId, userMessage.createdAt),
+    ).bind(userMessage.id, user.id, userMessage.body, activeAnalysisId, userMessage.createdAt),
     env.DB.prepare(
       `INSERT INTO miyagi_conversation_messages
          (id, user_id, role, body, kind, analysis_id, journal_entry_id, source_ref, created_at)
        VALUES (?, ?, 'assistant', ?, 'chat', ?, NULL, NULL, ?)`,
-    ).bind(assistantMessage.id, user.id, assistantMessage.body, analysisId, assistantMessage.createdAt),
+    ).bind(assistantMessage.id, user.id, assistantMessage.body, activeAnalysisId, assistantMessage.createdAt),
   ]);
 
   return json({ messages: [userMessage, assistantMessage] });
