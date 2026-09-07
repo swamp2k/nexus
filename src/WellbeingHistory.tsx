@@ -126,12 +126,24 @@ export default function WellbeingHistory({ onClose }: { onClose: () => void }) {
         {days.map((day) => {
           const open = openDays.has(day.date);
           return <article className={`wellbeing-history-day ${open ? "open" : ""}`} key={day.date}>
-            <button className="wellbeing-history-day-toggle" type="button" onClick={() => toggle(day.date)} aria-expanded={open}>
+            <div
+              className="wellbeing-history-day-toggle"
+              role="button"
+              tabIndex={0}
+              onClick={() => toggle(day.date)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter" || event.key === " ") {
+                  event.preventDefault();
+                  toggle(day.date);
+                }
+              }}
+              aria-expanded={open}
+            >
               <span className="wellbeing-history-chevron">›</span>
               <strong>{formatDate(day.date)}</strong>
               <span>{day.metrics.length ? `${day.metrics.length} målepunkter` : "Ingen målepunkter"}</span>
-              {day.journals.length > 0 && <span>{day.journals.length} journal{day.journals.length === 1 ? "" : "er"}</span>}
-            </button>
+              {day.journals.length > 0 && <span>{day.journals.length} kommentar{day.journals.length === 1 ? "" : "er"}</span>}
+            </div>
 
             {open && <div className="wellbeing-history-day-body">
               {day.metrics.length > 0 && <div className="wellbeing-history-metrics">
