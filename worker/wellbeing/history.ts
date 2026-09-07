@@ -35,7 +35,7 @@ export async function handleWellbeingHistoryRoute(request: Request, env: Env): P
   const oldest = selectedDates[selectedDates.length - 1];
   const newest = selectedDates[0];
 
-  const [entries, journals, followups] = await Promise.all([
+  const [entries, journals] = await Promise.all([
     env.DB.prepare(
       `SELECT e.entry_date AS entryDate, e.value, e.metric_id AS metricId,
               m.name, m.emoji, m.direction, m.value_type AS valueType, m.sort_order AS sortOrder
@@ -49,21 +49,12 @@ export async function handleWellbeingHistoryRoute(request: Request, env: Env): P
        FROM journal_entries
        WHERE user_id = ? AND entry_date BETWEEN ? AND ?
        ORDER BY entry_date DESC, created_at`,
-    ).bind(user.id, oldest, newest).all<Row>(),
-    env.DB.prepare(
-      `SELECT f.id, f.journal_entry_id AS journalEntryId, f.question, f.answer,
-              f.model, f.created_at AS createdAt, f.answered_at AS answeredAt
-       FROM journal_followups f
-       JOIN journal_entries j ON j.id = f.journal_entry_id
-       WHERE f.user_id = ? AND j.entry_date BETWEEN ? AND ?
-       ORDER BY f.created_at`,
-    ).bind(user.id, oldest, newest).all<Row>(),
+    ).bind(user.id, oldest, newest).all<Row>()
   ]);
 
   const dateSet = new Set(selectedDates);
   const metricMap = new Map<string, Row[]>();
   const journalMap = new Map<string, Row[]>();
-  const followupMap = new Map<string, Row[]>();
 
   for (const row of entries.results) {
     const date = String(row.entryDate ?? "");
@@ -73,19 +64,11 @@ export async function handleWellbeingHistoryRoute(request: Request, env: Env): P
     metricMap.set(date, current);
   }
 
-  for (const row of followups.results) {
-    const journalId = String(row.journalEntryId ?? "");
-    const current = followupMap.get(journalId) ?? [];
-    current.push(row);
-    followupMap.set(journalId, current);
-  }
-
   for (const row of journals.results) {
     const date = String(row.entryDate ?? "");
     if (!dateSet.has(date)) continue;
-    const journal = { ...row, followups: followupMap.get(String(row.id ?? "")) ?? [] };
     const current = journalMap.get(date) ?? [];
-    current.push(journal);
+    current.push(row);
     journalMap.set(date, current);
   }
 
