@@ -16,6 +16,7 @@ import { handleUnraidRoute } from "./unraid/routes";
 import { handleJournalAiRoute } from "./wellbeing/journal-ai";
 import { handleMiyagiHistoryRoute } from "./wellbeing/miyagi-history";
 import { handleMiyagiRoute } from "./wellbeing/miyagi";
+import { handleWellbeingExportRoute } from "./wellbeing/export";
 import { handleWellbeingHistoryRoute } from "./wellbeing/history";
 import { handleWellbeingRoute } from "./wellbeing/routes";
 
@@ -49,6 +50,7 @@ export default {
       if (url.pathname.startsWith("/api/wellbeing/miyagi/")) { const response = await handleMiyagiRoute(request, env); if (response) return response; }
       if (url.pathname.startsWith("/api/wellbeing/journal-ai/")) { const response = await handleJournalAiRoute(request, env); if (response) return response; }
       if (url.pathname === "/api/wellbeing/history") { const response = await handleWellbeingHistoryRoute(request, env); if (response) return response; }
+      if (url.pathname === "/api/wellbeing/export") { const response = await handleWellbeingExportRoute(request, env); if (response) return response; }
       if (url.pathname.startsWith("/api/wellbeing/")) { const response = await handleWellbeingRoute(request, env); if (response) return response; }
       if (url.pathname === "/api/home-layout") { const response = await handleHomeLayoutRoute(request, env); if (response) return response; }
       if (url.pathname === "/api/navigation") { const response = await handleNavigationRoute(request, env); if (response) return response; }
