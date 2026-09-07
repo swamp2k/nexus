@@ -24,7 +24,7 @@ export async function handleMiyagiHistoryRoute(request: Request, env: Env): Prom
               a.focus, a.response_length AS responseLength, a.tone,
               COUNT(m.id) AS messageCount
        FROM miyagi_analyses a
-       LEFT JOIN miyagi_messages m ON m.analysis_id = a.id AND m.user_id = a.user_id
+       LEFT JOIN miyagi_conversation_messages m ON m.analysis_id = a.id AND m.user_id = a.user_id AND m.kind <> 'legacy'
        WHERE a.user_id = ?
        GROUP BY a.id
        ORDER BY a.created_at DESC
@@ -48,9 +48,9 @@ export async function handleMiyagiHistoryRoute(request: Request, env: Env): Prom
     if (!analysis) return json({ error: "analysis_not_found" }, { status: 404 });
 
     const messages = await env.DB.prepare(
-      `SELECT id, role, body, created_at AS createdAt
-       FROM miyagi_messages
-       WHERE analysis_id = ? AND user_id = ?
+      `SELECT id, role, body, kind, journal_entry_id AS journalEntryId, created_at AS createdAt
+       FROM miyagi_conversation_messages
+       WHERE analysis_id = ? AND user_id = ? AND kind <> 'legacy'
        ORDER BY created_at`,
     ).bind(match[1], user.id).all<Row>();
 
