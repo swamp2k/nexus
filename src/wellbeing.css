@@ -409,6 +409,14 @@
   box-shadow: var(--shadow-soft);
 }
 
+.miyagi-workspace--collapsed {
+  gap: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
 .miyagi-intro {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
