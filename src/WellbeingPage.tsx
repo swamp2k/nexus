@@ -39,8 +39,6 @@ async function errorText(response: Response): Promise<string> {
   try {
     const body = await response.json() as { error?: string; detail?: string };
     const code = body.detail ?? body.error;
-    if (code === "journal_ai_not_configured") return "Journal-assistenten mangler AI-konfiguration.";
-    if (code?.startsWith("journal_ai_provider_")) return "Journal-assistenten kunne ikke få svar lige nu.";
     return code ?? `HTTP ${response.status}`;
   } catch { return `HTTP ${response.status}`; }
 }
@@ -197,7 +195,7 @@ export default function WellbeingPage() {
     {!loading && date === today && (hasTodayData || todayJournal) && <section className="wellbeing-today-summary" aria-label="Dagens velbefindende">
       <div className="wellbeing-today-heading"><div><p className="section-label">I dag</p><h2>Dagens status</h2></div><button className="secondary-action" type="button" onClick={() => setCheckInOpen(true)}>Rediger</button></div>
       {hasTodayData && <div className="wellbeing-today-metrics">{metrics.filter((metric) => values[metric.id] !== null && values[metric.id] !== undefined).map((metric) => <div key={metric.id}><span>{metric.emoji} {metric.name}</span><strong>{metricValueLabel(metric, values[metric.id])}</strong></div>)}</div>}
-      <div className="wellbeing-today-journal"><span>Journal</span>{todayJournal ? <p>{todayJournal.body}</p> : <p className="is-empty">Ingen journalnote i dag.</p>}</div>
+      <div className="wellbeing-today-journal"><span>Kommentar</span>{todayJournal ? <p>{todayJournal.body}</p> : <p className="is-empty">Ingen kommentar i dag.</p>}</div>
     </section>}
 
     <MiyagiWorkspace
