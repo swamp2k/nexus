@@ -9,8 +9,10 @@ type TooltipPos = { x: number; y: number };
 const TZ = "Europe/Copenhagen";
 const DAY = 24 * 3600;
 
-function clock(ms: number): string {
-  return new Intl.DateTimeFormat("da-DK", { hour: "2-digit", minute: "2-digit", timeZone: TZ }).format(new Date(ms));
+function clock(ms: number, displayShiftMs?: number | null): string {
+  const hasDisplayShift = displayShiftMs !== null && displayShiftMs !== undefined;
+  const value = hasDisplayShift ? ms + displayShiftMs : ms;
+  return new Intl.DateTimeFormat("da-DK", { hour: "2-digit", minute: "2-digit", timeZone: hasDisplayShift ? "UTC" : TZ }).format(new Date(value));
 }
 function shortDate(value: string): string {
   return new Intl.DateTimeFormat("da-DK", { day: "numeric", month: "short" }).format(new Date(`${value}T12:00:00Z`));
@@ -35,7 +37,7 @@ function pointerPos(clientX: number, clientY: number, element: Element): Tooltip
   return { x: Math.max(54, Math.min(rect.width - 54, clientX - rect.left)), y: Math.max(34, clientY - rect.top - 12) };
 }
 
-export function SleepMetricChart({ points, min, max, unit = "" }: { points: Point[]; min?: number; max?: number; unit?: string }) {
+export function SleepMetricChart({ points, min, max, unit = "", displayShiftMs }: { points: Point[]; min?: number; max?: number; unit?: string; displayShiftMs?: number | null }) {
   const [active, setActive] = useState<number | null>(null);
   const [tooltip, setTooltip] = useState<TooltipPos | null>(null);
   if (points.length < 2) return <div className="sleep-chart-empty">Ingen målinger</div>;
@@ -73,12 +75,12 @@ export function SleepMetricChart({ points, min, max, unit = "" }: { points: Poin
         onPointerCancel={() => { setActive(null); setTooltip(null); }}>
         <rect x="0" y="0" width={width} height={height} fill="transparent" />
         {yTicks.map((tick) => { const yy = y(tick); return <g key={tick}><line x1={left} x2={width - right} y1={yy} y2={yy} className="sleep-chart-grid" /><text x={left - 6} y={yy + 4} textAnchor="end" className="sleep-axis-text">{Math.round(tick)}{unit}</text></g>; })}
-        {xTicks.map((tick, i) => <text key={tick} x={x(tick)} y={height - 5} textAnchor={i === 0 ? "start" : i === 2 ? "end" : "middle"} className="sleep-axis-text">{clock(tick)}</text>)}
+        {xTicks.map((tick, i) => <text key={tick} x={x(tick)} y={height - 5} textAnchor={i === 0 ? "start" : i === 2 ? "end" : "middle"} className="sleep-axis-text">{clock(tick, displayShiftMs)}</text>)}
         <path d={path} className="sleep-chart-line" />
         {selected && <><line x1={x(selected.time)} x2={x(selected.time)} y1={top} y2={height - bottom} className="sleep-crosshair" /><circle cx={x(selected.time)} cy={y(selected.value)} r="5" className="sleep-crosshair-dot" /></>}
       </g>;
     }}</ChartFrame>
-    {selected && tooltip && <div className="sleep-chart-tooltip cursor-tooltip" style={{ left: tooltip.x, top: tooltip.y }}><strong>{selected.value.toFixed(unit === "" ? 0 : 1)}{unit}</strong><span>{clock(selected.time)}</span></div>}
+    {selected && tooltip && <div className="sleep-chart-tooltip cursor-tooltip" style={{ left: tooltip.x, top: tooltip.y }}><strong>{selected.value.toFixed(unit === "" ? 0 : 1)}{unit}</strong><span>{clock(selected.time, displayShiftMs)}</span></div>}
   </div>;
 }
 

@@ -10,6 +10,8 @@ type SleepRow = {
   date: string;
   sleep_start_ms: number | null;
   sleep_end_ms: number | null;
+  sleep_start_display_ms: number | null;
+  sleep_end_display_ms: number | null;
   sleep_seconds: number | null;
   nap_seconds: number | null;
   deep_seconds: number | null;
@@ -22,6 +24,9 @@ type SleepRow = {
   detail?: {
     sleepStartMs: number | null;
     sleepEndMs: number | null;
+    sleepStartDisplayMs: number | null;
+    sleepEndDisplayMs: number | null;
+    displayShiftMs: number | null;
     bodyBatteryChange: number | null;
     restingHeartRate: number | null;
     stages: StagePoint[];
@@ -48,9 +53,9 @@ function duration(seconds: number | null | undefined): string {
   return `${hours} t ${minutes} min`;
 }
 
-function clock(ms: number | null | undefined): string {
+function clock(ms: number | null | undefined, timeZone = "Europe/Copenhagen"): string {
   if (!ms) return "—";
-  return new Intl.DateTimeFormat("da-DK", { hour: "2-digit", minute: "2-digit", timeZone: "Europe/Copenhagen" }).format(new Date(ms));
+  return new Intl.DateTimeFormat("da-DK", { hour: "2-digit", minute: "2-digit", timeZone }).format(new Date(ms));
 }
 
 function shortDate(value: string): string {
@@ -69,11 +74,20 @@ function stageSeconds(row: SleepRow, stage: Stage): number {
   return stage === "deep" ? row.deep_seconds ?? 0 : stage === "light" ? row.light_seconds ?? 0 : stage === "rem" ? row.rem_seconds ?? 0 : row.awake_seconds ?? 0;
 }
 
-function secondsOfDay(ms: number | null): number | null {
+function secondsOfDay(ms: number | null, wallClockEncoded = false): number | null {
   if (!ms) return null;
-  const parts = new Intl.DateTimeFormat("en-GB", { hour: "2-digit", minute: "2-digit", hour12: false, timeZone: "Europe/Copenhagen" }).formatToParts(new Date(ms));
+  const parts = new Intl.DateTimeFormat("en-GB", {
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+    timeZone: wallClockEncoded ? "UTC" : "Europe/Copenhagen",
+  }).formatToParts(new Date(ms));
   const map = Object.fromEntries(parts.map((part) => [part.type, part.value]));
   return Number(map.hour) * 3600 + Number(map.minute) * 60;
+}
+
+function sleepSecondsOfDay(displayMs: number | null, sourceMs: number | null): number | null {
+  return displayMs !== null ? secondsOfDay(displayMs, true) : secondsOfDay(sourceMs);
 }
 
 function circularMean(values: number[]): number | null {
@@ -94,7 +108,7 @@ function formatSecondsOfDay(seconds: number | null): string {
   return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
 }
 
-function StageTimeline({ stages, start, end }: { stages: StagePoint[]; start: number; end: number }) {
+function StageTimeline({ stages, start, end, displayStart, displayEnd }: { stages: StagePoint[]; start: number; end: number; displayStart: number | null; displayEnd: number | null }) {
   const row = { awake: 3, rem: 2, light: 1, deep: 0 } as const;
   return <div className="sleep-stage-timeline">
     <div className="sleep-stage-axis"><span>Vågen</span><span>REM</span><span>Let</span><span>Dyb</span></div>
@@ -106,7 +120,7 @@ function StageTimeline({ stages, start, end }: { stages: StagePoint[]; start: nu
         return <span key={`${stage.start}-${index}`} className={`sleep-stage-block sleep-stage-${stage.stage}`} style={{ left: `${left}%`, width: `${Math.max(0.35, width)}%`, bottom: `${row[stage.stage] * 25}%`, height: `${(row[stage.stage] + 1) * 25}%` }} />;
       })}
     </div>
-    <div className="sleep-stage-times"><span>{clock(start)}</span><span>{clock(end)}</span></div>
+    <div className="sleep-stage-times"><span>{displayStart !== null ? clock(displayStart, "UTC") : clock(start)}</span><span>{displayEnd !== null ? clock(displayEnd, "UTC") : clock(end)}</span></div>
   </div>;
 }
 
@@ -137,14 +151,14 @@ function DailyView({ row }: { row: SleepRow }) {
   const detail = row.detail;
   return <div className="sleep-daily-view">
     <SleepStageOverview row={row} />
-    {detail?.stages?.length ? <article className="sleep-garmin-section"><h4>Søvnstadier</h4><StageTimeline stages={detail.stages} start={detail.sleepStartMs ?? row.sleep_start_ms ?? detail.stages[0].start} end={detail.sleepEndMs ?? row.sleep_end_ms ?? detail.stages.at(-1)!.end} /></article> : null}
+    {detail?.stages?.length ? <article className="sleep-garmin-section"><h4>Søvnstadier</h4><StageTimeline stages={detail.stages} start={detail.sleepStartMs ?? row.sleep_start_ms ?? detail.stages[0].start} end={detail.sleepEndMs ?? row.sleep_end_ms ?? detail.stages.at(-1)!.end} displayStart={detail.sleepStartDisplayMs ?? row.sleep_start_display_ms} displayEnd={detail.sleepEndDisplayMs ?? row.sleep_end_display_ms} /></article> : null}
     <div className="sleep-signal-pills"><span>Bevægelse</span><span>Hvilepuls {detail?.restingHeartRate ? `${detail.restingHeartRate} bpm` : ""}</span><span>Body Battery {detail?.bodyBatteryChange === null || detail?.bodyBatteryChange === undefined ? "" : `${detail.bodyBatteryChange > 0 ? "+" : ""}${detail.bodyBatteryChange}`}</span></div>
     <article className="sleep-garmin-section"><h4>Søvnmålinger</h4><div className="sleep-metrics-grid"><div><strong>{detail?.restingHeartRate ? `${detail.restingHeartRate} bpm` : "—"}</strong><span>Hvilepuls</span></div><div><strong>{detail?.bodyBatteryChange === null || detail?.bodyBatteryChange === undefined ? "—" : `${detail.bodyBatteryChange > 0 ? "+" : ""}${detail.bodyBatteryChange}`}</strong><span>Body Battery ændring</span></div><div><strong>{row.avg_respiration === null ? "—" : `${row.avg_respiration.toFixed(0)} brpm`}</strong><span>Gns. respiration</span></div><div><strong>{row.low_respiration === null ? "—" : `${row.low_respiration.toFixed(0)} brpm`}</strong><span>Laveste respiration</span></div></div></article>
     <div className="sleep-signal-grid compact">
-      <article className="sleep-garmin-section"><h4>Puls gennem natten</h4><SleepMetricChart points={detail?.heartRate ?? []} unit=" bpm" /></article>
-      <article className="sleep-garmin-section"><h4>Body Battery</h4><SleepMetricChart points={detail?.bodyBattery ?? []} min={0} max={100} /></article>
-      <article className="sleep-garmin-section"><h4>Stress</h4><SleepMetricChart points={detail?.stress ?? []} min={0} max={100} /></article>
-      <article className="sleep-garmin-section"><h4>Respiration</h4><SleepMetricChart points={detail?.respiration ?? []} unit="/min" /></article>
+      <article className="sleep-garmin-section"><h4>Puls gennem natten</h4><SleepMetricChart points={detail?.heartRate ?? []} unit=" bpm" displayShiftMs={detail?.displayShiftMs} /></article>
+      <article className="sleep-garmin-section"><h4>Body Battery</h4><SleepMetricChart points={detail?.bodyBattery ?? []} min={0} max={100} displayShiftMs={detail?.displayShiftMs} /></article>
+      <article className="sleep-garmin-section"><h4>Stress</h4><SleepMetricChart points={detail?.stress ?? []} min={0} max={100} displayShiftMs={detail?.displayShiftMs} /></article>
+      <article className="sleep-garmin-section"><h4>Respiration</h4><SleepMetricChart points={detail?.respiration ?? []} unit="/min" displayShiftMs={detail?.displayShiftMs} /></article>
     </div>
   </div>;
 }
@@ -158,6 +172,8 @@ function averageSleepRow(rows: SleepRow[]): SleepRow | null {
     date: valid.at(-1)?.date ?? "",
     sleep_start_ms: null,
     sleep_end_ms: null,
+    sleep_start_display_ms: null,
+    sleep_end_display_ms: null,
     sleep_seconds: mean("sleep_seconds"),
     nap_seconds: null,
     deep_seconds: mean("deep_seconds"),
@@ -173,7 +189,7 @@ function averageSleepRow(rows: SleepRow[]): SleepRow | null {
 type SleepChartRow = { date: string; seconds: number | null; bedSeconds: number | null; wakeSeconds: number | null };
 
 function sleepChartRows(history: SleepRow[], range: RangeKey): SleepChartRow[] {
-  const daily = history.map((row) => ({ date: row.date, seconds: row.sleep_seconds, bedSeconds: secondsOfDay(row.sleep_start_ms), wakeSeconds: secondsOfDay(row.sleep_end_ms) }));
+  const daily = history.map((row) => ({ date: row.date, seconds: row.sleep_seconds, bedSeconds: sleepSecondsOfDay(row.sleep_start_display_ms, row.sleep_start_ms), wakeSeconds: sleepSecondsOfDay(row.sleep_end_display_ms, row.sleep_end_ms) }));
   if (range !== "1y") return daily;
   const result: SleepChartRow[] = [];
   for (let index = 0; index < daily.length; index += 7) {
@@ -195,8 +211,8 @@ function RangeView({ history, range, onSelect }: { history: SleepRow[]; range: R
   const valid = history.filter((row) => (row.sleep_seconds ?? 0) > 0);
   const avg = valid.length ? valid.reduce((sum, row) => sum + (row.sleep_seconds ?? 0), 0) / valid.length : 0;
   const averageRow = averageSleepRow(history);
-  const bedtimes = valid.map((row) => secondsOfDay(row.sleep_start_ms)).filter((value): value is number => value !== null);
-  const wakeTimes = valid.map((row) => secondsOfDay(row.sleep_end_ms)).filter((value): value is number => value !== null);
+  const bedtimes = valid.map((row) => sleepSecondsOfDay(row.sleep_start_display_ms, row.sleep_start_ms)).filter((value): value is number => value !== null);
+  const wakeTimes = valid.map((row) => sleepSecondsOfDay(row.sleep_end_display_ms, row.sleep_end_ms)).filter((value): value is number => value !== null);
   const avgBed = circularMean(bedtimes);
   const avgWake = circularMean(wakeTimes);
   const plotted = sleepChartRows(history, range);

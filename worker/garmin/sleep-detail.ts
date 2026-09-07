@@ -116,11 +116,26 @@ export async function getSleepDetail(env: Env, userId: string, requestedDate: st
         const gmtEnd = num(dto?.sleepEndTimestampGMT) ?? rawSelected.sleep_end_ms;
         const localStart = num(dto?.sleepStartTimestampLocal);
         const localEnd = num(dto?.sleepEndTimestampLocal);
+        const displayStart = localStart ?? rawSelected.sleep_start_display_ms;
+        const displayEnd = localEnd ?? rawSelected.sleep_end_display_ms;
+        const displayShiftMs = displayStart !== null && gmtStart !== null ? displayStart - gmtStart : null;
 
-        // Keep Garmin's GMT timestamps as real instants. The client formats them in
-        // Europe/Copenhagen, which handles both local time and DST correctly. The
-        // Garmin "Local" fields are wall-clock encoded values and must not be added
-        // as an offset; doing so can shift sleep by several hours.
+        // Garmin's Local timestamps are wall-clock encoded milliseconds, not real
+        // UTC instants. Keep GMT for relative positioning, and expose the local
+        // wall-clock anchors separately so the client can label the same timeline
+        // without applying a second timezone conversion.
+        if ((rawSelected.sleep_start_display_ms === null && localStart !== null)
+          || (rawSelected.sleep_end_display_ms === null && localEnd !== null)) {
+          await env.DB.prepare(
+            `UPDATE garmin_sleep
+             SET sleep_start_display_ms = COALESCE(?, sleep_start_display_ms),
+                 sleep_end_display_ms = COALESCE(?, sleep_end_display_ms)
+             WHERE user_id = ? AND date = ?`,
+          ).bind(localStart, localEnd, userId, rawSelected.date).run();
+          rawSelected.sleep_start_display_ms = localStart ?? rawSelected.sleep_start_display_ms;
+          rawSelected.sleep_end_display_ms = localEnd ?? rawSelected.sleep_end_display_ms;
+        }
+
         const stages = pointList(raw?.sleepLevels).map((item) => {
           const start = timestamp(item.startGMT);
           const end = timestamp(item.endGMT);
@@ -136,8 +151,9 @@ export async function getSleepDetail(env: Env, userId: string, requestedDate: st
         detail = {
           sleepStartMs: gmtStart,
           sleepEndMs: gmtEnd,
-          localStartRawMs: localStart,
-          localEndRawMs: localEnd,
+          sleepStartDisplayMs: displayStart,
+          sleepEndDisplayMs: displayEnd,
+          displayShiftMs,
           bodyBatteryChange: num(raw?.bodyBatteryChange),
           restingHeartRate: num(raw?.restingHeartRate),
           stages,
