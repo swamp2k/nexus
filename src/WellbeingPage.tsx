@@ -13,15 +13,7 @@ type Metric = {
 
 type MetricValue = number | null;
 type Entry = { metricId: string; value: number };
-type Followup = {
-  id: string;
-  journalEntryId?: string;
-  question: string;
-  answer: string | null;
-  createdAt: string;
-  answeredAt: string | null;
-};
-type Journal = { id: string; entryDate: string; body: string; createdAt: string; followups?: Followup[] };
+type Journal = { id: string; entryDate: string; body: string; createdAt: string };
 type DayResponse = { date: string; metrics: Metric[]; entries: Entry[]; journals: Journal[] };
 
 const goodFaces = ["😫", "😕", "😐", "🙂", "😁"];
@@ -63,46 +55,25 @@ export default function WellbeingPage() {
   const [journalText, setJournalText] = useState("");
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [journalAiBusy, setJournalAiBusy] = useState<string | null>(null);
-  const [followupAnswers, setFollowupAnswers] = useState<Record<string, string>>({});
+  const [pendingJournalId, setPendingJournalId] = useState<string | null>(null);
   const [checkInOpen, setCheckInOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [miyagiOpen, setMiyagiOpen] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
 
-  function mergeFollowups(base: Journal[], followups: Followup[]): Journal[] {
-    const grouped = new Map<string, Followup[]>();
-    for (const followup of followups) {
-      const journalId = followup.journalEntryId ?? "";
-      if (!journalId) continue;
-      const current = grouped.get(journalId) ?? [];
-      current.push(followup);
-      grouped.set(journalId, current);
-    }
-    return base.map((journal) => ({ ...journal, followups: grouped.get(journal.id) ?? [] }));
-  }
-
   async function load(target = date) {
     setLoading(true);
     setMessage(null);
     try {
-      const [dayResponse, followupResponse] = await Promise.all([
-        fetch(`/api/wellbeing/day?date=${encodeURIComponent(target)}`, { credentials: "same-origin", cache: "no-store" }),
-        fetch(`/api/wellbeing/journal-ai/day?date=${encodeURIComponent(target)}`, { credentials: "same-origin", cache: "no-store" }),
-      ]);
+      const dayResponse = await fetch(`/api/wellbeing/day?date=${encodeURIComponent(target)}`, { credentials: "same-origin", cache: "no-store" });
       if (!dayResponse.ok) throw new Error(await errorText(dayResponse));
       const body = await dayResponse.json() as DayResponse;
-      let dayJournals = body.journals;
-      if (followupResponse.ok) {
-        const followupBody = await followupResponse.json() as { followups: Followup[] };
-        dayJournals = mergeFollowups(body.journals, followupBody.followups ?? []);
-      }
       const nextValues: Record<string, MetricValue> = Object.fromEntries(body.metrics.map((metric) => [metric.id, null]));
       for (const entry of body.entries) nextValues[entry.metricId] = entry.value;
       setMetrics(body.metrics);
       setValues(nextValues);
       setSavedValues({ ...nextValues });
-      setJournals(dayJournals);
+      setJournals(body.journals);
       setJournalText("");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Kunne ikke hente dagens check-in.");
@@ -148,32 +119,6 @@ export default function WellbeingPage() {
     setValues((current) => ({ ...current, [metricId]: current[metricId] === next ? null : next }));
   }
 
-  function updateJournalFollowup(journalId: string, followup: Followup | null) {
-    if (!followup) return;
-    setJournals((current) => current.map((journal) => journal.id === journalId
-      ? { ...journal, followups: [...(journal.followups ?? []).filter((item) => item.id !== followup.id), followup] }
-      : journal));
-  }
-
-  async function generateJournalFollowup(journalId: string) {
-    setJournalAiBusy(journalId);
-    try {
-      const response = await fetch("/api/wellbeing/journal-ai/generate", {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ journalId }),
-      });
-      if (!response.ok) throw new Error(await errorText(response));
-      const body = await response.json() as { followup: Followup | null };
-      updateJournalFollowup(journalId, body.followup);
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Journal-assistenten kunne ikke svare.");
-    } finally {
-      setJournalAiBusy(null);
-    }
-  }
-
   async function saveAll() {
     setSaving(true); setMessage(null);
     try {
@@ -196,41 +141,17 @@ export default function WellbeingPage() {
         });
         if (!journalResponse.ok) throw new Error(await errorText(journalResponse));
         const body = await journalResponse.json() as { journal: Journal };
-        const journal = { ...body.journal, followups: [] };
+        const journal = body.journal;
         setJournals((current) => [journal, ...current]);
         setJournalText("");
-        void generateJournalFollowup(journal.id);
+        setPendingJournalId(journal.id);
+        setCheckInOpen(false);
       }
 
       setMessage("Check-in er gemt.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Check-in kunne ikke gemmes.");
     } finally { setSaving(false); }
-  }
-
-  async function answerFollowup(journalId: string, followupId: string) {
-    const answer = (followupAnswers[followupId] ?? "").trim();
-    if (!answer) return;
-    setJournalAiBusy(journalId);
-    setMessage(null);
-    try {
-      const response = await fetch("/api/wellbeing/journal-ai/answer", {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ followupId, answer }),
-      });
-      if (!response.ok) throw new Error(await errorText(response));
-      setJournals((current) => current.map((journal) => journal.id === journalId
-        ? { ...journal, followups: (journal.followups ?? []).map((item) => item.id === followupId ? { ...item, answer, answeredAt: new Date().toISOString() } : item) }
-        : journal));
-      setFollowupAnswers((current) => ({ ...current, [followupId]: "" }));
-      setJournalAiBusy(null);
-      await generateJournalFollowup(journalId);
-    } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Svaret kunne ikke gemmes.");
-      setJournalAiBusy(null);
-    }
   }
 
   async function removeJournal(id: string) {
@@ -279,7 +200,11 @@ export default function WellbeingPage() {
       <div className="wellbeing-today-journal"><span>Journal</span>{todayJournal ? <p>{todayJournal.body}</p> : <p className="is-empty">Ingen journalnote i dag.</p>}</div>
     </section>}
 
-    <MiyagiWorkspace expanded={miyagiOpen} />
+    <MiyagiWorkspace
+      expanded={miyagiOpen}
+      pendingJournalId={pendingJournalId}
+      onPendingJournalHandled={() => setPendingJournalId(null)}
+    />
     {historyOpen && <WellbeingHistory onClose={() => setHistoryOpen(false)} />}
 
     {checkInOpen && <div className="wellbeing-checkin-overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeCheckIn(); }}>
@@ -322,22 +247,12 @@ export default function WellbeingPage() {
         </section>}
 
         <section className="wellbeing-journal wellbeing-journal-inline">
-          <div><p className="section-label">Journal</p><h3>Noter fra dagen</h3><p>Skriv frit. Når check-in gemmes, kan Nexus stille et kort opfølgende spørgsmål med dagens sundhed, målepunkter og relevant journalhistorik som kontekst.</p></div>
+          <div><p className="section-label">Kommentar</p><h3>Noter fra dagen</h3><p>Skriv frit. Hvis du skriver en kommentar, svarer Miyagi i den fælles chat med dagens check-in og relevante Nexus-data som kontekst.</p></div>
           <textarea value={journalText} onChange={(event) => setJournalText(event.target.value)} rows={4} maxLength={20_000} placeholder="Hvad fyldte i dag? Hvad gik godt eller skidt?" />
 
           {journals.length > 0 && <div className="wellbeing-journal-list">{journals.map((journal) => <article key={journal.id}>
             <p>{journal.body}</p>
             <div><small>{new Intl.DateTimeFormat("da-DK", { timeStyle: "short" }).format(new Date(journal.createdAt))}</small><button type="button" onClick={() => void removeJournal(journal.id)}>Slet</button></div>
-
-            {journalAiBusy === journal.id && !(journal.followups?.some((item) => !item.answer)) && <div className="journal-ai-thinking"><span className="miyagi-thinking-dot" /><small>Nexus læser notatet i kontekst…</small></div>}
-
-            {(journal.followups ?? []).map((followup) => <section className="journal-ai-followup" key={followup.id}>
-              <div className="journal-ai-reply"><strong>Nexus</strong><p>{followup.question}</p></div>
-              {followup.answer ? <div className="journal-ai-answer"><strong>Dig</strong><p>{followup.answer}</p></div> : <form onSubmit={(event) => { event.preventDefault(); void answerFollowup(journal.id, followup.id); }}>
-                <textarea rows={2} maxLength={5000} value={followupAnswers[followup.id] ?? ""} onChange={(event) => setFollowupAnswers((current) => ({ ...current, [followup.id]: event.target.value }))} placeholder="Svar, hvis du vil uddybe…" />
-                <button className="secondary-action" type="submit" disabled={journalAiBusy === journal.id || !(followupAnswers[followup.id] ?? "").trim()}>Svar</button>
-              </form>}
-            </section>)}
           </article>)}</div>}
         </section>
 
