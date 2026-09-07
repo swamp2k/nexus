@@ -230,7 +230,7 @@ export default function GarminSleepDetail({ initialDate, onClose }: { initialDat
   const [data, setData] = useState<SleepResponse | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [selectedDate, setSelectedDate] = useState(initialDate);
-  const [range, setRange] = useState<RangeKey>("4w");
+  const [range, setRange] = useState<RangeKey>("1d");
 
   async function load(date: string, nextRange = range) {
     setState("loading");
@@ -244,7 +244,7 @@ export default function GarminSleepDetail({ initialDate, onClose }: { initialDat
     } catch { setState("error"); }
   }
 
-  useEffect(() => { setRange("4w"); void load(initialDate, "4w"); }, [initialDate]);
+  useEffect(() => { setRange("1d"); void load(initialDate, "1d"); }, [initialDate]);
   function changeRange(next: RangeKey) { setRange(next); void load(selectedDate, next); }
   function selectNight(date: string) { setRange("1d"); void load(date, "1d"); }
 
