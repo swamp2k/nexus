@@ -234,11 +234,19 @@ async function createJournal(request: Request, env: Env): Promise<Response> {
   if (!text) return json({ error: "journal_body_required" }, { status: 400 });
 
   const id = crypto.randomUUID();
+  const conversationId = crypto.randomUUID();
   const now = new Date().toISOString();
-  await env.DB.prepare(
-    `INSERT INTO journal_entries (id, user_id, entry_date, body, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?)`,
-  ).bind(id, user.id, date, text, now, now).run();
+  await env.DB.batch([
+    env.DB.prepare(
+      `INSERT INTO journal_entries (id, user_id, entry_date, body, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+    ).bind(id, user.id, date, text, now, now),
+    env.DB.prepare(
+      `INSERT INTO miyagi_conversation_messages
+         (id, user_id, role, body, kind, analysis_id, journal_entry_id, source_ref, created_at)
+       VALUES (?, ?, 'user', ?, 'checkin', NULL, ?, ?, ?)`,
+    ).bind(conversationId, user.id, text, id, `journal_entries:${id}`, now),
+  ]);
   return json({ journal: { id, entryDate: date, body: text, createdAt: now, updatedAt: now } }, { status: 201 });
 }
 
