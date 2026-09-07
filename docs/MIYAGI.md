@@ -26,9 +26,9 @@ Anthropic Messages API
           ↓
 miyagi_analyses
           ↓
-optional follow-up conversation
+one ongoing Miyagi conversation
           ↓
-miyagi_messages
+miyagi_conversation_messages
 ```
 
 The model never receives direct database access. The Worker builds a bounded context first.
@@ -95,59 +95,47 @@ Each generated analysis stores:
 
 The saved context is intentional: follow-up chat should discuss the same data that produced the visible analysis, even if new Nexus data arrives later.
 
-Chat messages are stored separately in `miyagi_messages` and linked to the analysis.
+All current Miyagi dialogue is stored in `miyagi_conversation_messages` as one chronological user-owned timeline. Each message may retain an `analysis_id` showing which analysis was active for that reply and/or a `journal_entry_id` showing that it originated from a daily check-in comment.
 
-The UI exposes a history view where prior analyses and their associated chats can be reopened.
+The conversation continues across new analyses. A new analysis changes the analytical background for subsequent replies; it does not start a second chat or erase the visible conversation.
+
+The UI exposes a history view where prior analyses can still be reopened with the messages associated with that analysis at the time.
 
 AI output never overwrites Garmin data, wellbeing entries, or user-authored journal text.
 
-## Journal assistant
+## Daily check-in and Miyagi conversation
 
-Journal AI is related to Miyagi but intentionally has a narrower job.
+The daily check-in contains subjective metrics plus an optional free-text comment.
 
-When a user writes a journal entry, Nexus can generate a short contextual follow-up. It may consider:
+The comment remains authoritative source text in `journal_entries`. In the same database write it is also referenced into `miyagi_conversation_messages` as a user message with `kind = 'checkin'` and the original journal creation timestamp.
 
-- the new journal entry
-- the same day's wellbeing metrics
-- same-day Garmin daily signals
-- sleep around that date
-- activities on that date
-- a small number of recent journal entries
-- a compact rolling summary of older journal history
+If a comment is present:
 
-The journal assistant should not receive the full 90-day Miyagi dataset for every entry.
+1. the check-in and journal text are saved first
+2. the Miyagi chat opens
+3. the comment appears immediately as the user's next conversation message
+4. Miyagi builds a bounded same-day context from wellbeing metrics, Garmin health/sleep/activity, recent journal history and the latest analysis when one exists
+5. Miyagi's reply is written to the same chronological conversation timeline
 
-The goal is reflection and useful follow-up, not broad longitudinal analysis.
+There is no separate journal-assistant chat in the UI.
 
-### Token strategy
+Miyagi may still converse when no full analysis exists. In that case he must stay within the available conversation/check-in context and must not pretend to have longitudinal structured data he has not analyzed.
 
-The journal assistant borrows the useful parts of the NoteFlow tracker strategy:
+The old `journal_followups` and `miyagi_messages` tables are retained as legacy storage only. Migration `0031_miyagi_conversation.sql` backfills their content into the unified timeline. Existing journal follow-up rows are unfolded into separate assistant and user messages using their original `created_at` and `answered_at` timestamps.
 
-- recent entries remain raw but bounded
-- older history is compressed into a rolling summary
-- imported legacy user messages can contribute to the rolling summary; legacy assistant/AI messages are retained separately but excluded from AI memory
-- current structured Nexus data is reduced to a small set of relevant fields
-- journal bodies are clipped in AI context while source text remains intact in D1
-- follow-up conversations are bounded
+The rolling summary in `journal_ai_state` remains a compact source-only memory helper. Original journal text remains ground truth and AI output never overwrites it.
 
-Current implementation limits include:
+### Export and chronology
 
-- recent raw journal window: 30 days, maximum 12 entries
-- each recent journal entry: maximum 800 context characters
-- current entry: maximum 4,000 context characters
-- older rolling-summary input: maximum 60,000 characters per pass
-- a refresh may run up to 3 passes so a large imported backlog can be bootstrapped immediately
-- summary progress advances only through source rows actually included in a pass
-- refresh runs when older unsummarized user-authored history exists
-- maximum 3 AI follow-up rounds per journal entry
+`GET /api/wellbeing/export` returns an authenticated JSON export containing:
 
-The rolling summary lives in `journal_ai_state`. Individual AI prompts and user responses remain in `journal_followups` linked to the original `journal_entries` row.
+- wellbeing metric definitions
+- all recorded check-in values
+- authoritative journal entries
+- Miyagi analyses
+- `miyagi.conversationTimeline`, ordered by `createdAt`
 
-Legacy imports may use `journal_legacy_messages`. Only rows with `role = 'user'` are eligible for the rolling summary. Legacy assistant output is preserved for archival/history purposes but is never treated as user-authored journal evidence.
-
-Miyagi analyses include the current compact `historicalJournalSummary` alongside their bounded raw analysis window. The summary is explicitly treated as compressed background context; raw journal and structured Nexus data in the active period take precedence if they conflict.
-
-Journal AI must never block or roll back the journal save itself. Source text is saved first; AI is a secondary layer.
+The conversation timeline includes current Miyagi chat, check-in comments, migrated journal follow-up dialogue, and imported legacy conversation rows with provenance metadata. Check-in comments therefore remain available both as raw journal source records and as their correctly timestamped position in the conversation timeline.
 
 ## Provider configuration
 
@@ -171,7 +159,9 @@ Never commit the API key.
 
 Miyagi base persistence requires `migrations/0013_miyagi.sql`.
 
-Miyagi analysis preferences and rolling journal-AI summary state require `migrations/0014_wellbeing_history_and_ai.sql`.
+Miyagi analysis preferences and rolling journal summary state require `migrations/0014_wellbeing_history_and_ai.sql`.
+
+The unified Miyagi/check-in conversation requires `migrations/0031_miyagi_conversation.sql`.
 
 Deploys do not apply migrations automatically. Apply explicitly:
 
@@ -188,7 +178,9 @@ GET  /api/wellbeing/miyagi/latest
 GET  /api/wellbeing/miyagi/history
 GET  /api/wellbeing/miyagi/history/:analysisId
 POST /api/wellbeing/miyagi/analyze
+POST /api/wellbeing/miyagi/checkin
 POST /api/wellbeing/miyagi/chat
+GET  /api/wellbeing/export
 ```
 
 `POST /analyze` accepts:
@@ -219,15 +211,9 @@ GET /api/wellbeing/history?limit=180
 
 Returns daily wellbeing metrics, journal entries, and linked journal-AI followups grouped by date.
 
-### Journal AI
+### Legacy Journal AI routes
 
-```text
-GET  /api/wellbeing/journal-ai/day?date=YYYY-MM-DD
-POST /api/wellbeing/journal-ai/generate
-POST /api/wellbeing/journal-ai/answer
-```
-
-AI followups use `journal_followups`; the original journal entry remains authoritative and immutable except through its normal journal CRUD flow.
+The old `/api/wellbeing/journal-ai/*` routes remain temporarily for backwards compatibility and historical data handling. The current UI does not call them; new check-in comments use `POST /api/wellbeing/miyagi/checkin` and the unified conversation timeline.
 
 ## Product boundary
 
