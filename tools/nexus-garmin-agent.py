@@ -34,6 +34,7 @@ PROBE_DAYS = 7
 PROBE_RECHECK_DAYS = 7
 HRV_RECHECK_DAYS = 30
 DIRECT_MONITORING_DAYS = 3
+SLEEP_REFRESH_DAYS = 30
 STALE_DAYS = {
     "sleep": 14,
     "rhr": 14,
@@ -616,12 +617,12 @@ def build_incremental_zip(data_dir: Path, user_id: str, before: dict[str, str]) 
             changed.append(file_path)
             included.add(file_path)
 
-    # Sleep can be refined by Garmin after an earlier sync. Always resend today
-    # and yesterday so D1's upsert gets the latest finalized record even when a
-    # reused pre-sync snapshot already contains the same local file hash.
+    # Sleep can be refined by Garmin after an earlier sync. Re-send the latest
+    # month so D1 can both absorb revisions and backfill normalization changes
+    # without requiring a full historical Garmin export.
     today = datetime.date.today()
     refreshed_sleep = 0
-    for offset in (0, 1):
+    for offset in range(SLEEP_REFRESH_DAYS):
         day = today - datetime.timedelta(days=offset)
         sleep_path = data_dir / "Sleep" / f"sleep_{day.isoformat()}.json"
         if sleep_path.is_file() and sleep_path not in included:

@@ -51,9 +51,35 @@ async function upsertDaily(db: D1Database, userId: string, importId: string, val
 async function upsertSleep(db: D1Database, userId: string, importId: string, value: unknown, path: string) {
   const root=object(value); const dto=object(root?.dailySleepDTO); const date=str(dto?.calendarDate) ?? dateFromPath(path);
   if (!dto || !date) throw new Error("sleep_invalid"); const now=new Date().toISOString();
-  await db.prepare(`INSERT INTO garmin_sleep (user_id,date,import_id,sleep_start_ms,sleep_end_ms,sleep_seconds,nap_seconds,deep_seconds,light_seconds,rem_seconds,awake_seconds,avg_respiration,low_respiration,high_respiration,updated_at)
-    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(user_id,date) DO UPDATE SET import_id=excluded.import_id,sleep_start_ms=excluded.sleep_start_ms,sleep_end_ms=excluded.sleep_end_ms,sleep_seconds=excluded.sleep_seconds,nap_seconds=excluded.nap_seconds,deep_seconds=excluded.deep_seconds,light_seconds=excluded.light_seconds,rem_seconds=excluded.rem_seconds,awake_seconds=excluded.awake_seconds,avg_respiration=excluded.avg_respiration,low_respiration=excluded.low_respiration,high_respiration=excluded.high_respiration,updated_at=excluded.updated_at`)
-    .bind(userId,date,importId,num(dto.sleepStartTimestampGMT),num(dto.sleepEndTimestampGMT),num(dto.sleepTimeSeconds),num(dto.napTimeSeconds),num(dto.deepSleepSeconds),num(dto.lightSleepSeconds),num(dto.remSleepSeconds),num(dto.awakeSleepSeconds),num(dto.averageRespirationValue),num(dto.lowestRespirationValue),num(dto.highestRespirationValue),now).run();
+  await db.prepare(`INSERT INTO garmin_sleep (
+    user_id,date,import_id,sleep_start_ms,sleep_end_ms,sleep_start_display_ms,sleep_end_display_ms,
+    sleep_seconds,nap_seconds,deep_seconds,light_seconds,rem_seconds,awake_seconds,
+    avg_respiration,low_respiration,high_respiration,updated_at)
+    VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+    ON CONFLICT(user_id,date) DO UPDATE SET
+    import_id=excluded.import_id,
+    sleep_start_ms=excluded.sleep_start_ms,
+    sleep_end_ms=excluded.sleep_end_ms,
+    sleep_start_display_ms=excluded.sleep_start_display_ms,
+    sleep_end_display_ms=excluded.sleep_end_display_ms,
+    sleep_seconds=excluded.sleep_seconds,
+    nap_seconds=excluded.nap_seconds,
+    deep_seconds=excluded.deep_seconds,
+    light_seconds=excluded.light_seconds,
+    rem_seconds=excluded.rem_seconds,
+    awake_seconds=excluded.awake_seconds,
+    avg_respiration=excluded.avg_respiration,
+    low_respiration=excluded.low_respiration,
+    high_respiration=excluded.high_respiration,
+    updated_at=excluded.updated_at`)
+    .bind(
+      userId,date,importId,
+      num(dto.sleepStartTimestampGMT),num(dto.sleepEndTimestampGMT),
+      num(dto.sleepStartTimestampLocal),num(dto.sleepEndTimestampLocal),
+      num(dto.sleepTimeSeconds),num(dto.napTimeSeconds),num(dto.deepSleepSeconds),num(dto.lightSleepSeconds),
+      num(dto.remSleepSeconds),num(dto.awakeSleepSeconds),num(dto.averageRespirationValue),
+      num(dto.lowestRespirationValue),num(dto.highestRespirationValue),now,
+    ).run();
 }
 
 async function upsertRhr(db:D1Database,userId:string,importId:string,value:unknown,path:string){
