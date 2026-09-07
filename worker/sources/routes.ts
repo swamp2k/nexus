@@ -1,5 +1,5 @@
 import { getAuthenticatedUser } from "../auth/session";
-import { getElectricityUsage } from "./eloverblik";
+import { getElectricityUsage, validUsageRange } from "./eloverblik";
 import { getEloverblikCredentials, getEloverblikCredentialStatus } from "./eloverblik-credentials";
 import { getEnergyPrices, resolveEnergySettings } from "./energy-prices";
 import { getWeatherForecast, resolveWeatherLocation } from "./weather";
@@ -79,7 +79,12 @@ export async function handleSourceRoute(request: Request, env: SourceEnv): Promi
   if (pathname === "/api/sources/energy/usage") {
     const credentials = await getEloverblikCredentials(env, user.id);
     if (!credentials) return json({ error: "source_not_configured" }, { status: 503 });
-    return json(await getElectricityUsage(env, user.id, credentials));
+    const params = new URL(request.url).searchParams;
+    const from = params.get("from"), to = params.get("to");
+    if ((from !== null || to !== null) && (!from || !to || !validUsageRange(from, to))) {
+      return json({ error: "invalid_usage_range" }, { status: 400 });
+    }
+    return json(await getElectricityUsage(env, user.id, credentials, from && to ? { from, to } : undefined));
   }
 
   if (pathname === "/api/sources/waste") {

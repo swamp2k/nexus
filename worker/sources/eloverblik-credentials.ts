@@ -1,3 +1,5 @@
+import { readSourceCache, writeSourceCache } from "./cache";
+
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
@@ -52,6 +54,19 @@ async function decryptValue(env: EloverblikCredentialsEnv, ciphertext: string, i
 
 async function clearUsageCache(env: EloverblikCredentialsEnv, userId: string): Promise<void> {
   await env.DB.prepare(`DELETE FROM source_cache WHERE source_key = ?`).bind(`energy:usage:${userId}`).run();
+  const prefix = `energy:usage:v2:${userId}:`;
+  await env.DB.prepare(`DELETE FROM source_cache WHERE substr(source_key, 1, ?) = ? OR source_key = ?`)
+    .bind(prefix.length, prefix, `energy:access:${userId}`).run();
+}
+
+// Access tokens are sensitive too: retain them encrypted and reuse for 23 hours.
+export async function readEloverblikAccessToken(env: EloverblikCredentialsEnv, userId: string): Promise<string | null> {
+  const cached = await readSourceCache<{ ciphertext: string; iv: string }>(env.DB, `energy:access:${userId}`);
+  return cached && !cached.stale ? decryptValue(env, cached.data.ciphertext, cached.data.iv) : null;
+}
+
+export async function storeEloverblikAccessToken(env: EloverblikCredentialsEnv, userId: string, token: string): Promise<void> {
+  await writeSourceCache(env.DB, `energy:access:${userId}`, await encryptValue(env, token), 23 * 60 * 60 * 1000);
 }
 
 export async function getEloverblikCredentials(env: EloverblikCredentialsEnv, userId: string): Promise<EloverblikCredentials | null> {

@@ -329,3 +329,13 @@ Avoid adding infrastructure until a concrete requirement demands it.
 10. Validate assumptions against real source data before freezing schemas.
 11. Build reusable, registered data widgets rather than separate Home-only copies of feature visualizations.
 12. Keep dashboard layout user-specific and avoid hard-coded personal layouts.
+
+### Electricity usage history
+
+`electricity_usage_days` retains daily Eloverblik consumption by user, metering point and Danish calendar date. Migration `0032_electricity_usage_history.sql` enables persistent history (`npm run db:migrate`); Workers Builds does not run migrations. Until it is applied, the adapter uses a separate source-backed cache so deployment does not break consumption views. Historical values only become permanently retained after migration.
+
+`GET /api/sources/energy/usage` keeps the widget response shape and defaults to ten recent calendar days. Optional `from` (inclusive) and `to` (exclusive) select up to 366 days, ending no later than today. The Strøm page offers 7/30/90/365 days and previous/next periods. Longer charts group daily totals into seven-day buckets or calendar months; colours use the average per available day. Missing days are not treated as zero.
+
+The adapter requests Day aggregation and handles UTC period starts as Europe/Copenhagen dates. Missing or incomplete daily quantities are excluded; valid zeroes and estimates are retained. Successful reads upsert history without deleting older days, and source failures fall back to stored history. Data is fetched on demand by pages/displays, with a six-hour cache and reuse of fresh daily records across overlapping requests. Access tokens are encrypted with the existing Eloverblik credential key and reused for 23 hours; updating credentials invalidates access and range caches. This does not add a background collector: opening an older period imports that period. Switching meters isolates history by meter. The old ten-day cache is not migrated because it used UTC date slicing; the source is re-read with corrected date handling.
+
+Provider references: [Customer API](https://api.eloverblik.dk/CustomerApi/index.html) and [data description](https://energinet.dk/media/m2xo05he/customer-and-third-party-api-for-datahub-eloverblik-data-description.pdf). Availability depends on the user's meter and source access; the UI makes no promise of complete historical coverage.

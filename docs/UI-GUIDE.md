@@ -211,3 +211,7 @@ One concern has one owner. A stylesheet never re-sizes another module's elements
 - [ ] No page subheading, no duplicate labels in a card header, no hero panel.
 - [ ] Edit controls still say the truth in one-column layouts.
 - [ ] `npm run check` and `npm run build` pass.
+
+### Electricity history
+
+The Strøm usage card offers 7/30/90/365-day periods, previous/next navigation and an inclusive end-date picker. Charts use calendar days for 7/30 days, seven-day totals for 90 days and calendar-month totals for 365 days. Missing days remain gaps; partial aggregate bars are faded. The daily value table provides exact values on touch screens. Band colours always represent average consumption per available day, and totals/counts explicitly describe available coverage.

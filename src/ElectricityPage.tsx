@@ -1,11 +1,11 @@
 import { useEffect, useMemo, useState } from "react";
+import ElectricityUsageHistory from "./ElectricityUsageHistory";
 import ChartFrame from "./dashboard/ChartFrame";
 import { bandFor, bandsFrom, DEFAULT_PRICE_BANDS, DEFAULT_USAGE_BANDS } from "./data/api-types";
-import type { Bands, EnergyPricePoint, EnergyPricesResponse, ElectricityUsageResponse, SettingsResponse } from "./data/api-types";
+import type { Bands, EnergyPricePoint, EnergyPricesResponse, SettingsResponse } from "./data/api-types";
 
 type PricePoint = EnergyPricePoint;
 type EnergyResponse = EnergyPricesResponse;
-type UsageResponse = ElectricityUsageResponse;
 type PriceBands = Bands;
 type UsageBands = Bands;
 type HourWindow = { start: string; average: number };
@@ -75,40 +75,6 @@ function hourlyBars(points: PricePoint[]): HourBar[] {
 
 const bandClass = bandFor;
 
-function UsageSection({ usage, bands }: { usage: UsageResponse | null; bands: UsageBands }) {
-  const rows = usage?.data.days.filter((day) => Number.isFinite(day.kwh) && day.kwh >= 0).slice(-7) ?? [];
-  if (rows.length === 0) {
-    return <article className="electricity-card electricity-usage-card"><div className="electricity-card-heading"><div><p className="section-label">Eloverblik</p><h3>Elforbrug · seneste 7 dage</h3></div></div><div className="electricity-empty">Ingen Eloverblik-forbrugsdata endnu.</div></article>;
-  }
-
-  const latest = rows[rows.length - 1];
-  const average = rows.reduce((sum, day) => sum + day.kwh, 0) / rows.length;
-  const total = rows.reduce((sum, day) => sum + day.kwh, 0);
-  const max = Math.max(...rows.map((day) => day.kwh), 1);
-  const dayFormatter = new Intl.DateTimeFormat("da-DK", { weekday: "short" });
-  const dateFormatter = new Intl.DateTimeFormat("da-DK", { weekday: "long", day: "numeric", month: "short" });
-
-  return <article className="electricity-card electricity-usage-card">
-    <div className="electricity-card-heading">
-      <div><p className="section-label">Eloverblik</p><h3>Elforbrug · seneste 7 dage</h3></div>
-      {usage && <span className="electricity-usage-freshness">Opdateret {ageLabel(usage.fetchedAt)}{usage.stale ? " · forsinket" : ""}</span>}
-    </div>
-    <div className="electricity-usage-summary">
-      <div><span>Seneste døgn</span><strong>{latest.kwh.toFixed(1).replace(".", ",")} kWh</strong><small>{dateFormatter.format(new Date(latest.date + "T12:00:00"))}</small></div>
-      <div><span>7-dages gennemsnit</span><strong>{average.toFixed(1).replace(".", ",")} kWh</strong><small>pr. døgn</small></div>
-      <div><span>7 dage i alt</span><strong>{total.toFixed(1).replace(".", ",")} kWh</strong><small>{rows.length} registrerede døgn</small></div>
-    </div>
-    <div className="band-legend electricity-band-legend electricity-usage-band-legend"><span className="low">Lav ≤ {bands.low.toFixed(1).replace(".", ",")} kWh</span><span className="medium">Middel</span><span className="high">Høj ≥ {bands.high.toFixed(1).replace(".", ",")} kWh</span></div>
-    <div className="electricity-usage-bars" aria-label="Elforbrug de seneste 7 dage">
-      {rows.map((day) => <div className="electricity-usage-bar-item" key={day.date}>
-        <strong>{day.kwh.toFixed(1).replace(".", ",")}</strong>
-        <div className="electricity-usage-bar-track"><span className={bandClass(day.kwh, bands)} style={{ height: Math.max(5, (day.kwh / max) * 100) + "%" }} /></div>
-        <small>{dayFormatter.format(new Date(day.date + "T12:00:00"))}</small>
-      </div>)}
-    </div>
-  </article>;
-}
-
 function PriceChart({ points, bands }: { points: PricePoint[]; bands: PriceBands }) {
   const bars = hourlyBars(points);
   if (bars.length === 0) return <div className="electricity-empty">Ingen priser til grafen.</div>;
@@ -146,21 +112,18 @@ function PriceChart({ points, bands }: { points: PricePoint[]; bands: PriceBands
 
 export default function ElectricityPage() {
   const [response, setResponse] = useState<EnergyResponse | null>(null);
-  const [usage, setUsage] = useState<UsageResponse | null>(null);
   const [bands, setBands] = useState<PriceBands>(DEFAULT_BANDS);
   const [usageBands, setUsageBands] = useState<UsageBands>(DEFAULT_USAGE_BANDS);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
 
   async function refresh() {
     try {
-      const [priceResult, usageResult, settingsResult] = await Promise.all([
+      const [priceResult, settingsResult] = await Promise.all([
         fetch("/api/sources/energy/prices", { credentials: "same-origin", cache: "no-store" }),
-        fetch("/api/sources/energy/usage", { credentials: "same-origin", cache: "no-store" }),
         fetch("/api/settings", { credentials: "same-origin", cache: "no-store" }),
       ]);
       if (!priceResult.ok) throw new Error(`HTTP ${priceResult.status}`);
       setResponse(await priceResult.json() as EnergyResponse);
-      setUsage(usageResult.ok ? await usageResult.json() as UsageResponse : null);
       if (settingsResult.ok) {
         const settings = (await settingsResult.json() as SettingsResponse).settings;
         setBands(bandsFrom(settings.energyLowPriceDkk, settings.energyHighPriceDkk, DEFAULT_BANDS));
@@ -213,7 +176,7 @@ export default function ElectricityPage() {
   }, [response]);
 
   if (state === "loading") return <section className="electricity-state">Henter elpriser…</section>;
-  if (state === "error" || !response || !metrics) return <section className="electricity-state"><strong>Elpriserne kunne ikke hentes.</strong><button className="secondary-action" type="button" onClick={() => void refresh()}>Prøv igen</button></section>;
+  if (state === "error" || !response || !metrics) return <section className="electricity-page"><div className="electricity-state"><strong>Elpriserne kunne ikke hentes.</strong><button className="secondary-action" type="button" onClick={() => void refresh()}>Prøv igen</button></div><ElectricityUsageHistory bands={usageBands} /></section>;
 
   const current = metrics.current;
   const supplierInclVat = current ? current.supplierMarkupExVatDkkPerKwh * 1.25 : 0;
@@ -225,7 +188,7 @@ export default function ElectricityPage() {
         <div className="electricity-hero-metrics"><div><span>Billigste time</span><strong>{metrics.cheapest ? `${metrics.cheapest.average.toFixed(2)} kr` : "—"}</strong><small>{metrics.cheapest ? `fra ${formatTime(metrics.cheapest.start)}` : ""}</small></div><div><span>Dyreste time</span><strong>{metrics.highest ? `${metrics.highest.average.toFixed(2)} kr` : "—"}</strong><small>{metrics.highest ? `fra ${formatTime(metrics.highest.start)}` : ""}</small></div></div>
       </article>
 
-      <UsageSection usage={usage} bands={usageBands} />
+      <ElectricityUsageHistory bands={usageBands} />
 
       {current && <article className="electricity-day-card electricity-price-breakdown"><p className="section-label">Pris lige nu</p><div><span>Spot inkl. moms</span><strong>{current.spotInclVatDkkPerKwh.toFixed(2)} kr</strong></div><div><span>Netselskab</span><strong>{current.gridInclVatDkkPerKwh === null ? "—" : `${current.gridInclVatDkkPerKwh.toFixed(2)} kr`}</strong></div><div><span>Energinet</span><strong>{current.energinetInclVatDkkPerKwh.toFixed(2)} kr</strong></div><div><span>Elafgift</span><strong>{current.electricityTaxInclVatDkkPerKwh.toFixed(2)} kr</strong></div><div><span>Elselskabstillæg</span><strong>{supplierInclVat.toFixed(2)} kr</strong></div><div className="electricity-price-total"><span>I alt</span><strong>{price(current).toFixed(2)} kr</strong></div></article>}
 
