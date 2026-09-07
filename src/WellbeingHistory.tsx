@@ -9,19 +9,10 @@ type MetricEntry = {
   value: number;
 };
 
-type Followup = {
-  id: string;
-  question: string;
-  answer: string | null;
-  createdAt: string;
-  answeredAt: string | null;
-};
-
 type Journal = {
   id: string;
   body: string;
   createdAt: string;
-  followups: Followup[];
 };
 
 type HistoryDay = {
@@ -82,7 +73,7 @@ export default function WellbeingHistory({ onClose }: { onClose: () => void }) {
   return <div className="wellbeing-history-overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
     <section className="wellbeing-history-dialog" role="dialog" aria-modal="true" aria-labelledby="wellbeing-history-title">
       <header className="wellbeing-history-heading">
-        <div><p className="section-label">Dagligt check-in</p><h2 id="wellbeing-history-title">Historik</h2><p>Målepunkter, journal og AI-opfølgning samlet pr. dag.</p></div>
+        <div><p className="section-label">Dagligt check-in</p><h2 id="wellbeing-history-title">Historik</h2><p>Målepunkter og kommentarer pr. dag. Miyagi-samtalen fortsætter samlet i chatten.</p></div>
         <button className="icon-action" type="button" onClick={onClose} aria-label="Luk historik">×</button>
       </header>
 
@@ -108,12 +99,6 @@ export default function WellbeingHistory({ onClose }: { onClose: () => void }) {
 
               {day.journals.map((journal) => <section className="wellbeing-history-journal" key={journal.id}>
                 <p>{journal.body}</p>
-                {journal.followups?.length > 0 && <div className="wellbeing-history-followups">
-                  {journal.followups.map((followup) => <div key={followup.id}>
-                    <div className="wellbeing-history-ai"><strong>Nexus</strong><p>{followup.question}</p></div>
-                    {followup.answer && <div className="wellbeing-history-user"><strong>Dig</strong><p>{followup.answer}</p></div>}
-                  </div>)}
-                </div>}
               </section>)}
             </div>}
           </article>;
