@@ -77,7 +77,9 @@
 }
 
 .wellbeing-history-day-toggle {
+  position: static;
   width: 100%;
+  min-height: 44px;
   display: grid;
   grid-template-columns: 18px minmax(180px, 1fr) auto auto;
   align-items: center;
@@ -86,8 +88,19 @@
   border: 0;
   background: transparent;
   color: var(--text);
+  font-size: 0.88rem;
+  line-height: 1.2;
   text-align: left;
+  visibility: visible;
+  opacity: 1;
   cursor: pointer;
+  appearance: none;
+}
+
+.wellbeing-history-day-toggle > * {
+  min-width: 0;
+  visibility: visible;
+  opacity: 1;
 }
 
 .wellbeing-history-day-toggle > span:not(.wellbeing-history-chevron) {
