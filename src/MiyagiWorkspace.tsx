@@ -232,19 +232,21 @@ export default function MiyagiWorkspace({ expanded = true }: MiyagiWorkspaceProp
     </div>}
     </>}
 
-    {analysis && <>
+    <>
       <button
         className={`miyagi-chat-launcher ${chatOpen ? "open" : ""}`}
         type="button"
         onClick={() => setChatOpen((open) => !open)}
         aria-expanded={chatOpen}
         aria-controls="miyagi-chat-popout"
+        disabled={!analysis || state === "loading" || state === "analyzing"}
+        title={!analysis ? "Start en Miyagi-analyse først" : undefined}
       >
         <span className="miyagi-chat-launcher-icon" aria-hidden="true">🥋</span>
         <span>Tal med Miyagi</span>
       </button>
 
-      {chatOpen && <section id="miyagi-chat-popout" className="miyagi-chat-popout" role="dialog" aria-label="Tal med Mr. Miyagi">
+      {chatOpen && analysis && <section id="miyagi-chat-popout" className="miyagi-chat-popout" role="dialog" aria-label="Tal med Mr. Miyagi">
         <header className="miyagi-chat-popout-header">
           <div>
             <strong>Mr. Miyagi</strong>
@@ -290,7 +292,7 @@ export default function MiyagiWorkspace({ expanded = true }: MiyagiWorkspaceProp
           </div>
         </form>
       </section>}
-    </>}
+    </>
 
     {error && <p className="settings-feedback error">{error}</p>}
     {expanded && <small className="miyagi-disclaimer">Miyagi er et analyseværktøj i et privat hobbyprojekt. Han kan hjælpe med mønstre og refleksion, men er ikke læge og erstatter ikke faglig vurdering.</small>}
