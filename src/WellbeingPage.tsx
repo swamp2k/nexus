@@ -279,7 +279,7 @@ export default function WellbeingPage() {
       <div className="wellbeing-today-journal"><span>Journal</span>{todayJournal ? <p>{todayJournal.body}</p> : <p className="is-empty">Ingen journalnote i dag.</p>}</div>
     </section>}
 
-    {miyagiOpen && <MiyagiWorkspace />}
+    <MiyagiWorkspace expanded={miyagiOpen} />
     {historyOpen && <WellbeingHistory onClose={() => setHistoryOpen(false)} />}
 
     {checkInOpen && <div className="wellbeing-checkin-overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeCheckIn(); }}>
