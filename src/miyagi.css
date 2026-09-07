@@ -416,6 +416,14 @@
   box-shadow: 0 16px 38px rgba(0, 0, 0, 0.26);
 }
 
+.miyagi-chat-launcher:disabled,
+.miyagi-chat-launcher:disabled:hover {
+  opacity: 0.58;
+  transform: none;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.16);
+  cursor: default;
+}
+
 .miyagi-chat-launcher.open {
   opacity: 0;
   pointer-events: none;
