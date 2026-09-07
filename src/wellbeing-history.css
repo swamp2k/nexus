@@ -62,8 +62,11 @@
 }
 
 .wellbeing-history-list {
+  min-height: 0;
   overflow: auto;
   display: grid;
+  /* Keep days at content height; scroll the list instead of clipping each day. */
+  grid-auto-rows: max-content;
   align-content: start;
   gap: 7px;
   padding-top: 12px;
