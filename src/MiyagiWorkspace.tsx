@@ -24,9 +24,12 @@ type Analysis = {
 };
 
 type Message = {
-  id?: string;
+  id: string;
   role: "user" | "assistant";
   body: string;
+  kind?: "chat" | "checkin" | "legacy";
+  analysisId?: string | null;
+  journalEntryId?: string | null;
   createdAt: string;
 };
 
@@ -36,6 +39,8 @@ type AnalysisTone = "objective" | "empathetic" | "miyagi";
 
 type MiyagiWorkspaceProps = {
   expanded?: boolean;
+  pendingJournalId?: string | null;
+  onPendingJournalHandled?: () => void;
 };
 
 async function errorText(response: Response): Promise<string> {
@@ -63,7 +68,20 @@ function formatTimestamp(value: string): string {
   return new Intl.DateTimeFormat("da-DK", { dateStyle: "medium", timeStyle: "short" }).format(parsed);
 }
 
-export default function MiyagiWorkspace({ expanded = true }: MiyagiWorkspaceProps) {
+function mergeMessages(current: Message[], incoming: Message[]): Message[] {
+  const byId = new Map(current.map((message) => [message.id, message]));
+  for (const message of incoming) byId.set(message.id, message);
+  return [...byId.values()].sort((a, b) => {
+    const time = a.createdAt.localeCompare(b.createdAt);
+    return time || a.id.localeCompare(b.id);
+  });
+}
+
+export default function MiyagiWorkspace({
+  expanded = true,
+  pendingJournalId = null,
+  onPendingJournalHandled,
+}: MiyagiWorkspaceProps) {
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [state, setState] = useState<"loading" | "ready" | "analyzing" | "error">("loading");
@@ -99,6 +117,39 @@ export default function MiyagiWorkspace({ expanded = true }: MiyagiWorkspaceProp
       });
     return () => { cancelled = true; };
   }, []);
+
+  useEffect(() => {
+    if (!pendingJournalId) return;
+    let cancelled = false;
+    setChatOpen(true);
+    setChatBusy(true);
+    setError(null);
+
+    void fetch("/api/wellbeing/miyagi/checkin", {
+      method: "POST",
+      credentials: "same-origin",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ journalId: pendingJournalId }),
+    })
+      .then(async (response) => {
+        if (!response.ok) throw new Error(await errorText(response));
+        return response.json() as Promise<{ messages: Message[] }>;
+      })
+      .then((body) => {
+        if (cancelled) return;
+        setMessages((current) => mergeMessages(current, body.messages ?? []));
+      })
+      .catch((caught: Error) => {
+        if (!cancelled) setError(caught.message);
+      })
+      .finally(() => {
+        if (cancelled) return;
+        setChatBusy(false);
+        onPendingJournalHandled?.();
+      });
+
+    return () => { cancelled = true; };
+  }, [pendingJournalId]);
 
   useEffect(() => {
     if (!analysisDialogOpen) return;
@@ -162,13 +213,16 @@ export default function MiyagiWorkspace({ expanded = true }: MiyagiWorkspaceProp
   }
 
   async function sendMessage() {
-    if (!analysis || !chatText.trim() || chatBusy) return;
+    if (!chatText.trim() || chatBusy) return;
     const text = chatText.trim();
     const pendingId = `pending-${Date.now()}`;
     const pendingMessage: Message = {
       id: pendingId,
       role: "user",
       body: text,
+      kind: "chat",
+      analysisId: analysis?.id ?? null,
+      journalEntryId: null,
       createdAt: new Date().toISOString(),
     };
 
@@ -182,14 +236,14 @@ export default function MiyagiWorkspace({ expanded = true }: MiyagiWorkspaceProp
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ analysisId: analysis.id, message: text }),
+        body: JSON.stringify({ analysisId: analysis?.id, message: text }),
       });
       if (!response.ok) throw new Error(await errorText(response));
       const body = await response.json() as { messages: Message[] };
-      setMessages((current) => [
-        ...current.filter((message) => message.id !== pendingId),
-        ...body.messages,
-      ]);
+      setMessages((current) => mergeMessages(
+        current.filter((message) => message.id !== pendingId),
+        body.messages,
+      ));
     } catch (caught) {
       setMessages((current) => current.filter((message) => message.id !== pendingId));
       setChatText(text);
@@ -239,18 +293,17 @@ export default function MiyagiWorkspace({ expanded = true }: MiyagiWorkspaceProp
         onClick={() => setChatOpen((open) => !open)}
         aria-expanded={chatOpen}
         aria-controls="miyagi-chat-popout"
-        disabled={!analysis || state === "loading" || state === "analyzing"}
-        title={!analysis ? "Start en Miyagi-analyse først" : undefined}
+        disabled={state === "loading" || state === "analyzing"}
       >
         <span className="miyagi-chat-launcher-icon" aria-hidden="true">🥋</span>
         <span>Tal med Miyagi</span>
       </button>
 
-      {chatOpen && analysis && <section id="miyagi-chat-popout" className="miyagi-chat-popout" role="dialog" aria-label="Tal med Mr. Miyagi">
+      {chatOpen && <section id="miyagi-chat-popout" className="miyagi-chat-popout" role="dialog" aria-label="Tal med Mr. Miyagi">
         <header className="miyagi-chat-popout-header">
           <div>
             <strong>Mr. Miyagi</strong>
-            <span>Spørg ind til analysen eller giv ham mere kontekst.</span>
+            <span>Check-in, analyse og samtale samlet ét sted.</span>
           </div>
           <button className="icon-action" type="button" onClick={() => setChatOpen(false)} aria-label="Luk chat">×</button>
         </header>
@@ -281,14 +334,14 @@ export default function MiyagiWorkspace({ expanded = true }: MiyagiWorkspaceProp
                 void sendMessage();
               }
             }}
-            disabled={chatBusy}
+            disabled={chatBusy || state === "analyzing"}
             maxLength={4000}
             placeholder="Skriv til Miyagi…"
             aria-label="Skriv til Mr. Miyagi"
           />
           <div className="miyagi-chat-compose-actions">
             <small>Shift+Enter = ny linje</small>
-            <button type="submit" disabled={chatBusy || !chatText.trim()}>{chatBusy ? "…" : "Send"}</button>
+            <button type="submit" disabled={chatBusy || state === "analyzing" || !chatText.trim()}>{chatBusy ? "…" : "Send"}</button>
           </div>
         </form>
       </section>}
