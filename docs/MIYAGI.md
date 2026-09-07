@@ -194,7 +194,7 @@ GET  /api/wellbeing/export
 }
 ```
 
-`POST /chat` requires the saved analysis id and a message:
+`POST /chat` accepts a message and may include the current analysis id. If omitted, Miyagi uses the user's latest analysis when one exists:
 
 ```json
 {
@@ -209,7 +209,7 @@ GET  /api/wellbeing/export
 GET /api/wellbeing/history?limit=180
 ```
 
-Returns daily wellbeing metrics, journal entries, and linked journal-AI followups grouped by date.
+Returns daily wellbeing metrics and authoritative journal comments grouped by date. Miyagi dialogue lives in the separate unified conversation timeline.
 
 ### Legacy Journal AI routes
 
@@ -217,7 +217,7 @@ The old `/api/wellbeing/journal-ai/*` routes remain temporarily for backwards co
 
 ## Product boundary
 
-Miyagi and Journal AI are allowed to offer low-risk reflection such as things worth observing or tracking.
+Miyagi is allowed to offer low-risk reflection such as things worth observing or tracking.
 
 They must not present themselves as doctors, diagnose conditions, prescribe treatment, or turn sparse personal telemetry into medical certainty.
 
