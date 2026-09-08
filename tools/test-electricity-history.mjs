@@ -18,7 +18,20 @@ try {
   const { parseDays, validUsageRange, getElectricityUsage } = await import(pathToFileURL(join(temporary, 'eloverblik.mjs')));
   const { setEloverblikCredentials } = await import(pathToFileURL(join(temporary, 'eloverblik-credentials.mjs')));
   const point = (position, quantity, quality = 'A04') => ({ position: String(position), 'out_Quantity.quantity': quantity, 'out_Quantity.quality': quality });
-  const payload = (start, points) => ({ result: [{ success: true, MyEnergyData_MarketDocument: { TimeSeries: [{ 'measurement_Unit.name': 'KWH', Period: [{ resolution: 'P1D', timeInterval: { start }, Point: points }] }] } }] });
+  const payload = (start, points, resolution = 'PT1D') => ({ result: [{ success: true, MyEnergyData_MarketDocument: { TimeSeries: [{ 'measurement_Unit.name': 'KWH', Period: [{ resolution, timeInterval: { start }, Point: points }] }] } }] });
+  // Live Day responses use PT1D, while the specification documents P1D.
+  for (const resolution of ['PT1D', 'P1D']) {
+    const daily = payload('2026-03-28T23:00:00Z', [point(1, '10')], resolution);
+    daily.result[0].MyEnergyData_MarketDocument.TimeSeries[0].Period.push({
+      resolution, timeInterval: { start: '2026-03-29T22:00:00Z' }, Point: [point(1, '12')],
+    });
+    assert.deepEqual(parseDays(daily), [{ date: '2026-03-29', kwh: 10 }, { date: '2026-03-30', kwh: 12 }]);
+  }
+  for (const resolution of ['PT1H', 'PT15M', 'P1M', undefined]) {
+    const invalid = payload('2026-03-28T23:00:00Z', [point(1, '10')]);
+    invalid.result[0].MyEnergyData_MarketDocument.TimeSeries[0].Period[0].resolution = resolution;
+    assert.throws(() => parseDays(invalid), /eloverblik_unexpected_resolution/);
+  }
   assert.deepEqual(parseDays(payload('2026-03-27T23:00:00Z', [point(1, '10'), point(2, '11'), point(3, '12')])), [
     { date: '2026-03-28', kwh: 10 }, { date: '2026-03-29', kwh: 11 }, { date: '2026-03-30', kwh: 12 },
   ]);

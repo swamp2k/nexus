@@ -89,7 +89,8 @@ export function parseDays(payload: unknown): UsageDay[] {
         if (typeof rawPeriod !== "object" || rawPeriod === null) continue;
         const period = rawPeriod as Period;
         const start = period.timeInterval?.start;
-        if (period.resolution !== "P1D") throw new Error("eloverblik_unexpected_resolution");
+        // Eloverblik sends PT1D for Day aggregation; its specification uses P1D.
+        if (period.resolution !== "P1D" && period.resolution !== "PT1D") throw new Error("eloverblik_unexpected_resolution");
         if (typeof start !== "string" || !Number.isFinite(Date.parse(start)) || !Array.isArray(period.Point)) continue;
         const firstDate = localUsageDate(new Date(start));
         for (const rawPoint of period.Point) {
