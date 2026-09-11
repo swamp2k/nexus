@@ -1,15 +1,20 @@
 import type { WidgetDefinition, WidgetSize } from "../widgets/widgetRegistry";
 
 export type WidgetConfig = Record<string, unknown>;
+export type WidgetRows = 1 | 2 | 3;
 
 /**
  * Stored dashboard item. Legacy widgets use `id` as both instance and widget
  * type. Configurable widgets can keep a stable instance `id` and point at a
  * reusable widget definition through `type`.
+ *
+ * `size` controls width. `rows` optionally overrides the registry's default
+ * height for this specific dashboard instance.
  */
 export type LayoutItem = {
   id: string;
   size: WidgetSize;
+  rows?: WidgetRows;
   type?: string;
   config?: WidgetConfig;
 };
@@ -17,6 +22,7 @@ export type LayoutItem = {
 export type WidgetResolver = (id: string) => WidgetDefinition | undefined;
 
 export const SIZE_LABELS: Record<WidgetSize, string> = { small: "Lille", medium: "Mellem", wide: "Bred" };
+export const ROW_OPTIONS: WidgetRows[] = [1, 2, 3];
 
 /**
  * Pure layout edits shared by Home and the Displays editor. Every function
@@ -34,6 +40,7 @@ export function normalizeLayout(layout: LayoutItem[], resolve: WidgetResolver): 
     result.push({
       ...item,
       size: !widget || widget.supportedSizes.includes(item.size) ? item.size : widget.defaultSize,
+      ...(item.rows === 1 || item.rows === 2 || item.rows === 3 ? { rows: item.rows } : { rows: undefined }),
     });
   }
   return result;
@@ -65,6 +72,22 @@ export function stepSize(layout: LayoutItem[], id: string, direction: -1 | 1, re
     const index = widget.supportedSizes.indexOf(item.size);
     const next = Math.max(0, Math.min(widget.supportedSizes.length - 1, index + direction));
     return { ...item, size: widget.supportedSizes[next] ?? item.size };
+  });
+}
+
+export function effectiveRows(item: Pick<LayoutItem, "rows">, widget?: Pick<WidgetDefinition, "rows">): WidgetRows {
+  return item.rows ?? widget?.rows ?? 1;
+}
+
+export function changeRows(layout: LayoutItem[], id: string, rows: WidgetRows): LayoutItem[] {
+  return layout.map((item) => item.id === id ? { ...item, rows } : item);
+}
+
+export function cycleRows(layout: LayoutItem[], id: string, fallbackRows: WidgetRows = 1): LayoutItem[] {
+  return layout.map((item) => {
+    if (item.id !== id) return item;
+    const current = item.rows ?? fallbackRows;
+    return { ...item, rows: current === 3 ? 1 : current + 1 as WidgetRows };
   });
 }
 
