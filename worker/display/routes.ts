@@ -87,6 +87,7 @@ function cleanTheme(value: unknown): "light" | "dark" | "system" {
 type DisplayLayoutItem = {
   id: string;
   size: "small" | "medium" | "wide";
+  rows?: 1 | 2 | 3;
   type?: string;
   config?: Record<string, unknown>;
 };
@@ -108,16 +109,18 @@ function cleanLayout(value: unknown): DisplayLayoutItem[] {
   const output: DisplayLayoutItem[] = [];
   for (const item of value.slice(0, 30)) {
     if (!item || typeof item !== "object") continue;
-    const row = item as { id?: unknown; size?: unknown; type?: unknown; config?: unknown };
+    const row = item as { id?: unknown; size?: unknown; rows?: unknown; type?: unknown; config?: unknown };
     const id = typeof row.id === "string" ? row.id.trim().slice(0, 100) : "";
     if (!id || seen.has(id)) continue;
     const size = row.size === "small" || row.size === "wide" ? row.size : "medium";
+    const rows = row.rows === 1 || row.rows === 2 || row.rows === 3 ? row.rows : undefined;
     const type = typeof row.type === "string" ? row.type.trim().slice(0, 100) : "";
     const config = cleanConfig(row.config);
     seen.add(id);
     output.push({
       id,
       size,
+      ...(rows ? { rows } : {}),
       ...(type ? { type } : {}),
       ...(config ? { config } : {}),
     });
