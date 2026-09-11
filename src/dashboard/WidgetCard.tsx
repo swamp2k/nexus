@@ -1,4 +1,4 @@
-import type { HTMLAttributes, ReactNode } from "react";
+import type { ButtonHTMLAttributes, ReactNode } from "react";
 import { DashboardRefreshScope } from "../data/dashboardRefresh";
 import type { RefreshClass } from "../data/dashboardRefresh";
 import type { WidgetSize } from "../widgets/widgetRegistry";
@@ -15,7 +15,7 @@ export type WidgetEditControls = {
   onRemove: () => void;
 };
 
-type DragProps = Pick<HTMLAttributes<HTMLElement>, "draggable" | "onDragStart" | "onDragEnd" | "onDragOver" | "onDrop">;
+type DragHandleProps = Pick<ButtonHTMLAttributes<HTMLButtonElement>, "onPointerDown">;
 
 export type WidgetCardProps = {
   id: string;
@@ -31,7 +31,7 @@ export type WidgetCardProps = {
   /** When present the card renders inline edit controls instead of the link. */
   edit?: WidgetEditControls;
   className?: string;
-  dragProps?: DragProps;
+  dragHandleProps?: DragHandleProps;
   children: ReactNode;
 };
 
@@ -40,18 +40,19 @@ export type WidgetCardProps = {
  * paired displays all render through here so sizing, headers and controls
  * cannot drift apart.
  */
-export default function WidgetCard({ id, title, kicker, size, rows = 1, compact, refreshClass, link, edit, className, dragProps, children }: WidgetCardProps) {
+export default function WidgetCard({ id, title, kicker, size, rows = 1, compact, refreshClass, link, edit, className, dragHandleProps, children }: WidgetCardProps) {
   const classes = ["home-widget", `home-widget--${size}`];
   if (rows === 2) classes.push("home-widget--rows-2");
   if (compact) classes.push("home-widget--compact");
   if (edit) classes.push("home-widget--editing");
   if (className) classes.push(className);
 
-  return <article className={classes.join(" ")} data-widget-id={id} data-refresh-class={refreshClass} {...dragProps}>
+  return <article className={classes.join(" ")} data-widget-id={id} data-refresh-class={refreshClass}>
     <header>
       <div>{edit && kicker && <span className="home-widget-kicker">{kicker}</span>}<h3>{title}</h3></div>
       {edit
         ? <div className="home-widget-direct-controls">
+            {dragHandleProps && <button type="button" className="widget-drag-handle" title="Træk for at flytte; brug pilene med tastatur" aria-label={`Træk ${title} for at flytte`} {...dragHandleProps}>⠿</button>}
             <button type="button" title="Mindre" aria-label={`Gør ${title} mindre`} disabled={!edit.canShrink} onClick={edit.onShrink}>−</button>
             <button type="button" title="Større" aria-label={`Gør ${title} større`} disabled={!edit.canGrow} onClick={edit.onGrow}>+</button>
             <button type="button" className="home-widget-order-button" title="Flyt tidligere" aria-label={`Flyt ${title} tidligere`} disabled={!edit.canMoveEarlier} onClick={edit.onMoveEarlier}><span className="glyph-row">←</span><span className="glyph-col">↑</span></button>

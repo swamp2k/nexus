@@ -14,10 +14,9 @@
   --card-gap: 14px;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  /* Rows grow with content. Never fixed-height rows: content decides height,
-     the grid keeps neighbours aligned. Never `dense`: stored order is visual
-     order, or the editor cannot be reasoned about. */
-  grid-auto-rows: minmax(var(--card-row), auto);
+  /* Layout owns geometry. Intrinsic content must never resize other cards. */
+  grid-auto-rows: var(--card-row);
+  align-content: start;
   gap: var(--card-gap);
   align-items: stretch;
 }
@@ -30,6 +29,9 @@
 /* --- Card ----------------------------------------------------------------- */
 
 .home-widget {
+  position: relative;
+  box-sizing: border-box;
+  overflow: hidden;
   container-type: inline-size;
   container-name: home-widget;
   min-width: 0;
@@ -44,6 +46,9 @@
 }
 
 .home-widget > header {
+  position: relative;
+  flex: 0 0 30px;
+  min-height: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -64,8 +69,10 @@
 
 /* Source label. Rendered only in editors, where the catalogue is the context. */
 .home-widget-kicker {
+  position: absolute;
+  top: -10px;
   display: block;
-  margin-bottom: 2px;
+  line-height: 1;
   color: var(--muted);
   font-size: 0.66rem;
   font-weight: 800;
@@ -90,7 +97,10 @@
   min-height: 0;
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: safe center;
+  overflow: auto;
+  overflow-wrap: anywhere;
+  overscroll-behavior: contain;
   padding-top: 12px;
 }
 
@@ -129,7 +139,16 @@
 }
 
 .widget-fill > .chart-frame { flex: 1 1 var(--chart-h, 150px); }
-.chart-frame > svg { display: block; overflow: visible; }
+.chart-frame > svg { position: absolute; inset: 0; display: block; width: 100%; height: 100%; overflow: hidden; }
+
+/* Dashboard charts consume remaining card space; page charts keep --chart-h. */
+.home-widget .widget-fill > .chart-frame { flex: 1 1 0; height: auto; min-height: 80px; }
+.home-widget .widget-fill > :not(.chart-frame) { flex-shrink: 0; }
+
+/* One-row cards prioritize primary values; detail must not be half-clipped. */
+.home-widget:not(.home-widget--rows-2) .home-metric > small,
+.home-widget:not(.home-widget--rows-2) .home-weather small,
+.home-widget:not(.home-widget--rows-2) .home-three-stats > small { display: none; }
 
 .chart-axis { fill: var(--muted); font-size: 10px; font-weight: 600; }
 .chart-axis--strong { fill: var(--muted-strong); font-weight: 800; }
@@ -173,13 +192,19 @@
 /* --- Edit controls -------------------------------------------------------- */
 
 .home-widget-direct-controls {
-  flex: 0 0 auto;
+  position: absolute;
+  z-index: 1;
+  top: 0;
+  right: 0;
+  max-width: 100%;
+  background: var(--surface);
   display: flex;
   align-items: center;
   gap: 4px;
 }
 
 .home-widget-direct-controls button {
+  flex: 0 0 30px;
   width: 30px;
   height: 30px;
   display: inline-grid;
@@ -207,50 +232,45 @@
   outline-offset: -4px;
 }
 
-.display-edit-widget { cursor: grab; transition: opacity 120ms ease, transform 120ms ease, box-shadow 120ms ease; }
-.display-edit-widget:active { cursor: grabbing; }
-.display-edit-widget.is-dragging { opacity: 0.42; transform: scale(0.985); box-shadow: none; }
+.widget-drag-handle { touch-action: none; cursor: grab !important; }
+.widget-drag-handle:active { cursor: grabbing !important; }
+.home-widget.is-dragging { opacity: .5; outline: 2px solid var(--accent); outline-offset: -2px; }
+.home-widget.widget-drop--before { box-shadow: inset 4px 0 var(--accent); }
+.home-widget.widget-drop--after { box-shadow: inset -4px 0 var(--accent); }
+.widget-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
 /* --- Size-aware content --------------------------------------------------- */
 
 /* Small cards: the glanceable number only. */
+/* Content selectors include their owner so later widget styles cannot override
+   responsive decisions solely through stylesheet import order. */
 @container home-widget (max-width: 300px) {
-  .home-widget-content { --chart-h: 120px; }
-  .home-metric > small { display: none; }
-  .home-weather { gap: 10px; }
-  .home-weather-icon { font-size: 2rem; }
-  .home-weather small { display: none; }
-  .home-wellbeing-journal, .home-wellbeing-no-journal { display: none; }
-  .home-wellbeing-metrics span:nth-child(n+3) { display: none; }
-  .home-three-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .home-three-stats > div:nth-child(2) { display: none; }
-  .home-weather-hours, .home-weather-week { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .home-weather-hours > div:nth-child(n+4), .home-weather-week > div:nth-child(n+4) { display: none; }
-  .chart-summary small { display: none; }
-  /* Editing controls are more important than the title on very small cards.
-     Let them overlay the header instead of disappearing or forcing overflow. */
-  .home-widget > header { position: relative; }
-  .home-widget-direct-controls {
-    position: absolute;
-    z-index: 1;
-    top: 0;
-    right: 0;
-    gap: 3px;
-  }
-  .home-widget-direct-controls button { width: 27px; height: 27px; }
+  .home-widget-content .home-metric > small { display: none; }
+  .home-widget-content .home-weather { gap: 10px; }
+  .home-widget-content .home-weather-icon { font-size: 2rem; }
+  .home-widget-content .home-weather small { display: none; }
+  .home-widget-content .home-wellbeing-journal, .home-widget-content .home-wellbeing-no-journal { display: none; }
+  .home-widget-content .home-wellbeing-metrics span:nth-child(n+3) { display: none; }
+  .home-widget-content .home-three-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .home-widget-content .home-three-stats > div:nth-child(2) { display: none; }
+  .home-widget-content .home-weather-hours, .home-widget-content .home-weather-week { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .home-widget-content .home-weather-hours > div:nth-child(n+4), .home-widget-content .home-weather-week > div:nth-child(n+4) { display: none; }
+  .home-widget-content .chart-summary small { display: none; }
+  .home-widget-direct-controls { gap: 3px; }
+  .home-widget-direct-controls button { flex-basis: 24px; width: 24px; height: 30px; }
 }
 
-/* Medium cards: the full named horizon, compact. */
+/* Medium cards keep the full forecast in two compact rows. */
 @container home-widget (min-width: 301px) and (max-width: 650px) {
-  .home-widget-content { --chart-h: 150px; }
-  .home-wellbeing-journal { display: none; }
-  .home-weather-hours small, .home-weather-week small { font-size: 0.58rem; }
+  .home-widget-content .home-wellbeing-journal { display: none; }
+  .home-widget-content .home-weather-hours { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .home-widget-content .home-weather-week { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .home-widget-content .home-weather-hours > div, .home-widget-content .home-weather-week > div { gap: 2px; padding: 6px 4px; }
+  .home-widget-content .home-weather-hours small, .home-widget-content .home-weather-week small { font-size: 0.58rem; }
 }
 
-/* Wide cards: complete forecast, journal and taller charts. */
 @container home-widget (min-width: 651px) {
-  .home-widget-content { --chart-h: 170px; }
-  .home-wellbeing-journal p { max-width: 90ch; }
+  .home-widget-content .home-wellbeing-journal p { max-width: 90ch; }
 }
 
 /* --- Breakpoints ---------------------------------------------------------- */
@@ -264,13 +284,39 @@
 }
 
 @media (max-width: 760px) {
-  .home-widget-grid { --card-row: 0px; grid-template-columns: 1fr; grid-auto-rows: auto; }
+  .home-widget-grid { grid-template-columns: 1fr; }
   .home-widget--small, .home-widget--medium, .home-widget--wide { grid-column: 1; }
-  .home-widget--rows-2 { grid-row: auto; }
-  .home-widget { min-height: 120px; }
-  .home-widget-content { --chart-h: 150px; }
   /* One column: earlier/later is up/down. */
   .home-widget-order-button .glyph-row { display: none; }
   .home-widget-order-button .glyph-col { display: inline; }
   .chart-summary small { margin-left: 0; flex-basis: 100%; }
+}
+
+/* Kiosk columns follow the screen, independently of the app/sidebar host. */
+.display-dashboard-shell .display-dashboard-grid {
+  flex: 1;
+  width: 100%;
+  max-width: 1600px;
+  min-height: 0;
+  margin: 0 auto;
+}
+@media (min-width: 900px) {
+  .display-dashboard-shell .display-dashboard-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+@media (min-width: 761px) and (max-width: 899px) {
+  .display-dashboard-shell .display-dashboard-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .display-dashboard-shell .home-widget--medium { grid-column: 1 / -1; }
+}
+/* The narrow editor must not retain two unusable columns on a desktop screen. */
+@container dashboard-host (max-width: 480px) {
+  .home-widget-grid { grid-template-columns: 1fr; }
+  .home-widget--small, .home-widget--medium, .home-widget--wide { grid-column: 1; }
+  .home-widget-order-button .glyph-row { display: none; }
+  .home-widget-order-button .glyph-col { display: inline; }
+  .home-widget.widget-drop--before { box-shadow: inset 0 4px var(--accent); }
+  .home-widget.widget-drop--after { box-shadow: inset 0 -4px var(--accent); }
+}
+@media (max-width: 760px) {
+  .home-widget.widget-drop--before { box-shadow: inset 0 4px var(--accent); }
+  .home-widget.widget-drop--after { box-shadow: inset 0 -4px var(--accent); }
 }

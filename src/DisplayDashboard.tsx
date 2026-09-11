@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { unavailableWidgetDefinition } from "./widgets/unavailableWidget";
 import WidgetCard from "./dashboard/WidgetCard";
 import type { LayoutItem } from "./dashboard/layoutEditing";
 import { resolveDashboardRefreshClass } from "./data/dashboardRefresh";
@@ -24,7 +25,7 @@ const DATE_FORMATTER = new Intl.DateTimeFormat("da-DK", { weekday: "long", day: 
 
 /**
  * Paired kiosk view. No app chrome, no drill-down links, fills the screen:
- * the grid distributes the viewport height across its rows and only scrolls
+ * the grid uses stable row units and only scrolls
  * when the layout genuinely cannot fit.
  */
 export default function DisplayDashboard({ dashboard, theme, onThemeChange }: Props) {
@@ -62,11 +63,10 @@ export default function DisplayDashboard({ dashboard, theme, onThemeChange }: Pr
     {dashboard.layout.length === 0 ? <div className="home-empty"><strong>Displayet er tomt.</strong><span>Tilføj widgets fra Displays i Nexus.</span></div> :
       <main className="home-widget-grid display-dashboard-grid">
         {dashboard.layout.map((item) => {
-          const widget = widgetDefinitionById(item.type ?? item.id);
-          if (!widget) return null;
+          const widget = widgetDefinitionById(item.type ?? item.id) ?? unavailableWidgetDefinition(item.type ?? item.id);
           const Widget = widget.component;
           const refreshClass = resolveDashboardRefreshClass(widgetRefreshGroup(widget), refreshSettings);
-          return <WidgetCard key={item.id} id={item.id} title={widget.title} size={item.size} rows={widget.rows} refreshClass={refreshClass}><Widget /></WidgetCard>;
+          return <WidgetCard key={item.id} id={item.id} title={widget.resolveTitle?.(item.config) ?? widget.title} size={item.size} rows={widget.rows} refreshClass={refreshClass}><Widget config={item.config} /></WidgetCard>;
         })}
       </main>}
   </div>;

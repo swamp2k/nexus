@@ -39,7 +39,7 @@ export type WidgetDefinition = {
   surfaces?: WidgetSurface[];
   defaultSize: WidgetSize;
   supportedSizes: WidgetSize[];
-  /** Grid rows the card claims on desktop. 2 for charts and lists; 1 (default) for numbers. */
+  /** Stable grid row units the card claims on every surface. 2 for charts and lists; 1 (default) for numbers. */
   rows?: 1 | 2;
   component: ComponentType<WidgetRuntimeProps>;
 };
@@ -192,10 +192,10 @@ export const widgetRegistry: WidgetDefinition[] = [
   { id: "energy.price.todayRange", title: "Elpris · i dag", description: "Laveste, gennemsnit og højeste pris i dag", group: "Strøm", page: "Strøm", surfaces: ["home", "display"], defaultSize: "small", supportedSizes: FLEX_SIZES, component: EnergyTodayRangeWidget },
   { id: "energy.price.next24h", rows: 2, title: "Elpris · næste døgn", description: "Prisgraf for de næste 24 timer", group: "Strøm", page: "Strøm", surfaces: ["home", "display"], defaultSize: "medium", supportedSizes: FLEX_SIZES, component: EnergyPriceChartWidget },
   { id: "weather.current", title: "Vejr", description: "Vejret lige nu", group: "Vejr", page: "Vejr", surfaces: ["home", "display"], defaultSize: "medium", supportedSizes: ["small", "medium"], component: WeatherCurrentWidget },
-  { id: "weather.nextHours", title: "Vejr · næste timer", description: "Temperatur, vind og nedbør de næste timer", group: "Vejr", page: "Vejr", surfaces: ["home", "display"], defaultSize: "medium", supportedSizes: FLEX_SIZES, component: WeatherNextHoursWidget },
-  { id: "weather.week", title: "Vejr · 7 dage", description: "Kort 7-dages vejrudsigt", group: "Vejr", page: "Vejr", surfaces: ["home", "display"], defaultSize: "medium", supportedSizes: FLEX_SIZES, component: WeatherWeekWidget },
+  { id: "weather.nextHours", rows: 2, title: "Vejr · næste timer", description: "Temperatur, vind og nedbør de næste timer", group: "Vejr", page: "Vejr", surfaces: ["home", "display"], defaultSize: "medium", supportedSizes: FLEX_SIZES, component: WeatherNextHoursWidget },
+  { id: "weather.week", rows: 2, title: "Vejr · 7 dage", description: "Kort 7-dages vejrudsigt", group: "Vejr", page: "Vejr", surfaces: ["home", "display"], defaultSize: "medium", supportedSizes: FLEX_SIZES, component: WeatherWeekWidget },
   { id: "calendar.waste.next", rows: 2, title: "Affald", description: "Næste tømning af rest, plast og papir", group: "Kalender", page: "Kalender", surfaces: ["home", "display"], defaultSize: "medium", supportedSizes: FLEX_SIZES, component: CalendarWasteWidget },
-  { id: "melcloud.atw.current", title: "Varmepumpe", description: "Rum, tank, ude og driftsstatus", group: "MELCloud", page: "Varmepumpe", surfaces: ["home", "display"], defaultSize: "medium", supportedSizes: FLEX_SIZES, component: MelCloudWidget },
+  { id: "melcloud.atw.current", rows: 2, title: "Varmepumpe", description: "Rum, tank, ude og driftsstatus", group: "MELCloud", page: "Varmepumpe", surfaces: ["home", "display"], defaultSize: "medium", supportedSizes: FLEX_SIZES, component: MelCloudWidget },
   { id: "wellbeing.today", rows: 2, title: "Velbefindende", description: "Dagens check-in og journal", group: "Velbefindende", page: "Velbefindende", defaultSize: "medium", supportedSizes: FLEX_SIZES, component: WellbeingTodayWidget },
 ];
 

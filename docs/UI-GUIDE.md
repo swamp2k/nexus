@@ -8,7 +8,7 @@ This is the design reference for every screen in Nexus: the desktop app, the sam
 
 1. **The data is the interface.** Chrome exists to frame data, never to compete with it. One heading per page, one title per card, no explanatory hero panels.
 2. **Compact and calm.** Density comes from small consistent spacing, not from small fonts. Do not solve an empty-space problem by shrinking everything.
-3. **Predictable layout.** Stored order is visual order. Content decides height. Nothing is positioned by hand per widget.
+3. **Predictable layout.** Stored order is visual order. The layout owns card bounds; content adapts inside them. Nothing is positioned by hand per widget.
 4. **Three surfaces, one system.** Desktop, phone and kiosk share tokens, cards and charts. They differ only in column count, target size and what chrome is shown.
 5. **Light and dark are equals.** Every colour comes from a token so both themes are designed, not derived.
 6. **Truthful controls.** `›` navigates, `−/+` resize, arrows reorder in the direction they point, a chevron only opens something inline.
@@ -63,7 +63,7 @@ Numbers use Danish formatting: thousands separator `.`, decimal `,`, unit after 
 | Viewport ≤ 760px | Top bar with horizontal chip nav; avatar menu holds Settings and Log ud | 1 column, rows auto |
 | Viewport ≤ 460px | Tighter paddings, full-width action buttons | Tiles collapse to 2 across |
 
-For Home and the Displays editor preview, the 4/2-column decision is based on the **actual dashboard host width**, not the browser viewport. Sidebar and editor chrome therefore cannot leave a nominally four-column grid with unusably narrow cards. The kiosk (`/display`) ignores the app frame and sizes to its own screen. See section 8.
+For Home and the Displays editor preview, the 4/2-column decision is based on the **actual dashboard host width**, not the browser viewport. Sidebar and editor chrome therefore cannot leave a nominally four-column grid with unusably narrow cards. Hosts at 480px or less use one column even on desktop. The kiosk (`/display`) ignores the app frame and sizes to its own screen. See section 8.
 
 Page anatomy: an `h1` in `.app-header`, then content. There is no subheading under the page title. Explanations belong next to the control they explain, once.
 
@@ -94,12 +94,14 @@ Home, the Displays editor preview and paired displays all render `WidgetCard` (`
 | `medium` | 2 of 4 | full | full |
 | `wide` | full row | full | full |
 
-`rows` (1 or 2) is declared in the widget registry, not in CSS. Charts and lists claim 2 rows so two stacked number cards sit beside them; numbers claim 1. Rows are `minmax(150px, auto)`, so a card that needs more height takes it and its neighbours follow. Nothing is clipped, nothing overflows.
+`rows` (1 or 2) is declared in the widget registry, not inferred from content. The grid uses 150px row units and 14px gaps: cards occupy 150px or 314px in all modes, including mobile. `small`, `medium`, and persisted `wide` (large) are width choices only. Forecasts, charts and longer lists declare two rows. Card headers reserve a stable 30px slot, so entering edit mode does not resize the card. Content has zero automatic minimum size and scrolls within its allocated area when it cannot fit.
+
+This deliberately replaces content-grown rows: those coupled neighboring widget heights to chart intrinsic sizing and wrapping. Long journals or unusually large lists may scroll inside the card; they never grow the dashboard grid.
 
 Rules that keep this working:
 
-- Never `grid-auto-flow: dense`. Stored order is visual order, so the editor's arrows always do what they say. Accept an occasional gap; the editor preview shows exactly what the display will show, so gaps can be fixed by reordering.
-- Never fixed-height rows and never `grid-row: span` keyed by widget ID in a stylesheet. If a widget needs two rows, set `rows: 2` in its registry entry.
+- Never `grid-auto-flow: dense`. Stored order is visual order, so the editor's arrows always do what they say. Accept an occasional gap; preview and kiosk share order and row semantics, but their column counts follow their available widths.
+- Never derive row height from rendered widget content or key row spans by widget ID in a stylesheet. Set `rows: 2` in the registry when a widget needs more space.
 - Never size `.home-widget` or `.chart-frame` outside `dashboard.css`. Widget stylesheets style their own content only.
 
 ### Size-aware content
@@ -108,9 +110,9 @@ Cards are container-query roots. Widget content adapts to the card's real width,
 
 | Container width | Class of card | What changes |
 |---|---|---|
-| ≤ 300px | small | Detail line hidden, only the first 2 chips, 3 forecast tiles, chart 120px |
-| 301–650px | medium | Journal hidden, 6 hour tiles / 7 day tiles, chart 150px |
-| ≥ 651px | wide | Everything, chart 170px |
+| ≤ 300px | small | Detail line hidden, only the first 2 chips, 3 forecast tiles, chart fills remaining height |
+| 301–650px | medium | Journal hidden, 6 hour tiles / 7 day tiles, chart fills remaining height |
+| ≥ 651px | wide | Everything, chart fills remaining height |
 
 Hide tertiary detail before shrinking type. Do not add a new container query for one widget; use the existing three bands.
 
@@ -136,7 +138,7 @@ All SVG charts render through `ChartFrame` (`src/dashboard/ChartFrame.tsx`). The
 
 Rules:
 
-1. **CSS decides height.** Set `--chart-h` on the frame (or inherit the card's container-query value). Never derive height from a `viewBox` aspect ratio and never fix an SVG height in JSX.
+1. **CSS decides height.** Dashboard chart frames flex into remaining card space, with an 80px minimum for axes. Feature-page frames use `--chart-h`. The SVG is absolutely positioned inside the measured frame, so its intrinsic dimensions cannot feed back into flex/grid sizing. Never derive height from a `viewBox` aspect ratio.
 2. **Draw in pixels.** Paddings, bar widths and text positions are pixel values computed from the measured `width` and `height`. Axis text is `10px` via `.chart-axis` and never scales.
 3. **Label density comes from width.** Decide how many x labels to show from the slot width, for example one label per 36 to 40px, so labels never collide on a phone or crowd on a display.
 4. **Fixed reference scales where comparison matters.** Electricity price is always 0 to 6 kr/kWh; usage rounds up to the next 10 kWh. Say so in the chart summary (`Fast skala 0–6 kr/kWh`).
@@ -149,13 +151,13 @@ A chart block reads top to bottom: headline number and caption, band legend, cha
 
 ## 7. Editing dashboards
 
-Home and Displays use the same pure edit functions (`src/dashboard/layoutEditing.ts`) and the same inline controls.
+Home and Displays use the same pure edit functions (`src/dashboard/layoutEditing.ts`), pointer controller (`src/dashboard/useWidgetDrag.ts`) and inline controls. Layouts retain `{id, size, type?, config?}` in the existing user-scoped APIs; unavailable definitions are retained rather than deleted on save. No schema migration is required.
 
 - `Rediger Hjem` switches Home into edit mode: dashed outlines, the catalogue panel above the grid, `Annuller` and `Gem layout` in the toolbar. Nothing is saved until `Gem`.
 - Per card: `−` `+` step through the widget's supported sizes, arrows move it one place, `×` removes it. Disabled buttons stay visible so the boundary is obvious.
 - Arrows are `←` `→` in multi-column layouts and `↑` `↓` in the one-column phone layout. Both glyph sets are in the markup; CSS shows the truthful pair.
 - The catalogue offers the same widgets grouped by source, with a size select and up/down for keyboard and touch users. Display availability is declared by each widget through its `surfaces` capability; only widgets marked for `display` may be offered, and that capability must match what the display data alias can actually serve.
-- The Displays preview is drag-and-drop on desktop with the same buttons as fallback. The preview renders the same grid the kiosk will show.
+- Both Home and Displays have a dedicated drag handle for mouse, pen and touch. Dragging starts after 6px, highlights the source and the target edge, and leaves the grid stationary until drop. Drop on the first/second half of a card to insert before/after it (vertical on one column, horizontal otherwise). Viewport-edge dragging scrolls the page. Escape, pointer cancellation, window blur, and viewport resize cancel the gesture. Only the handle disables native touch scrolling. Arrow buttons remain the keyboard and no-drag fallback; a live region announces drag completion. Home container groups move atomically in both paths.
 
 ### Repeatable utility widgets
 
@@ -167,7 +169,7 @@ Repeatable widgets use a stable instance `id`, a reusable definition in `type`, 
 
 - No sidebar, no user menu, no page heading. One header line: `NEXUS` and the dashboard name on the left, clock and date on the right, theme toggle at the end.
 - The grid keeps 4 columns from 900px up regardless of the app breakpoint, uses 2 columns from 761–899px, and falls to 1 column at 760px and below. A landscape iPad therefore shows the same shape as a desktop without inheriting sidebar-driven app breakpoints.
-- Kiosk rows are content-driven: `minmax(140px, auto)` with `align-content: start`. The registry's `rows: 2` hint is for Home and the editor preview and is ignored on the paired display, so a chart or list does not become twice as tall merely because the screen has spare height. Charts keep their normal width-derived `120/150/170px` `ChartFrame` height. Extra viewport space stays empty below the grid instead of inflating cards.
+- Kiosk uses the same stable row units and registry row spans as Home and the editor. It does not stretch cards to fill spare viewport height. Spare space stays below the grid, and a layout taller than the viewport scrolls. Column count remains kiosk-specific.
 - Big numbers scale up (`clamp(2rem, 3.4vw, 3rem)`) because the reader is further away. Nothing else changes size.
 - Cards show no drill-down links and no kickers. Freshness belongs inside the widget (`Viser seneste kendte data`), not in the chrome.
 - The dashboard's saved theme wins over the device preference. Auto-refresh follows the refresh classes in Settings.
@@ -183,7 +185,7 @@ Repeatable widgets use a stable instance `id`, a reusable definition in `type`, 
 
 - Test every change in light and dark. If a colour only looks right in one theme, the token is wrong, not the component.
 - Icon-only buttons carry an `aria-label`. Charts carry `role="img"` and a Danish `aria-label` describing what is drawn.
-- Primary touch targets are at least 40px. Dashboard edit controls are 30px (27px in small cards) and only appear in edit mode.
+- Primary touch targets are at least 40px. Dashboard edit controls are 30px high (24px wide in small cards) and only appear in edit mode.
 - Prefer native elements: `<details>` for collapsibles and the user menu, `<select>` for size choice, `<button type="button">` everywhere a click does something.
 - Respect the viewport: wide content scrolls inside its own container, the page never scrolls horizontally.
 

@@ -29,11 +29,11 @@ export function normalizeLayout(layout: LayoutItem[], resolve: WidgetResolver): 
   const result: LayoutItem[] = [];
   for (const item of layout) {
     const widget = resolve(item.type ?? item.id);
-    if (!widget || seen.has(item.id)) continue;
+    if (seen.has(item.id)) continue;
     seen.add(item.id);
     result.push({
       ...item,
-      size: widget.supportedSizes.includes(item.size) ? item.size : widget.defaultSize,
+      size: !widget || widget.supportedSizes.includes(item.size) ? item.size : widget.defaultSize,
     });
   }
   return result;
@@ -69,26 +69,33 @@ export function stepSize(layout: LayoutItem[], id: string, direction: -1 | 1, re
 }
 
 export function moveWidget(layout: LayoutItem[], id: string, direction: -1 | 1): LayoutItem[] {
-  const index = layout.findIndex((item) => item.id === id);
-  const target = index + direction;
-  if (index < 0 || target < 0 || target >= layout.length) return layout;
-  const copy = [...layout];
-  [copy[index], copy[target]] = [copy[target], copy[index]];
-  return copy;
-}
-
-/** Drag/drop: place `sourceId` before `targetId`. */
-export function moveBefore(layout: LayoutItem[], sourceId: string, targetId: string): LayoutItem[] {
-  if (sourceId === targetId) return layout;
-  const source = layout.findIndex((item) => item.id === sourceId);
-  const target = layout.findIndex((item) => item.id === targetId);
-  if (source < 0 || target < 0) return layout;
-  const copy = [...layout];
-  const [moved] = copy.splice(source, 1);
-  copy.splice(source < target ? target - 1 : target, 0, moved);
-  return copy;
+  return stepVisualWidget(layout, id, direction);
 }
 
 export function sizeIndex(item: LayoutItem, widget: WidgetDefinition): number {
   return widget.supportedSizes.indexOf(item.size);
+}
+
+/** A displayed card can represent multiple stored items (Home containers). */
+export function visualWidgetIds(layout: LayoutItem[], visualId: (id: string) => string = (id) => id): string[] {
+  return [...new Set(layout.map((item) => visualId(item.id)))];
+}
+
+/** Move an entire visual group, preserving every instance and its config. */
+export function moveVisualWidget(layout: LayoutItem[], sourceId: string, targetId: string, after: boolean,
+  visualId: (id: string) => string = (id) => id): LayoutItem[] {
+  if (sourceId === targetId) return layout;
+  const ids = visualWidgetIds(layout, visualId);
+  if (!ids.includes(sourceId) || !ids.includes(targetId)) return layout;
+  const order = ids.filter((id) => id !== sourceId);
+  order.splice(order.indexOf(targetId) + Number(after), 0, sourceId);
+  return order.flatMap((id) => layout.filter((item) => visualId(item.id) === id));
+}
+
+export function stepVisualWidget(layout: LayoutItem[], id: string, direction: -1 | 1,
+  visualId: (id: string) => string = (id) => id): LayoutItem[] {
+  const ids = visualWidgetIds(layout, visualId);
+  const index = ids.indexOf(id);
+  const target = ids[index + direction];
+  return index < 0 || !target ? layout : moveVisualWidget(layout, id, target, direction > 0, visualId);
 }

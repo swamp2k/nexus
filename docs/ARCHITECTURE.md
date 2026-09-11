@@ -95,18 +95,18 @@ weather.current
 unraid.storage
 ```
 
-A central widget registry should eventually describe at least:
+The central widget registry/catalog describes:
 
 - stable widget ID
 - display title
 - source/module
 - render component
 - supported sizes
-- permissions/availability requirements
+- surface availability, refresh group and row units
 
 Both feature pages and Home render registered widget components. Do not duplicate a chart or data card just because it appears in two places.
 
-Home layout is user-owned configuration. It should store widget IDs plus layout information per user, rather than hard-coded React components. The first implementation may use a simple grid/list; drag/drop and resize controls should be layered on only after the registry and persistence model are stable.
+Home layout is user-owned configuration in `user_home_layout`; display layouts live in `display_dashboards`. Both store ordered `{id, size, type?, config?}` items in user-scoped D1 records. The registry defines supported widths and row units; `dashboard/dashboard.css` owns grid/card dimensions. Content adapts within those bounds rather than sizing shared grid tracks. Home and the display editor share pointer/touch reorder and arrow controls, while the paired kiosk keeps its own column breakpoints and omits editing/navigation chrome. Saved order is visual order, including Home's grouped container card. No schema migration is required by the layout overhaul. See `docs/UI-GUIDE.md` for sizing rules and `docs/WIDGET-SYSTEM-REVIEW.md` for regression coverage and tradeoffs.
 
 Widgets should consume shared query/cache/data services where practical. Multiple Garmin widgets on Home should not each independently fetch overlapping Garmin datasets if one shared request/cache can serve them.
 

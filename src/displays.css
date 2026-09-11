@@ -14,7 +14,7 @@
 .display-dashboard-list button { display: grid; gap: 3px; text-align: left; padding: 13px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface); color: var(--text); cursor: pointer; }
 .display-dashboard-list button.active { border-color: var(--accent); box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 12%, transparent); }
 .display-dashboard-list span { color: var(--muted); font-size: .76rem; }
-.display-dashboard-editor { display: grid; gap: 14px; }
+.display-dashboard-editor { display: grid; min-width: 0; gap: 14px; }
 .display-editor-actions { display: flex; justify-content: flex-end; gap: 8px; }
 .display-layout-preview { container-type: inline-size; container-name: dashboard-host; display: grid; gap: 14px; padding: 18px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); box-shadow: var(--shadow-soft); }
 
@@ -42,48 +42,8 @@
 .display-clock span { color: var(--muted); font-size: .85rem; text-transform: capitalize; }
 .display-theme-toggle { width: 36px; height: 36px; box-shadow: none; }
 
-/* The grid takes the remaining viewport and shares it between its rows, so a
-   display fills the screen without scrolling. It only scrolls when the layout
-   genuinely cannot fit. Charts grow into the extra height via .widget-fill. */
-.display-dashboard-shell .display-dashboard-grid {
-  --card-row: 140px;
-  flex: 1;
-  width: 100%;
-  max-width: 1600px;
-  min-height: 0;
-  margin: 0 auto;
-  grid-auto-rows: minmax(var(--card-row), auto);
-  align-content: start;
-}
-
-.display-dashboard-shell .home-widget { overflow: hidden; }
-
-/* Kiosk rows are content-driven. The registry's rows:2 hint is for the app
-   dashboard/editor and must not double card height on a fixed display. */
-.display-dashboard-shell .home-widget--rows-2 { grid-row: auto; }
-
-/* ChartFrame keeps its width-derived dashboard height instead of growing just
-   because another card in the same row is taller. */
-.display-dashboard-shell .widget-fill > .chart-frame { flex: 0 0 var(--chart-h, 150px); }
-
 .display-dashboard-shell .home-metric > strong,
 .display-dashboard-shell .home-weather strong { font-size: clamp(2rem, 3.4vw, 3rem); }
-
-/* Landscape tablets keep four columns even though the app breakpoint would
-   drop to two: a kiosk sizes to its screen, not to the app's content column. */
-@media (min-width: 900px) {
-  .display-dashboard-shell .display-dashboard-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-  .display-dashboard-shell .home-widget--small { grid-column: span 1; }
-  .display-dashboard-shell .home-widget--medium { grid-column: span 2; }
-  .display-dashboard-shell .home-widget--wide { grid-column: 1 / -1; }
-}
-
-@media (min-width: 761px) and (max-width: 899px) {
-  .display-dashboard-shell .display-dashboard-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .display-dashboard-shell .home-widget--small { grid-column: span 1; }
-  .display-dashboard-shell .home-widget--medium,
-  .display-dashboard-shell .home-widget--wide { grid-column: 1 / -1; }
-}
 
 @media (max-width: 900px) {
   .displays-layout { grid-template-columns: 1fr; }

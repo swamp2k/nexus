@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
+import { useWidgetDrag } from "./dashboard/useWidgetDrag";
+import { unavailableWidgetDefinition } from "./widgets/unavailableWidget";
 import WidgetCard from "./dashboard/WidgetCard";
-import { changeSize, moveBefore, moveWidget, removeWidget, SIZE_LABELS, sizeIndex, stepSize, toggleWidget } from "./dashboard/layoutEditing";
+import { changeSize, moveVisualWidget, moveWidget, removeWidget, SIZE_LABELS, sizeIndex, stepSize, toggleWidget } from "./dashboard/layoutEditing";
 import type { LayoutItem } from "./dashboard/layoutEditing";
 import { resolveDashboardRefreshClass } from "./data/dashboardRefresh";
 import { useSettings } from "./data/settings";
@@ -21,7 +23,8 @@ export default function DisplaysPage() {
   const [pairCode, setPairCode] = useState<{ code: string; expiresAt: string } | null>(null);
   const [deviceName, setDeviceName] = useState("Køkken-iPad");
   const [message, setMessage] = useState<string | null>(null);
-  const [draggedId, setDraggedId] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+
   const { data: refreshSettings } = useSettings();
 
   async function load() {
@@ -56,6 +59,9 @@ export default function DisplaysPage() {
     setDraft((current) => current ? { ...current, layout: update(current.layout) } : current);
   }
 
+  const drag = useWidgetDrag(Boolean(draft) && !saving, ({ source, target, after }) =>
+    updateLayout((layout) => moveVisualWidget(layout, source, target, after)), draft?.id);
+
   async function createDashboard() {
     const response = await fetch("/api/display/dashboards", { method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: `Display ${dashboards.length + 1}` }) });
     if (!response.ok) { setMessage("Displayet kunne ikke oprettes."); return; }
@@ -65,11 +71,21 @@ export default function DisplaysPage() {
   }
 
   async function saveDashboard() {
-    if (!draft) return;
-    const response = await fetch(`/api/display/dashboards/${encodeURIComponent(draft.id)}`, { method: "PUT", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: draft.name, theme: draft.theme, layout: draft.layout }) });
-    if (!response.ok) { setMessage("Displayet kunne ikke gemmes."); return; }
-    setMessage("Displayet er gemt.");
-    await load();
+    if (!draft || saving) return;
+    setSaving(true);
+    setMessage(null);
+    try {
+      const response = await fetch(`/api/display/dashboards/${encodeURIComponent(draft.id)}`, { method: "PUT", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ name: draft.name, theme: draft.theme, layout: draft.layout }) });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const body = await response.json() as { dashboard: Dashboard };
+      setDashboards((current) => current.map((item) => item.id === draft.id ? body.dashboard : item));
+      setDraft(body.dashboard);
+      setMessage("Displayet er gemt.");
+    } catch {
+      setMessage("Displayet kunne ikke gemmes. Dine ændringer er bevaret; prøv igen.");
+    } finally {
+      setSaving(false);
+    }
   }
 
   async function deleteDashboard() {
@@ -92,7 +108,7 @@ export default function DisplaysPage() {
     await load();
   }
 
-  return <section className="displays-page">
+  return <section className="displays-page" inert={saving} aria-busy={saving}>
     <div className="displays-toolbar"><div><p className="section-label">Nexus displays</p><h2>Dashboards til faste skærme</h2><p>Byg flere displays med de samme widgets som Hjem, og par iPads eller andre skærme til det dashboard de skal vise.</p></div><button className="primary-action" type="button" onClick={() => void createDashboard()}>Nyt display</button></div>
     {message && <p className="home-layout-note">{message}</p>}
     <div className="displays-layout">
@@ -101,23 +117,16 @@ export default function DisplaysPage() {
         <section className="settings-card"><div className="settings-form"><label><span>Navn</span><input value={draft.name} onChange={(event) => setDraft({ ...draft, name: event.target.value })} /></label><label><span>Standardtema</span><select value={draft.theme} onChange={(event) => setDraft({ ...draft, theme: event.target.value as Dashboard["theme"] })}><option value="system">Enhedens valg</option><option value="light">Lys</option><option value="dark">Mørk</option></select></label></div></section>
 
         <section className="display-layout-preview">
-          <div className="home-editor-copy"><strong>Layout</strong><span>Træk kortene rundt direkte her. Brug −/+ til størrelse og × til at fjerne. Et display fylder skærmen: fire kolonner på en liggende tablet, og rækkerne deler højden.</span></div>
-          {draft.layout.length === 0 ? <div className="home-empty"><strong>Displayet er tomt.</strong><span>Tilføj widgets nedenfor.</span></div> : <div className="home-widget-grid display-dashboard-grid display-dashboard-grid--editing">
+          <div className="home-editor-copy"><strong>Layout</strong><span>Træk i ⠿ for at flytte, eller brug pilene. Brug −/+ til størrelse og × til at fjerne. Kolonnerne tilpasses pladsen her; displayet bruger sin egen skærmbredde.</span></div>
+          {draft.layout.length === 0 ? <div className="home-empty"><strong>Displayet er tomt.</strong><span>Tilføj widgets nedenfor.</span></div> : <div className="home-widget-grid display-dashboard-grid display-dashboard-grid--editing" ref={drag.gridRef}>
             {draft.layout.map((item, index) => {
-              const widget = widgetDefinitionById(item.type ?? item.id);
-              if (!widget) return null;
+              const widget = widgetDefinitionById(item.type ?? item.id) ?? unavailableWidgetDefinition(item.type ?? item.id);
               const Widget = widget.component;
               const currentSize = sizeIndex(item, widget);
               const refreshClass = resolveDashboardRefreshClass(widgetRefreshGroup(widget), refreshSettings);
-              return <WidgetCard key={item.id} id={item.id} title={widget.title} kicker={widget.group} size={item.size} rows={widget.rows} refreshClass={refreshClass}
-                className={`display-edit-widget${draggedId === item.id ? " is-dragging" : ""}`}
-                dragProps={{
-                  draggable: true,
-                  onDragStart: () => setDraggedId(item.id),
-                  onDragEnd: () => setDraggedId(null),
-                  onDragOver: (event) => event.preventDefault(),
-                  onDrop: () => { if (draggedId) updateLayout((layout) => moveBefore(layout, draggedId, item.id)); setDraggedId(null); },
-                }}
+              return <WidgetCard key={item.id} id={item.id} title={widget.resolveTitle?.(item.config) ?? widget.title} kicker={widget.group} size={item.size} rows={widget.rows} refreshClass={refreshClass}
+                className={drag.cardClass(item.id)}
+                dragHandleProps={drag.handleProps(item.id)}
                 edit={{
                   canShrink: currentSize > 0,
                   canGrow: currentSize >= 0 && currentSize < widget.supportedSizes.length - 1,
@@ -129,7 +138,7 @@ export default function DisplaysPage() {
                   onMoveLater: () => updateLayout((layout) => moveWidget(layout, item.id, 1)),
                   onRemove: () => updateLayout((layout) => removeWidget(layout, item.id)),
                 }}>
-                <Widget />
+                <Widget config={item.config} />
               </WidgetCard>;
             })}
           </div>}
@@ -141,5 +150,6 @@ export default function DisplaysPage() {
         <section className="settings-card"><div className="settings-card-heading"><div><p className="section-label">Enheder</p><h2>Parrede skærme</h2></div></div><div className="display-device-list">{devices.filter((device) => device.dashboardId === draft.id).map((device) => <div className="display-device-row" key={device.id}><div><strong>{device.name}</strong><small>Sidst set {new Date(device.lastSeenAt).toLocaleString("da-DK")}</small></div><button className="secondary-action" type="button" onClick={() => void revokeDevice(device.id)}>Fjern adgang</button></div>)}{devices.every((device) => device.dashboardId !== draft.id) && <p className="settings-help">Ingen skærme er parret endnu.</p>}</div></section>
       </div> : <div className="home-empty"><strong>Ingen displays endnu.</strong><span>Opret det første display-dashboard.</span></div>}
     </div>
+    <p className="widget-sr-only" role="status">{drag.announcement}</p>
   </section>;
 }

@@ -92,16 +92,11 @@
 .home-editor-controls button { width: 32px; cursor: pointer; }
 .home-editor-controls button:disabled { opacity: .35; cursor: default; }
 
-@media (max-width: 1060px) {
-  .home-weather-week { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-}
 
 @media (max-width: 760px) {
   .home-editor-groups { grid-template-columns: 1fr; }
   .home-edit-actions { width: 100%; }
   .home-edit-hint { width: 100%; margin: 0 0 4px; }
-  .home-weather-hours { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-  .home-weather-week { grid-template-columns: repeat(4, minmax(0, 1fr)); }
 }
 
 @media (max-width: 460px) {
@@ -110,9 +105,6 @@
   .home-edit-actions button { flex: 1; }
   .home-editor-row { align-items: flex-start; flex-direction: column; }
   .home-editor-controls { padding-left: 26px; }
-  .home-three-stats { grid-template-columns: 1fr; }
-  .home-three-stats > small { grid-column: 1; }
-  .home-weather-week { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 
 

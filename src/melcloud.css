@@ -203,9 +203,6 @@
   }
 }
 @media (max-width: 430px) {
-  .home-heatpump-values {
-    grid-template-columns: 1fr;
-  }
   .melcloud-big-pair {
     grid-template-columns: 1fr;
   }

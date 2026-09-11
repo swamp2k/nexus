@@ -183,7 +183,7 @@ Preserve existing successful visual patterns unless there is a concrete reason t
 Dashboard-specific rules that must not regress:
 
 - stored widget order is visual order (no `grid-auto-flow: dense`)
-- rows grow with content; a widget that needs two rows declares `rows: 2` in the registry, never in a stylesheet
+- the grid owns stable row heights; overflowing content scrolls inside the card, never grows neighboring cards; a widget that needs two rows declares `rows: 2` in the registry
 - every SVG chart renders through `src/dashboard/ChartFrame.tsx` in pixel coordinates with CSS-owned height
 - only `src/dashboard/dashboard.css` sizes `.home-widget` and `.chart-frame`
 
