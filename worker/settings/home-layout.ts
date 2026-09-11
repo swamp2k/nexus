@@ -1,8 +1,9 @@
 import { getAuthenticatedUser } from "../auth/session";
 
 type HomeWidgetSize = "small" | "medium" | "wide";
+type HomeWidgetRows = 1 | 2 | 3;
 type HomeWidgetConfig = Record<string, unknown>;
-type HomeWidgetLayoutItem = { id: string; size: HomeWidgetSize; type?: string; config?: HomeWidgetConfig };
+type HomeWidgetLayoutItem = { id: string; size: HomeWidgetSize; rows?: HomeWidgetRows; type?: string; config?: HomeWidgetConfig };
 type HomeLayoutBody = { layout?: unknown };
 
 const DEFAULT_LAYOUT: HomeWidgetLayoutItem[] = [
@@ -38,12 +39,14 @@ function normalizeLayout(value: unknown): HomeWidgetLayoutItem[] | null {
 
   for (const item of value) {
     if (!item || typeof item !== "object") return null;
-    const candidate = item as { id?: unknown; size?: unknown; type?: unknown; config?: unknown };
+    const candidate = item as { id?: unknown; size?: unknown; rows?: unknown; type?: unknown; config?: unknown };
     if (typeof candidate.id !== "string") return null;
     const id = candidate.id.trim();
     if (!id || id.length > 240 || seen.has(id)) return null;
     const size = candidate.size;
     if (size !== "small" && size !== "medium" && size !== "wide") return null;
+    const rows = candidate.rows === undefined ? undefined : candidate.rows === 1 || candidate.rows === 2 || candidate.rows === 3 ? candidate.rows : null;
+    if (rows === null) return null;
     const type = candidate.type === undefined ? undefined : typeof candidate.type === "string" ? candidate.type.trim() : null;
     if (type === null || (type !== undefined && (!type || type.length > 100))) return null;
     const config = cleanConfig(candidate.config);
@@ -52,6 +55,7 @@ function normalizeLayout(value: unknown): HomeWidgetLayoutItem[] | null {
     result.push({
       id,
       size,
+      ...(rows ? { rows } : {}),
       ...(type ? { type } : {}),
       ...(config ? { config } : {}),
     });
