@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { unavailableWidgetDefinition } from "./widgets/unavailableWidget";
 import WidgetCard from "./dashboard/WidgetCard";
+import { effectiveRows } from "./dashboard/layoutEditing";
 import type { LayoutItem } from "./dashboard/layoutEditing";
 import { resolveDashboardRefreshClass } from "./data/dashboardRefresh";
 import { useSettings } from "./data/settings";
@@ -66,7 +67,7 @@ export default function DisplayDashboard({ dashboard, theme, onThemeChange }: Pr
           const widget = widgetDefinitionById(item.type ?? item.id) ?? unavailableWidgetDefinition(item.type ?? item.id);
           const Widget = widget.component;
           const refreshClass = resolveDashboardRefreshClass(widgetRefreshGroup(widget), refreshSettings);
-          return <WidgetCard key={item.id} id={item.id} title={widget.resolveTitle?.(item.config) ?? widget.title} size={item.size} rows={widget.rows} refreshClass={refreshClass}><Widget config={item.config} /></WidgetCard>;
+          return <WidgetCard key={item.id} id={item.id} title={widget.resolveTitle?.(item.config) ?? widget.title} size={item.size} rows={effectiveRows(item, widget)} refreshClass={refreshClass}><Widget config={item.config} /></WidgetCard>;
         })}
       </main>}
   </div>;
