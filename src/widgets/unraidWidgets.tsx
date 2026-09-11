@@ -133,14 +133,18 @@ function UpsWidget() {
   return <Metric value={`${data.ups.batteryPct}%`} label={data.ups.model} detail={`${Math.round(data.ups.runtimeMin)} min · load ${data.ups.loadPct}%`} />;
 }
 
-function entityWidget(kind: "container" | "vm", id: string) {
+function findEntity<T extends { id: string; name: string }>(items: T[], id: string, name: string): T | undefined {
+  return items.find((candidate) => candidate.id === id) ?? items.find((candidate) => candidate.name === name);
+}
+
+function entityWidget(kind: "container" | "vm", id: string, name: string) {
   return function EntityWidget() {
     const { data, loading, error } = useOverview();
     if (loading) return <State>Henter status…</State>;
     if (error || !data) return <State>Status kunne ikke hentes</State>;
     const unavailable = kind === "container" ? data.unavailable.includes("containers") : data.unavailable.includes("vms");
     if (unavailable) return <State>Status utilgængelig</State>;
-    const item = kind === "container" ? data.containers.find((candidate) => candidate.id === id) : data.vms.find((candidate) => candidate.id === id);
+    const item = kind === "container" ? findEntity(data.containers, id, name) : findEntity(data.vms, id, name);
     if (!item) return <State>{kind === "container" ? "Container" : "VM"} ikke fundet</State>;
     return <div className={`unraid-entity-status ${statusOk(item.status) ? "ok" : "warn"}`}><span className="unraid-entity-dot" aria-hidden="true" /><strong>{statusOk(item.status) ? "Kører" : item.status}</strong><small>{kind === "container" ? "Docker" : "VM"}</small></div>;
   };
@@ -179,10 +183,10 @@ export function SelectedContainersWidget({ widgetIds }: { widgetIds: string[] })
 
   return <div className="widget-fill unraid-container-group">
     {selected.map((selectedContainer) => {
-      const container = data.containers.find((candidate) => candidate.id === selectedContainer.id);
+      const container = findEntity(data.containers, selectedContainer.id, selectedContainer.name);
       const ok = container ? statusOk(container.status) : false;
       const status = container ? (ok ? "Kører" : container.status) : "Ikke fundet";
-      return <div className={`unraid-container-group-item ${ok ? "ok" : "warn"}`} key={selectedContainer.id} title={`${selectedContainer.name}: ${status}`}>
+      return <div className={`unraid-container-group-item ${ok ? "ok" : "warn"}`} key={selectedContainer.name} title={`${selectedContainer.name}: ${status}`}>
         <span className="unraid-entity-dot" aria-hidden="true" />
         <strong>{selectedContainer.name}</strong>
         <small>{status}</small>
@@ -215,7 +219,7 @@ function dynamicDefinition(kind: "container" | "vm", id: string, name: string): 
     page: "Unraid",
     defaultSize: kind === "container" ? "medium" : "small",
     supportedSizes: kind === "container" ? ["medium", "wide"] : ["small", "medium"],
-    component: entityWidget(kind, id),
+    component: entityWidget(kind, id, name),
   };
 }
 
