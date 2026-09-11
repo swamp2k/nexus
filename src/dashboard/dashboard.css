@@ -25,6 +25,7 @@
 .home-widget--medium { grid-column: span 2; }
 .home-widget--wide { grid-column: 1 / -1; }
 .home-widget--rows-2 { grid-row: span 2; }
+.home-widget--rows-3 { grid-row: span 3; }
 
 /* --- Card ----------------------------------------------------------------- */
 
@@ -146,9 +147,9 @@
 .home-widget .widget-fill > :not(.chart-frame) { flex-shrink: 0; }
 
 /* One-row cards prioritize primary values; detail must not be half-clipped. */
-.home-widget:not(.home-widget--rows-2) .home-metric > small,
-.home-widget:not(.home-widget--rows-2) .home-weather small,
-.home-widget:not(.home-widget--rows-2) .home-three-stats > small { display: none; }
+.home-widget--rows-1 .home-metric > small,
+.home-widget--rows-1 .home-weather small,
+.home-widget--rows-1 .home-three-stats > small { display: none; }
 
 .chart-axis { fill: var(--muted); font-size: 10px; font-weight: 600; }
 .chart-axis--strong { fill: var(--muted-strong); font-weight: 800; }
@@ -224,6 +225,7 @@
 
 .home-widget-direct-controls button:disabled { opacity: 0.3; cursor: default; }
 .home-widget-direct-controls .home-widget-remove { color: var(--danger); }
+.home-widget-height-button { font-size: 0.72rem !important; }
 /* Order buttons carry both glyph sets; the layout decides which is truthful. */
 .home-widget-order-button .glyph-col { display: none; }
 
