@@ -10,7 +10,9 @@
 /* --- Grid ----------------------------------------------------------------- */
 
 .home-widget-grid {
-  --card-row: 150px;
+  /* 68px internal tracks + 14px gaps produce three user-facing height levels:
+     1 = 150px (2 tracks), 2 = 232px (3 tracks), 3 = 314px (4 tracks). */
+  --card-row: 68px;
   --card-gap: 14px;
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
@@ -24,8 +26,9 @@
 .home-widget--small { grid-column: span 1; }
 .home-widget--medium { grid-column: span 2; }
 .home-widget--wide { grid-column: 1 / -1; }
-.home-widget--rows-2 { grid-row: span 2; }
-.home-widget--rows-3 { grid-row: span 3; }
+.home-widget--rows-1 { grid-row: span 2; }
+.home-widget--rows-2 { grid-row: span 3; }
+.home-widget--rows-3 { grid-row: span 4; }
 
 /* --- Card ----------------------------------------------------------------- */
 
@@ -146,7 +149,7 @@
 .home-widget .widget-fill > .chart-frame { flex: 1 1 0; height: auto; min-height: 80px; }
 .home-widget .widget-fill > :not(.chart-frame) { flex-shrink: 0; }
 
-/* One-row cards prioritize primary values; detail must not be half-clipped. */
+/* Height level 1 prioritizes primary values; detail must not be half-clipped. */
 .home-widget--rows-1 .home-metric > small,
 .home-widget--rows-1 .home-weather small,
 .home-widget--rows-1 .home-three-stats > small { display: none; }
