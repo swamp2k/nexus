@@ -2,8 +2,8 @@ import { useEffect, useMemo, useState } from "react";
 import { useWidgetDrag } from "./dashboard/useWidgetDrag";
 import { unavailableWidgetDefinition } from "./widgets/unavailableWidget";
 import WidgetCard from "./dashboard/WidgetCard";
-import { changeSize, moveVisualWidget, stepVisualWidget, visualWidgetIds, normalizeLayout, removeWidget, SIZE_LABELS, sizeIndex, stepSize, toggleWidget } from "./dashboard/layoutEditing";
-import type { LayoutItem } from "./dashboard/layoutEditing";
+import { changeRows, changeSize, cycleRows, effectiveRows, moveVisualWidget, stepVisualWidget, visualWidgetIds, normalizeLayout, removeWidget, ROW_OPTIONS, SIZE_LABELS, sizeIndex, stepSize, toggleWidget } from "./dashboard/layoutEditing";
+import type { LayoutItem, WidgetRows } from "./dashboard/layoutEditing";
 import { resolveDashboardRefreshClass } from "./data/dashboardRefresh";
 import { useSettings } from "./data/settings";
 import { discoverUnraidWidgets, widgetCatalog, widgetDefinitionById } from "./widgets/widgetCatalog";
@@ -36,6 +36,11 @@ function isCompactEntityWidget(id: string): boolean {
 
 function containerGroupSize(items: LayoutItem[]): WidgetSize {
   return items.some((item) => item.size === "wide") ? "wide" : "medium";
+}
+
+function containerGroupRows(items: LayoutItem[]): WidgetRows {
+  const explicit = items.flatMap((item) => item.rows ? [item.rows] : []);
+  return explicit.length > 0 ? Math.max(...explicit) as WidgetRows : items.length > 6 ? 2 : 1;
 }
 
 export default function HomePage({ onOpenPage }: { onOpenPage: (page: WidgetTargetPage) => void }) {
@@ -123,6 +128,16 @@ export default function HomePage({ onOpenPage }: { onOpenPage: (page: WidgetTarg
     });
   }
 
+  function cycleContainerGroupRows() {
+    setDraft((current) => {
+      const selected = current.filter((item) => isUnraidContainerWidgetId(item.id));
+      if (selected.length === 0) return current;
+      const currentRows = containerGroupRows(selected);
+      const nextRows = currentRows === 3 ? 1 : currentRows + 1 as WidgetRows;
+      return current.map((item) => isUnraidContainerWidgetId(item.id) ? { ...item, rows: nextRows } : item);
+    });
+  }
+
   function addLinkCollection() {
     setDraft((current) => [...current, {
       id: `${LINK_COLLECTION_TYPE}.${crypto.randomUUID()}`,
@@ -165,6 +180,7 @@ export default function HomePage({ onOpenPage }: { onOpenPage: (page: WidgetTarg
   const firstContainerIndex = renderedLayout.findIndex((item) => isUnraidContainerWidgetId(item.id));
   const selectedContainerIds = selectedContainers.map((item) => item.id);
   const selectedContainerSize = containerGroupSize(selectedContainers);
+  const selectedContainerRows = containerGroupRows(selectedContainers);
   const visualIds = visualWidgetIds(renderedLayout, homeVisualId);
   const containerVisualIndex = visualIds.indexOf(CONTAINER_GROUP_ID);
   const visualItemCount = visualIds.length;
@@ -176,7 +192,7 @@ export default function HomePage({ onOpenPage }: { onOpenPage: (page: WidgetTarg
       <div className="home-toolbar">
         {!editing
           ? <button className="secondary-action" type="button" disabled={state === "loading"} onClick={beginEdit}>Rediger Hjem</button>
-          : <div className="home-edit-actions"><span className="home-edit-hint">Træk i ⠿ for at flytte, eller brug pilene. −/+ ændrer størrelse.</span><button className="secondary-action" type="button" onClick={() => { setDraft(layout); setEditing(false); setMessage(null); }}>Annuller</button><button className="primary-action" type="button" disabled={saving} onClick={() => void save()}>{saving ? "Gemmer…" : "Gem layout"}</button></div>}
+          : <div className="home-edit-actions"><span className="home-edit-hint">Træk i ⠿ for at flytte. −/+ ændrer bredde, ↕ ændrer højde.</span><button className="secondary-action" type="button" onClick={() => { setDraft(layout); setEditing(false); setMessage(null); }}>Annuller</button><button className="primary-action" type="button" disabled={saving} onClick={() => void save()}>{saving ? "Gemmer…" : "Gem layout"}</button></div>}
       </div>
 
       {state === "loading" && <p className="home-layout-note">Henter dit layout…</p>}
@@ -184,7 +200,7 @@ export default function HomePage({ onOpenPage }: { onOpenPage: (page: WidgetTarg
       {message && <p className="home-layout-note home-layout-note--error">{message}</p>}
 
       {editing && <aside className="home-editor" aria-label="Rediger Hjem">
-        <div className="home-editor-copy"><strong>Vælg moduler</strong><span>Tilføj og fjern widgets her. Rækkefølge og størrelse kan også ændres direkte på dashboardet nedenunder.</span></div>
+        <div className="home-editor-copy"><strong>Vælg moduler</strong><span>Tilføj og fjern widgets her. Bredde, højde og rækkefølge kan også ændres direkte på dashboardet nedenunder.</span></div>
         {unraidCatalogLoading && <p className="home-layout-note">Henter containere og VM'er fra UnraidWatch…</p>}
         <div className="home-editor-groups">
           <fieldset className="link-collection-editor-group">
@@ -208,7 +224,8 @@ export default function HomePage({ onOpenPage }: { onOpenPage: (page: WidgetTarg
             return <div className="home-editor-row" key={widget.id}>
               <label><input type="checkbox" checked={selected} onChange={() => setDraft((current) => toggleWidget(current, widget.id, resolve))} /><span><strong>{widget.title}</strong><small>{widget.description}</small></span></label>
               {selected && item && !groupedContainer && <div className="home-editor-controls">
-                {widget.supportedSizes.length > 1 && <select aria-label={`Størrelse for ${widget.title}`} value={item.size} onChange={(event) => setDraft((current) => changeSize(current, widget.id, event.target.value as WidgetSize, resolve))}>{widget.supportedSizes.map((size) => <option value={size} key={size}>{SIZE_LABELS[size]}</option>)}</select>}
+                {widget.supportedSizes.length > 1 && <select aria-label={`Bredde for ${widget.title}`} value={item.size} onChange={(event) => setDraft((current) => changeSize(current, widget.id, event.target.value as WidgetSize, resolve))}>{widget.supportedSizes.map((size) => <option value={size} key={size}>{SIZE_LABELS[size]}</option>)}</select>}
+                <select aria-label={`Højde for ${widget.title}`} value={effectiveRows(item, widget)} onChange={(event) => setDraft((current) => changeRows(current, widget.id, Number(event.target.value) as WidgetRows))}>{ROW_OPTIONS.map((rows) => <option value={rows} key={rows}>{rows} række{rows === 1 ? "" : "r"}</option>)}</select>
                 <button type="button" aria-label={`Flyt ${widget.title} op`} disabled={index <= 0} onClick={() => setDraft((current) => moveHomeWidget(current, widget.id, -1))}>↑</button>
                 <button type="button" aria-label={`Flyt ${widget.title} ned`} disabled={index < 0 || index >= visualIds.length - 1} onClick={() => setDraft((current) => moveHomeWidget(current, widget.id, 1))}>↓</button>
               </div>}
@@ -223,11 +240,13 @@ export default function HomePage({ onOpenPage }: { onOpenPage: (page: WidgetTarg
           if (isUnraidContainerWidgetId(item.id)) {
             if (index !== firstContainerIndex) return null;
             const refreshClass = resolveDashboardRefreshClass("Unraid", refreshSettings);
-            return <WidgetCard key={CONTAINER_GROUP_ID} id={CONTAINER_GROUP_ID} className={drag.cardClass(CONTAINER_GROUP_ID)} dragHandleProps={editing ? drag.handleProps(CONTAINER_GROUP_ID) : undefined} title={`Containere · ${selectedContainers.length}`} kicker="Unraid" size={selectedContainerSize} rows={selectedContainers.length > 6 ? 2 : 1} refreshClass={refreshClass}
+            return <WidgetCard key={CONTAINER_GROUP_ID} id={CONTAINER_GROUP_ID} className={drag.cardClass(CONTAINER_GROUP_ID)} dragHandleProps={editing ? drag.handleProps(CONTAINER_GROUP_ID) : undefined} title={`Containere · ${selectedContainers.length}`} kicker="Unraid" size={selectedContainerSize} rows={selectedContainerRows} refreshClass={refreshClass}
               link={{ label: "Unraid", onClick: () => onOpenPage("Unraid") }}
               edit={editing ? {
                 canShrink: selectedContainerSize === "wide",
                 canGrow: selectedContainerSize === "medium",
+                rows: selectedContainerRows,
+                onCycleRows: cycleContainerGroupRows,
                 canMoveEarlier: containerVisualIndex > 0,
                 canMoveLater: containerVisualIndex >= 0 && containerVisualIndex < visualItemCount - 1,
                 onShrink: () => stepContainerGroupSize(-1),
@@ -244,12 +263,15 @@ export default function HomePage({ onOpenPage }: { onOpenPage: (page: WidgetTarg
           const Widget = widget.component;
           const refreshClass = resolveDashboardRefreshClass(widgetRefreshGroup(widget), refreshSettings);
           const currentSize = sizeIndex(item, widget);
+          const rows = effectiveRows(item, widget);
           const title = widget.resolveTitle?.(item.config) ?? widget.title;
-          return <WidgetCard key={item.id} id={item.id} className={drag.cardClass(item.id)} dragHandleProps={editing ? drag.handleProps(item.id) : undefined} title={title} kicker={widget.group} size={item.size} rows={widget.rows} compact={isCompactEntityWidget(item.id)} refreshClass={refreshClass}
+          return <WidgetCard key={item.id} id={item.id} className={drag.cardClass(item.id)} dragHandleProps={editing ? drag.handleProps(item.id) : undefined} title={title} kicker={widget.group} size={item.size} rows={rows} compact={isCompactEntityWidget(item.id)} refreshClass={refreshClass}
             link={widget.page ? { label: widget.page, onClick: () => onOpenPage(widget.page!) } : undefined}
             edit={editing ? {
               canShrink: currentSize > 0,
               canGrow: currentSize >= 0 && currentSize < widget.supportedSizes.length - 1,
+              rows,
+              onCycleRows: () => setDraft((current) => cycleRows(current, item.id, widget.rows ?? 1)),
               canMoveEarlier: visualIds.indexOf(item.id) > 0,
               canMoveLater: visualIds.indexOf(item.id) < visualIds.length - 1,
               onShrink: () => setDraft((current) => stepSize(current, item.id, -1, resolve)),
