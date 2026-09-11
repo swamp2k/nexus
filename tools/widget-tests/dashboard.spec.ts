@@ -16,7 +16,8 @@ async function bounds(page: Page) {
     const id = node.getAttribute('data-widget-id');
     const grid = node.parentElement!.getBoundingClientRect();
     if (box.left < grid.left - 1 || box.right > grid.right + 1) errors.push(`${id}: outside grid`);
-    const expected = node.classList.contains('home-widget--rows-2') ? 314 : 150;
+    const rows = Number(node.getAttribute('data-widget-rows') ?? '1');
+    const expected = rows === 3 ? 314 : rows === 2 ? 232 : 150;
     if (Math.abs(box.height - expected) > 1) errors.push(`${id}: height ${box.height}, expected ${expected}`);
     const content = node.querySelector('.home-widget-content')!;
     if (content.querySelector('.home-metric, .home-weather, .home-three-stats, .home-weather-hours') && content.scrollHeight > content.clientHeight + 1) errors.push(`${id}: primary content needs scrolling (${content.scrollHeight}/${content.clientHeight})`);
