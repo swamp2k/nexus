@@ -14,6 +14,7 @@ import { handleEloverblikSettingsRoute } from "./sources/eloverblik-settings-rou
 import { handleSourceRoute } from "./sources/routes";
 import { handleUnraidRoute } from "./unraid/routes";
 import { handleJournalAiRoute } from "./wellbeing/journal-ai";
+import { handleMiyagiConversationRoute } from "./wellbeing/miyagi-conversation";
 import { handleMiyagiHistoryRoute } from "./wellbeing/miyagi-history";
 import { handleMiyagiRoute } from "./wellbeing/miyagi";
 import { handleWellbeingExportRoute } from "./wellbeing/export";
@@ -47,7 +48,10 @@ export default {
       if (url.pathname.startsWith("/api/melcloud/")) { const response = await handleMelCloudRoute(request, env); if (response) return response; }
       if (url.pathname.startsWith("/api/unraid/")) { const response = await handleUnraidRoute(request, env); if (response) return response; }
       if (url.pathname.startsWith("/api/wellbeing/miyagi/history")) { const response = await handleMiyagiHistoryRoute(request, env); if (response) return response; }
-      if (url.pathname.startsWith("/api/wellbeing/miyagi/")) { const response = await handleMiyagiRoute(request, env); if (response) return response; }
+      if (url.pathname.startsWith("/api/wellbeing/miyagi/")) {
+        const conversationResponse = await handleMiyagiConversationRoute(request, env); if (conversationResponse) return conversationResponse;
+        const response = await handleMiyagiRoute(request, env); if (response) return response;
+      }
       if (url.pathname.startsWith("/api/wellbeing/journal-ai/")) { const response = await handleJournalAiRoute(request, env); if (response) return response; }
       if (url.pathname === "/api/wellbeing/history") { const response = await handleWellbeingHistoryRoute(request, env); if (response) return response; }
       if (url.pathname === "/api/wellbeing/export") { const response = await handleWellbeingExportRoute(request, env); if (response) return response; }
