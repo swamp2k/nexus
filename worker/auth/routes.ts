@@ -188,7 +188,7 @@ async function consumeLoginToken(
        WHERE t.token_hash = ?
          AND t.consumed_at IS NULL
          AND t.expires_at > ?
-         AND u.status = 'active'`,
+         AND u.status IN ('active', 'invited')`,
     ).bind(
       session.tokenHash,
       now,
@@ -197,6 +197,12 @@ async function consumeLoginToken(
       tokenHash,
       now,
     ),
+    env.DB.prepare(
+      `UPDATE users
+       SET status = 'active', updated_at = ?
+       WHERE email = (SELECT email FROM auth_login_tokens WHERE token_hash = ?)
+         AND status = 'invited'`,
+    ).bind(now, tokenHash),
     env.DB.prepare(
       `UPDATE auth_login_tokens
        SET consumed_at = ?
