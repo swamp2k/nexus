@@ -121,6 +121,25 @@
 .settings-save-bar .primary-action { min-height: 38px; padding-block: 8px; }
 .settings-loading { margin: 0; color: var(--muted); }
 
+.users-settings { max-width: none; }
+.user-invite-form { display: grid; gap: 14px; padding: 16px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface-soft); }
+.user-invite-form .settings-coordinate-grid { margin-top: 0; }
+.users-list { display: grid; gap: 12px; }
+.user-row { display: grid; gap: 14px; padding: 16px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface-soft); }
+.user-row .settings-coordinate-grid { margin-top: 0; }
+.user-row-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.user-row-header > div { display: flex; align-items: center; gap: 9px; min-width: 0; }
+.user-row-header strong { overflow: hidden; text-overflow: ellipsis; }
+.user-row-header small { color: var(--muted); font-weight: 800; }
+.user-status { display: inline-flex; align-items: center; min-height: 24px; padding: 3px 8px; border-radius: 999px; font-size: 0.7rem; font-weight: 800; white-space: nowrap; }
+.user-status.active { background: color-mix(in srgb, var(--success) 12%, var(--surface)); color: var(--success); }
+.user-status.invited { background: var(--accent-soft); color: var(--accent); }
+.user-status.disabled { background: color-mix(in srgb, #d64545 10%, var(--surface)); color: #d64545; }
+.user-row-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.secondary-action, .danger-action { min-height: 38px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--text); font: inherit; font-weight: 800; cursor: pointer; }
+.danger-action { color: #d64545; }
+.secondary-action:disabled, .danger-action:disabled { opacity: 0.5; cursor: not-allowed; }
+
 @media (max-width: 650px) {
   .settings-card { padding: 16px; }
   .settings-collapsible:not([open]) { padding: 11px 13px; }
@@ -129,4 +148,7 @@
   .settings-coordinate-grid, .settings-choice-grid, .energy-band-preview { grid-template-columns: 1fr; }
   .settings-location-actions, .settings-save-bar { align-items: stretch; flex-direction: column; }
   .settings-save-bar > div { margin-right: 0; }
+  .user-row-header { align-items: flex-start; }
+  .user-row-header > div { align-items: flex-start; flex-direction: column; gap: 6px; }
+  .user-row-actions > button { flex: 1 1 auto; }
 }
