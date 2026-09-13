@@ -19,6 +19,10 @@ type UserEnv = Env & {
   MAIL_FROM?: string;
 };
 
+type AdminAuthResult =
+  | { user: NonNullable<Awaited<ReturnType<typeof getAuthenticatedUser>>>; response?: never }
+  | { response: Response; user?: never };
+
 function json(body: unknown, init: ResponseInit = {}): Response {
   const headers = new Headers(init.headers);
   headers.set("Cache-Control", "no-store");
@@ -47,7 +51,7 @@ function isStatus(value: unknown): value is UserStatus {
   return value === "active" || value === "invited" || value === "disabled";
 }
 
-async function requireAdmin(request: Request, env: Env) {
+async function requireAdmin(request: Request, env: Env): Promise<AdminAuthResult> {
   const user = await getAuthenticatedUser(request, env.DB);
   if (!user) return { response: json({ error: "unauthorized" }, { status: 401 }) };
   if (user.role !== "admin") return { response: json({ error: "forbidden" }, { status: 403 }) };
@@ -101,7 +105,7 @@ async function sendInvite(request: Request, env: UserEnv, user: UserRow): Promis
 
 async function listUsers(request: Request, env: Env): Promise<Response> {
   const auth = await requireAdmin(request, env);
-  if ("response" in auth) return auth.response;
+  if (auth.response) return auth.response;
 
   const result = await env.DB.prepare(
     `SELECT id, email, display_name, role, status, created_at, updated_at
@@ -124,7 +128,7 @@ async function listUsers(request: Request, env: Env): Promise<Response> {
 
 async function createUser(request: Request, env: UserEnv): Promise<Response> {
   const auth = await requireAdmin(request, env);
-  if ("response" in auth) return auth.response;
+  if (auth.response) return auth.response;
 
   let body: Record<string, unknown>;
   try { body = await request.json() as Record<string, unknown>; }
@@ -165,7 +169,7 @@ async function createUser(request: Request, env: UserEnv): Promise<Response> {
 
 async function updateUser(request: Request, env: Env, id: string): Promise<Response> {
   const auth = await requireAdmin(request, env);
-  if ("response" in auth) return auth.response;
+  if (auth.response) return auth.response;
 
   const current = await env.DB.prepare(
     `SELECT id, email, display_name, role, status, created_at, updated_at FROM users WHERE id = ?`,
@@ -210,7 +214,7 @@ async function updateUser(request: Request, env: Env, id: string): Promise<Respo
 
 async function deleteUser(request: Request, env: Env, id: string): Promise<Response> {
   const auth = await requireAdmin(request, env);
-  if ("response" in auth) return auth.response;
+  if (auth.response) return auth.response;
   if (id === auth.user.id) return json({ error: "cannot_delete_self" }, { status: 409 });
 
   const current = await env.DB.prepare(`SELECT role, status FROM users WHERE id = ?`).bind(id).first<{ role: UserRole; status: UserStatus }>();
@@ -223,7 +227,7 @@ async function deleteUser(request: Request, env: Env, id: string): Promise<Respo
 
 async function resendInvite(request: Request, env: UserEnv, id: string): Promise<Response> {
   const auth = await requireAdmin(request, env);
-  if ("response" in auth) return auth.response;
+  if (auth.response) return auth.response;
 
   const user = await env.DB.prepare(
     `SELECT id, email, display_name, role, status, created_at, updated_at FROM users WHERE id = ?`,
