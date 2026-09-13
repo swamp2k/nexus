@@ -35,7 +35,7 @@ export async function handleWellbeingHistoryRoute(request: Request, env: Env): P
   const oldest = selectedDates[selectedDates.length - 1];
   const newest = selectedDates[0];
 
-  const [entries, journals] = await Promise.all([
+  const [entries, journals, conversation] = await Promise.all([
     env.DB.prepare(
       `SELECT e.entry_date AS entryDate, e.value, e.metric_id AS metricId,
               m.name, m.emoji, m.direction, m.value_type AS valueType, m.sort_order AS sortOrder
@@ -49,12 +49,23 @@ export async function handleWellbeingHistoryRoute(request: Request, env: Env): P
        FROM journal_entries
        WHERE user_id = ? AND entry_date BETWEEN ? AND ?
        ORDER BY entry_date DESC, created_at`,
-    ).bind(user.id, oldest, newest).all<Row>()
+    ).bind(user.id, oldest, newest).all<Row>(),
+    env.DB.prepare(
+      `SELECT m.id, m.role, m.body, m.kind,
+              m.analysis_id AS analysisId, m.journal_entry_id AS journalEntryId,
+              m.source_ref AS sourceRef, j.entry_date AS subjectDate,
+              m.created_at AS createdAt
+       FROM miyagi_conversation_messages m
+       JOIN journal_entries j ON j.id = m.journal_entry_id AND j.user_id = m.user_id
+       WHERE m.user_id = ? AND m.kind = 'checkin' AND j.entry_date BETWEEN ? AND ?
+       ORDER BY j.entry_date DESC, m.created_at, m.id`,
+    ).bind(user.id, oldest, newest).all<Row>(),
   ]);
 
   const dateSet = new Set(selectedDates);
   const metricMap = new Map<string, Row[]>();
   const journalMap = new Map<string, Row[]>();
+  const conversationMap = new Map<string, Row[]>();
 
   for (const row of entries.results) {
     const date = String(row.entryDate ?? "");
@@ -72,11 +83,20 @@ export async function handleWellbeingHistoryRoute(request: Request, env: Env): P
     journalMap.set(date, current);
   }
 
+  for (const row of conversation.results) {
+    const date = String(row.subjectDate ?? "");
+    if (!dateSet.has(date)) continue;
+    const current = conversationMap.get(date) ?? [];
+    current.push(row);
+    conversationMap.set(date, current);
+  }
+
   return json({
     days: selectedDates.map((date) => ({
       date,
       metrics: metricMap.get(date) ?? [],
       journals: journalMap.get(date) ?? [],
+      conversation: conversationMap.get(date) ?? [],
     })),
   });
 }

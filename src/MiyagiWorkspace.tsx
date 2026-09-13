@@ -36,18 +36,7 @@ type Message = {
 type LatestResponse = { analysis: Analysis | null; messages: Message[] };
 type AnalysisLength = "short" | "normal" | "deep";
 type AnalysisTone = "objective" | "empathetic" | "miyagi";
-
-type PendingJournal = {
-  id: string;
-  body: string;
-  createdAt: string;
-};
-
-type MiyagiWorkspaceProps = {
-  expanded?: boolean;
-  pendingJournal?: PendingJournal | null;
-  onPendingJournalHandled?: () => void;
-};
+type MiyagiWorkspaceProps = { expanded?: boolean };
 
 async function errorText(response: Response): Promise<string> {
   try {
@@ -74,20 +63,20 @@ function formatTimestamp(value: string): string {
   return new Intl.DateTimeFormat("da-DK", { dateStyle: "medium", timeStyle: "short" }).format(parsed);
 }
 
+function chatOnly(messages: Message[] | undefined): Message[] {
+  return (messages ?? []).filter((message) => !message.kind || message.kind === "chat");
+}
+
 function mergeMessages(current: Message[], incoming: Message[]): Message[] {
   const byId = new Map(current.map((message) => [message.id, message]));
-  for (const message of incoming) byId.set(message.id, message);
+  for (const message of chatOnly(incoming)) byId.set(message.id, message);
   return [...byId.values()].sort((a, b) => {
     const time = a.createdAt.localeCompare(b.createdAt);
     return time || a.id.localeCompare(b.id);
   });
 }
 
-export default function MiyagiWorkspace({
-  expanded = true,
-  pendingJournal = null,
-  onPendingJournalHandled,
-}: MiyagiWorkspaceProps) {
+export default function MiyagiWorkspace({ expanded = true }: MiyagiWorkspaceProps) {
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [state, setState] = useState<"loading" | "ready" | "analyzing" | "error">("loading");
@@ -113,7 +102,7 @@ export default function MiyagiWorkspace({
       .then((body) => {
         if (cancelled) return;
         setAnalysis(body.analysis);
-        setMessages(body.messages ?? []);
+        setMessages(chatOnly(body.messages));
         setState("ready");
       })
       .catch((caught: Error) => {
@@ -125,54 +114,6 @@ export default function MiyagiWorkspace({
   }, []);
 
   useEffect(() => {
-    if (!pendingJournal) return;
-    let cancelled = false;
-    const pendingId = `pending-journal-${pendingJournal.id}`;
-    const optimisticMessage: Message = {
-      id: pendingId,
-      role: "user",
-      body: pendingJournal.body,
-      kind: "checkin",
-      analysisId: analysis?.id ?? null,
-      journalEntryId: pendingJournal.id,
-      createdAt: pendingJournal.createdAt,
-    };
-
-    setMessages((current) => mergeMessages(current, [optimisticMessage]));
-    setChatOpen(true);
-    setChatBusy(true);
-    setError(null);
-
-    void fetch("/api/wellbeing/miyagi/checkin", {
-      method: "POST",
-      credentials: "same-origin",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ journalId: pendingJournal.id }),
-    })
-      .then(async (response) => {
-        if (!response.ok) throw new Error(await errorText(response));
-        return response.json() as Promise<{ messages: Message[] }>;
-      })
-      .then((body) => {
-        if (cancelled) return;
-        setMessages((current) => mergeMessages(
-          current.filter((message) => message.id !== pendingId),
-          body.messages ?? [],
-        ));
-      })
-      .catch((caught: Error) => {
-        if (!cancelled) setError(caught.message);
-      })
-      .finally(() => {
-        if (cancelled) return;
-        setChatBusy(false);
-        onPendingJournalHandled?.();
-      });
-
-    return () => { cancelled = true; };
-  }, [pendingJournal?.id]);
-
-  useEffect(() => {
     if (!analysisDialogOpen) return;
     const close = (event: KeyboardEvent) => { if (event.key === "Escape") setAnalysisDialogOpen(false); };
     window.addEventListener("keydown", close);
@@ -181,9 +122,7 @@ export default function MiyagiWorkspace({
 
   useEffect(() => {
     if (!chatOpen) return;
-    const close = (event: KeyboardEvent) => {
-      if (event.key === "Escape") setChatOpen(false);
-    };
+    const close = (event: KeyboardEvent) => { if (event.key === "Escape") setChatOpen(false); };
     window.addEventListener("keydown", close);
     return () => window.removeEventListener("keydown", close);
   }, [chatOpen]);
@@ -215,17 +154,12 @@ export default function MiyagiWorkspace({
         method: "POST",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          days: analysisDays,
-          focus: focus.trim(),
-          length: analysisLength,
-          tone: analysisTone,
-        }),
+        body: JSON.stringify({ days: analysisDays, focus: focus.trim(), length: analysisLength, tone: analysisTone }),
       });
       if (!response.ok) throw new Error(await errorText(response));
       const body = await response.json() as LatestResponse;
       setAnalysis(body.analysis);
-      setMessages(body.messages ?? []);
+      setMessages(chatOnly(body.messages));
       setState("ready");
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Miyagi kunne ikke gennemføre analysen.");
@@ -257,33 +191,21 @@ export default function MiyagiWorkspace({
     const text = chatText.trim();
     const pendingId = `pending-${Date.now()}`;
     const pendingMessage: Message = {
-      id: pendingId,
-      role: "user",
-      body: text,
-      kind: "chat",
-      analysisId: analysis?.id ?? null,
-      journalEntryId: null,
-      createdAt: new Date().toISOString(),
+      id: pendingId, role: "user", body: text, kind: "chat",
+      analysisId: analysis?.id ?? null, journalEntryId: null, createdAt: new Date().toISOString(),
     };
-
     setChatBusy(true);
     setError(null);
     setChatText("");
     setMessages((current) => [...current, pendingMessage]);
-
     try {
       const response = await fetch("/api/wellbeing/miyagi/chat", {
-        method: "POST",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
+        method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ analysisId: analysis?.id, message: text }),
       });
       if (!response.ok) throw new Error(await errorText(response));
       const body = await response.json() as { messages: Message[] };
-      setMessages((current) => mergeMessages(
-        current.filter((message) => message.id !== pendingId),
-        body.messages,
-      ));
+      setMessages((current) => mergeMessages(current.filter((message) => message.id !== pendingId), body.messages));
     } catch (caught) {
       setMessages((current) => current.filter((message) => message.id !== pendingId));
       setChatText(text);
@@ -295,148 +217,74 @@ export default function MiyagiWorkspace({
 
   return <section className={`miyagi-workspace${expanded ? "" : " miyagi-workspace--collapsed"}`} aria-label="Mr. Miyagi analyse">
     {expanded && <>
-    <div className="miyagi-workspace-actions">
-      <button className="secondary-action" type="button" onClick={() => void exportWellbeing()}>Eksportér</button>
-      <button className="secondary-action" type="button" onClick={() => setHistoryOpen(true)}>Historik</button>
-      <button className="primary-action" type="button" disabled={state === "loading" || state === "analyzing"} onClick={openAnalysisDialog}>
-        {state === "analyzing" ? "Miyagi tænker…" : analysis ? "Analysér igen" : "Start analyse"}
-      </button>
-    </div>
+      <div className="miyagi-workspace-actions">
+        <button className="secondary-action" type="button" onClick={() => void exportWellbeing()}>Eksportér</button>
+        <button className="secondary-action" type="button" onClick={() => setHistoryOpen(true)}>Historik</button>
+        <button className="primary-action" type="button" disabled={state === "loading" || state === "analyzing"} onClick={openAnalysisDialog}>
+          {state === "analyzing" ? "Miyagi tænker…" : analysis ? "Analysér igen" : "Start analyse"}
+        </button>
+      </div>
 
-    {state === "loading" && <div className="miyagi-empty-analysis"><strong>Finder den seneste analyse…</strong></div>}
-    {state === "analyzing" && <div className="miyagi-thinking"><span className="miyagi-thinking-dot" /><div><strong>Miyagi lægger dagene ved siden af hinanden…</strong><p>Han leder efter samtidige ændringer, før/efter-forløb og ting der er værd at spørge dig om.</p></div></div>}
+      {state === "loading" && <div className="miyagi-empty-analysis"><strong>Finder den seneste analyse…</strong></div>}
+      {state === "analyzing" && <div className="miyagi-thinking"><span className="miyagi-thinking-dot" /><div><strong>Miyagi lægger dagene ved siden af hinanden…</strong><p>Han leder efter samtidige ændringer, før/efter-forløb og ting der er værd at spørge dig om.</p></div></div>}
 
-    {analysis && state !== "analyzing" && <section className="miyagi-analysis-card">
-      <header className="miyagi-analysis-meta">
-        <div><strong>Analyse</strong><span>{formatDate(analysis.periodStart)} – {formatDate(analysis.periodEnd)}</span></div>
-        <small>{formatTimestamp(analysis.createdAt)}</small>
-      </header>
-      <MiyagiMarkdown text={analysis.analysis} />
-      {analysis.coverage && <div className="miyagi-coverage">
-        <span>{analysis.coverage.healthDays} sundhedsdage</span>
-        <span>{analysis.coverage.sleepDays} nætter</span>
-        <span>{analysis.coverage.activityCount} aktiviteter</span>
-        <span>{analysis.coverage.checkInValues} check-in værdier</span>
-        <span>{analysis.coverage.journalEntries} journalnoter</span>
+      {analysis && state !== "analyzing" && <section className="miyagi-analysis-card">
+        <header className="miyagi-analysis-meta">
+          <div><strong>Analyse</strong><span>{formatDate(analysis.periodStart)} – {formatDate(analysis.periodEnd)}</span></div>
+          <small>{formatTimestamp(analysis.createdAt)}</small>
+        </header>
+        <MiyagiMarkdown text={analysis.analysis} />
+        {analysis.coverage && <div className="miyagi-coverage">
+          <span>{analysis.coverage.healthDays} sundhedsdage</span><span>{analysis.coverage.sleepDays} nætter</span>
+          <span>{analysis.coverage.activityCount} aktiviteter</span><span>{analysis.coverage.checkInValues} check-in værdier</span>
+          <span>{analysis.coverage.journalEntries} journalnoter</span>
+        </div>}
+      </section>}
+
+      {!analysis && state === "ready" && <div className="miyagi-empty-analysis">
+        <strong>Ingen analyse endnu</strong><p>Start en analyse. Standard er kort og empatisk; du kan vælge fokus eller en anden svarstil i dialogen.</p>
       </div>}
-    </section>}
-
-    {!analysis && state === "ready" && <div className="miyagi-empty-analysis">
-      <strong>Ingen analyse endnu</strong>
-      <p>Start en analyse. Standard er kort og empatisk; du kan vælge fokus eller en anden svarstil i dialogen.</p>
-    </div>}
     </>}
 
-    <>
-      <button
-        className={`miyagi-chat-launcher ${chatOpen ? "open" : ""}`}
-        type="button"
-        onClick={() => setChatOpen((open) => !open)}
-        aria-expanded={chatOpen}
-        aria-controls="miyagi-chat-popout"
-        disabled={state === "loading" || state === "analyzing"}
-      >
-        <span className="miyagi-chat-launcher-icon" aria-hidden="true">🥋</span>
-        <span>Tal med Miyagi</span>
-      </button>
+    <button
+      className={`miyagi-chat-launcher ${chatOpen ? "open" : ""}`}
+      type="button" onClick={() => setChatOpen((open) => !open)} aria-expanded={chatOpen}
+      aria-controls="miyagi-chat-popout" disabled={state === "loading" || state === "analyzing"}
+    >
+      <span className="miyagi-chat-launcher-icon" aria-hidden="true">🥋</span><span>Tal med Miyagi</span>
+    </button>
 
-      {chatOpen && <section id="miyagi-chat-popout" className="miyagi-chat-popout" role="dialog" aria-label="Tal med Mr. Miyagi">
-        <header className="miyagi-chat-popout-header">
-          <div>
-            <strong>Mr. Miyagi</strong>
-            <span>Check-in, analyse og samtale samlet ét sted.</span>
-          </div>
-          <button className="icon-action" type="button" onClick={() => setChatOpen(false)} aria-label="Luk chat">×</button>
-        </header>
-
-        <div className="miyagi-chat-popout-messages" ref={chatMessagesRef}>
-          {messages.length === 0 && <div className="miyagi-chat-empty">
-            <strong>Miyagi er klar.</strong>
-            <span>Skriv om dagens check-in, spørg ind til en analyse eller giv ham mere kontekst.</span>
-          </div>}
-          {messages.map((message, index) => <article className={`miyagi-message ${message.role}`} key={message.id ?? `${message.createdAt}-${index}`}>
-            <strong>{message.role === "assistant" ? "Miyagi" : "Dig"}</strong>
-            <MiyagiMarkdown text={message.body} />
-          </article>)}
-          {chatBusy && <div className="miyagi-chat-typing" role="status">
-            <span className="miyagi-thinking-dot" />
-            <span>Miyagi tænker…</span>
-          </div>}
-        </div>
-
-        <form className="miyagi-chat-compose" onSubmit={(event) => { event.preventDefault(); void sendMessage(); }}>
-          <textarea
-            rows={3}
-            value={chatText}
-            onChange={(event) => setChatText(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter" && !event.shiftKey) {
-                event.preventDefault();
-                void sendMessage();
-              }
-            }}
-            disabled={chatBusy || state === "analyzing"}
-            maxLength={4000}
-            placeholder="Skriv til Miyagi…"
-            aria-label="Skriv til Mr. Miyagi"
-          />
-          <div className="miyagi-chat-compose-actions">
-            <small>Shift+Enter = ny linje</small>
-            <button type="submit" disabled={chatBusy || state === "analyzing" || !chatText.trim()}>{chatBusy ? "…" : "Send"}</button>
-          </div>
-        </form>
-      </section>}
-    </>
+    {chatOpen && <section id="miyagi-chat-popout" className="miyagi-chat-popout" role="dialog" aria-label="Tal med Mr. Miyagi">
+      <header className="miyagi-chat-popout-header">
+        <div><strong>Mr. Miyagi</strong><span>Generel chat om dine data, analyser og fortolkninger.</span></div>
+        <button className="icon-action" type="button" onClick={() => setChatOpen(false)} aria-label="Luk chat">×</button>
+      </header>
+      <div className="miyagi-chat-popout-messages" ref={chatMessagesRef}>
+        {messages.length === 0 && <div className="miyagi-chat-empty"><strong>Miyagi er klar.</strong><span>Spørg ind til dine data eller en analyse. Daglige check-in-tråde ligger på selve dagen.</span></div>}
+        {messages.map((message, index) => <article className={`miyagi-message ${message.role}`} key={message.id ?? `${message.createdAt}-${index}`}>
+          <strong>{message.role === "assistant" ? "Miyagi" : "Dig"}</strong><MiyagiMarkdown text={message.body} />
+        </article>)}
+        {chatBusy && <div className="miyagi-chat-typing" role="status"><span className="miyagi-thinking-dot" /><span>Miyagi tænker…</span></div>}
+      </div>
+      <form className="miyagi-chat-compose" onSubmit={(event) => { event.preventDefault(); void sendMessage(); }}>
+        <textarea rows={3} value={chatText} onChange={(event) => setChatText(event.target.value)}
+          onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); void sendMessage(); } }}
+          disabled={chatBusy || state === "analyzing"} maxLength={4000} placeholder="Skriv til Miyagi…" aria-label="Skriv til Mr. Miyagi" />
+        <div className="miyagi-chat-compose-actions"><small>Shift+Enter = ny linje</small><button type="submit" disabled={chatBusy || state === "analyzing" || !chatText.trim()}>{chatBusy ? "…" : "Send"}</button></div>
+      </form>
+    </section>}
 
     {error && <p className="settings-feedback error">{error}</p>}
     {expanded && <small className="miyagi-disclaimer">Miyagi er et analyseværktøj i et privat hobbyprojekt. Han kan hjælpe med mønstre og refleksion, men er ikke læge og erstatter ikke faglig vurdering.</small>}
 
     {analysisDialogOpen && <div className="miyagi-analysis-overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) setAnalysisDialogOpen(false); }}>
       <section className="miyagi-analysis-dialog" role="dialog" aria-modal="true" aria-labelledby="miyagi-analysis-title">
-        <header>
-          <div><p className="section-label">Ny analyse</p><h3 id="miyagi-analysis-title">Hvad skal Miyagi kigge efter?</h3></div>
-          <button className="icon-action" type="button" onClick={() => setAnalysisDialogOpen(false)} aria-label="Luk">×</button>
-        </header>
-
-        <label className="miyagi-focus-field">
-          <span>Fokus <small>valgfrit</small></span>
-          <textarea rows={3} maxLength={1200} value={focus} onChange={(event) => setFocus(event.target.value)} placeholder="Tomt felt = generel analyse. Eller fx: Kig især på søvn, energi og perioder med høj hvilepuls." />
-        </label>
-
-        <fieldset className="miyagi-option-group miyagi-period-group">
-          <legend>Periode</legend>
-          <div>
-            {([30, 60, 90, 180] as const).map((value) => <button type="button" className={analysisDays === value ? "active" : ""} key={value} onClick={() => setAnalysisDays(value)}>
-              <strong>{value} dage</strong>
-              <small>{value === 30 ? "Seneste" : value === 60 ? "Kort sigt" : value === 90 ? "Standard" : "Langt blik"}</small>
-            </button>)}
-          </div>
-        </fieldset>
-
-        <fieldset className="miyagi-option-group">
-          <legend>Længde</legend>
-          <div>
-            {(["short", "normal", "deep"] as const).map((value) => <button type="button" className={analysisLength === value ? "active" : ""} key={value} onClick={() => setAnalysisLength(value)}>
-              <strong>{value === "short" ? "Kort" : value === "normal" ? "Normal" : "Grundig"}</strong>
-              <small>{value === "short" ? "Det vigtigste" : value === "normal" ? "Balanceret" : "Gå på opdagelse"}</small>
-            </button>)}
-          </div>
-        </fieldset>
-
-        <fieldset className="miyagi-option-group">
-          <legend>Tone</legend>
-          <div>
-            {(["objective", "empathetic", "miyagi"] as const).map((value) => <button type="button" className={analysisTone === value ? "active" : ""} key={value} onClick={() => setAnalysisTone(value)}>
-              <strong>{value === "objective" ? "Objektiv" : value === "empathetic" ? "Empatisk" : "Mr. Miyagi"}</strong>
-              <small>{value === "objective" ? "Nøgtern" : value === "empathetic" ? "Menneskelig" : "Wax on 😄"}</small>
-            </button>)}
-          </div>
-        </fieldset>
-
-        <div className="miyagi-analysis-dialog-actions">
-          <span>Valgt: <strong>{analysisDays} dage · {analysisLength === "short" ? "Kort" : analysisLength === "normal" ? "Normal" : "Grundig"} · {analysisTone === "objective" ? "Objektiv" : analysisTone === "empathetic" ? "Empatisk" : "Mr. Miyagi"}</strong></span>
-          <button className="primary-action" type="button" onClick={() => void runAnalysis()}>Start analyse</button>
-        </div>
+        <header><div><p className="section-label">Ny analyse</p><h3 id="miyagi-analysis-title">Hvad skal Miyagi kigge efter?</h3></div><button className="icon-action" type="button" onClick={() => setAnalysisDialogOpen(false)} aria-label="Luk">×</button></header>
+        <label className="miyagi-focus-field"><span>Fokus <small>valgfrit</small></span><textarea rows={3} maxLength={1200} value={focus} onChange={(event) => setFocus(event.target.value)} placeholder="Tomt felt = generel analyse. Eller fx: Kig især på søvn, energi og perioder med høj hvilepuls." /></label>
+        <fieldset className="miyagi-option-group miyagi-period-group"><legend>Periode</legend><div>{([30, 60, 90, 180] as const).map((value) => <button type="button" className={analysisDays === value ? "active" : ""} key={value} onClick={() => setAnalysisDays(value)}><strong>{value} dage</strong><small>{value === 30 ? "Seneste" : value === 60 ? "Kort sigt" : value === 90 ? "Standard" : "Langt blik"}</small></button>)}</div></fieldset>
+        <fieldset className="miyagi-option-group"><legend>Længde</legend><div>{(["short", "normal", "deep"] as const).map((value) => <button type="button" className={analysisLength === value ? "active" : ""} key={value} onClick={() => setAnalysisLength(value)}><strong>{value === "short" ? "Kort" : value === "normal" ? "Normal" : "Grundig"}</strong><small>{value === "short" ? "Det vigtigste" : value === "normal" ? "Balanceret" : "Gå på opdagelse"}</small></button>)}</div></fieldset>
+        <fieldset className="miyagi-option-group"><legend>Tone</legend><div>{(["objective", "empathetic", "miyagi"] as const).map((value) => <button type="button" className={analysisTone === value ? "active" : ""} key={value} onClick={() => setAnalysisTone(value)}><strong>{value === "objective" ? "Objektiv" : value === "empathetic" ? "Empatisk" : "Mr. Miyagi"}</strong><small>{value === "objective" ? "Nøgtern" : value === "empathetic" ? "Menneskelig" : "Wax on 😄"}</small></button>)}</div></fieldset>
+        <div className="miyagi-analysis-dialog-actions"><span>Valgt: <strong>{analysisDays} dage · {analysisLength === "short" ? "Kort" : analysisLength === "normal" ? "Normal" : "Grundig"} · {analysisTone === "objective" ? "Objektiv" : analysisTone === "empathetic" ? "Empatisk" : "Mr. Miyagi"}</strong></span><button className="primary-action" type="button" onClick={() => void runAnalysis()}>Start analyse</button></div>
       </section>
     </div>}
 

@@ -9,55 +9,57 @@ type MetricEntry = {
   value: number;
 };
 
-type Journal = {
+type Journal = { id: string; body: string; createdAt: string };
+type ConversationMessage = {
   id: string;
+  role: "user" | "assistant";
   body: string;
+  journalEntryId: string | null;
+  sourceRef?: string | null;
   createdAt: string;
 };
-
 type HistoryDay = {
   date: string;
   metrics: MetricEntry[];
   journals: Journal[];
+  conversation: ConversationMessage[];
 };
 
 function isMetricEntry(value: unknown): value is MetricEntry {
   if (!value || typeof value !== "object") return false;
   const row = value as Record<string, unknown>;
-  return typeof row.metricId === "string"
-    && typeof row.name === "string"
-    && typeof row.emoji === "string"
+  return typeof row.metricId === "string" && typeof row.name === "string" && typeof row.emoji === "string"
     && (row.direction === "high_good" || row.direction === "high_bad")
-    && (row.valueType === "scale" || row.valueType === "boolean")
-    && typeof row.value === "number";
+    && (row.valueType === "scale" || row.valueType === "boolean") && typeof row.value === "number";
 }
 
 function isJournal(value: unknown): value is Journal {
   if (!value || typeof value !== "object") return false;
   const row = value as Record<string, unknown>;
-  return typeof row.id === "string"
-    && typeof row.body === "string"
-    && typeof row.createdAt === "string";
+  return typeof row.id === "string" && typeof row.body === "string" && typeof row.createdAt === "string";
+}
+
+function isConversationMessage(value: unknown): value is ConversationMessage {
+  if (!value || typeof value !== "object") return false;
+  const row = value as Record<string, unknown>;
+  return typeof row.id === "string" && (row.role === "user" || row.role === "assistant")
+    && typeof row.body === "string" && typeof row.createdAt === "string";
 }
 
 function parseHistoryDays(value: unknown): HistoryDay[] {
   if (!value || typeof value !== "object") throw new Error("Ugyldigt historik-svar.");
   const body = value as Record<string, unknown>;
   if (!Array.isArray(body.days)) throw new Error("Ugyldigt historik-svar.");
-
   return body.days.map((item) => {
     if (!item || typeof item !== "object") throw new Error("Ugyldig historik-række.");
     const row = item as Record<string, unknown>;
-    if (typeof row.date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(row.date)) {
-      throw new Error("Historikken indeholder en ugyldig dato.");
-    }
-    if (!Array.isArray(row.metrics) || !Array.isArray(row.journals)) {
-      throw new Error("Historikken mangler målepunkter eller kommentarer.");
-    }
+    if (typeof row.date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(row.date)) throw new Error("Historikken indeholder en ugyldig dato.");
+    if (!Array.isArray(row.metrics) || !Array.isArray(row.journals)) throw new Error("Historikken mangler målepunkter eller kommentarer.");
     return {
       date: row.date,
       metrics: row.metrics.filter(isMetricEntry),
       journals: row.journals.filter(isJournal),
+      conversation: Array.isArray(row.conversation) ? row.conversation.filter(isConversationMessage) : [],
     };
   });
 }
@@ -65,6 +67,12 @@ function parseHistoryDays(value: unknown): HistoryDay[] {
 function formatDate(value: string): string {
   const date = new Date(`${value}T12:00:00`);
   return new Intl.DateTimeFormat("da-DK", { weekday: "short", day: "numeric", month: "long", year: "numeric" }).format(date);
+}
+
+function formatTime(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return new Intl.DateTimeFormat("da-DK", { dateStyle: "short", timeStyle: "short" }).format(date);
 }
 
 function faceFor(metric: MetricEntry): string {
@@ -114,7 +122,7 @@ export default function WellbeingHistory({ onClose }: { onClose: () => void }) {
   return <div className="wellbeing-history-overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
     <section className="wellbeing-history-dialog" role="dialog" aria-modal="true" aria-labelledby="wellbeing-history-title">
       <header className="wellbeing-history-heading">
-        <div><p className="section-label">Dagligt check-in</p><h2 id="wellbeing-history-title">Historik</h2><p>Målepunkter og kommentarer pr. dag. Miyagi-samtalen fortsætter samlet i chatten.</p></div>
+        <div><p className="section-label">Dagligt check-in</p><h2 id="wellbeing-history-title">Historik</h2><p>Hver dag viser både check-in, dine kommentarer og Miyagis tilhørende svar.</p></div>
         <button className="icon-action" type="button" onClick={onClose} aria-label="Luk historik">×</button>
       </header>
 
@@ -126,23 +134,12 @@ export default function WellbeingHistory({ onClose }: { onClose: () => void }) {
         {days.map((day) => {
           const open = openDays.has(day.date);
           return <article className={`wellbeing-history-day ${open ? "open" : ""}`} key={day.date}>
-            <div
-              className="wellbeing-history-day-toggle"
-              role="button"
-              tabIndex={0}
-              onClick={() => toggle(day.date)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter" || event.key === " ") {
-                  event.preventDefault();
-                  toggle(day.date);
-                }
-              }}
-              aria-expanded={open}
-            >
-              <span className="wellbeing-history-chevron">›</span>
-              <strong>{formatDate(day.date)}</strong>
+            <div className="wellbeing-history-day-toggle" role="button" tabIndex={0} onClick={() => toggle(day.date)}
+              onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); toggle(day.date); } }} aria-expanded={open}>
+              <span className="wellbeing-history-chevron">›</span><strong>{formatDate(day.date)}</strong>
               <span>{day.metrics.length ? `${day.metrics.length} målepunkter` : "Ingen målepunkter"}</span>
               {day.journals.length > 0 && <span>{day.journals.length} kommentar{day.journals.length === 1 ? "" : "er"}</span>}
+              {day.conversation.some((message) => message.role === "assistant") && <span>Miyagi</span>}
             </div>
 
             {open && <div className="wellbeing-history-day-body">
@@ -150,9 +147,15 @@ export default function WellbeingHistory({ onClose }: { onClose: () => void }) {
                 {day.metrics.map((metric) => <div key={metric.metricId}><span>{metric.emoji}</span><strong>{metric.name}</strong><span>{metricValue(metric)}</span></div>)}
               </div>}
 
-              {day.journals.map((journal) => <section className="wellbeing-history-journal" key={journal.id}>
-                <p>{journal.body}</p>
-              </section>)}
+              {day.journals.map((journal) => {
+                const thread = day.conversation.filter((message) => message.journalEntryId === journal.id && !(message.role === "user" && message.body === journal.body));
+                return <section className="wellbeing-history-journal" key={journal.id}>
+                  <strong>Dig</strong><p>{journal.body}</p><small>{formatTime(journal.createdAt)}</small>
+                  {thread.map((message) => <article className={`miyagi-message ${message.role}`} key={message.id}>
+                    <strong>{message.role === "assistant" ? "Miyagi" : "Dig"}</strong><p>{message.body}</p><small>{formatTime(message.createdAt)}</small>
+                  </article>)}
+                </section>;
+              })}
             </div>}
           </article>;
         })}

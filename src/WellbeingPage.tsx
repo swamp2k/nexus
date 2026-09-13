@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import MiyagiWorkspace from "./MiyagiWorkspace";
+import MiyagiMarkdown from "./MiyagiMarkdown";
 import WellbeingHistory from "./WellbeingHistory";
 
 type MetricValueType = "scale" | "boolean";
@@ -14,7 +15,19 @@ type Metric = {
 type MetricValue = number | null;
 type Entry = { metricId: string; value: number };
 type Journal = { id: string; entryDate: string; body: string; createdAt: string };
+type ConversationMessage = {
+  id: string;
+  role: "user" | "assistant";
+  body: string;
+  kind: "checkin";
+  analysisId?: string | null;
+  journalEntryId: string | null;
+  subjectDate?: string | null;
+  createdAt: string;
+};
 type DayResponse = { date: string; metrics: Metric[]; entries: Entry[]; journals: Journal[] };
+
+type ThreadResponse = { date?: string; messages: ConversationMessage[] };
 
 const goodFaces = ["😫", "😕", "😐", "🙂", "😁"];
 const badFaces = ["😁", "🙂", "😐", "😕", "😫"];
@@ -29,16 +42,29 @@ function displayDate(value: string): string {
   return new Intl.DateTimeFormat("da-DK", { weekday: "long", day: "numeric", month: "long" }).format(new Date(`${value}T12:00:00`));
 }
 
+function displayTimestamp(value: string): string {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return "";
+  return new Intl.DateTimeFormat("da-DK", { dateStyle: "short", timeStyle: "short" }).format(parsed);
+}
+
 function metricValueLabel(metric: Metric, value: MetricValue): string {
   if (value === null || value === undefined) return "—";
   if (metric.valueType === "boolean") return value === 1 ? "Ja" : "Nej";
   return `${value}/5`;
 }
 
+function mergeMessages(current: ConversationMessage[], incoming: ConversationMessage[]): ConversationMessage[] {
+  const byId = new Map(current.map((message) => [message.id, message]));
+  for (const message of incoming) byId.set(message.id, message);
+  return [...byId.values()].sort((a, b) => a.createdAt.localeCompare(b.createdAt) || a.id.localeCompare(b.id));
+}
+
 async function errorText(response: Response): Promise<string> {
   try {
     const body = await response.json() as { error?: string; detail?: string };
     const code = body.detail ?? body.error;
+    if (code?.startsWith("miyagi_provider_")) return "Miyagi kunne ikke svare lige nu.";
     return code ?? `HTTP ${response.status}`;
   } catch { return `HTTP ${response.status}`; }
 }
@@ -50,10 +76,12 @@ export default function WellbeingPage() {
   const [values, setValues] = useState<Record<string, MetricValue>>({});
   const [savedValues, setSavedValues] = useState<Record<string, MetricValue>>({});
   const [journals, setJournals] = useState<Journal[]>([]);
+  const [dayMessages, setDayMessages] = useState<ConversationMessage[]>([]);
   const [journalText, setJournalText] = useState("");
+  const [replyText, setReplyText] = useState<Record<string, string>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [pendingJournal, setPendingJournal] = useState<Journal | null>(null);
+  const [replyBusy, setReplyBusy] = useState<string | null>(null);
   const [checkInOpen, setCheckInOpen] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
   const [miyagiOpen, setMiyagiOpen] = useState(false);
@@ -63,16 +91,23 @@ export default function WellbeingPage() {
     setLoading(true);
     setMessage(null);
     try {
-      const dayResponse = await fetch(`/api/wellbeing/day?date=${encodeURIComponent(target)}`, { credentials: "same-origin", cache: "no-store" });
+      const [dayResponse, threadResponse] = await Promise.all([
+        fetch(`/api/wellbeing/day?date=${encodeURIComponent(target)}`, { credentials: "same-origin", cache: "no-store" }),
+        fetch(`/api/wellbeing/miyagi/checkin-thread?date=${encodeURIComponent(target)}`, { credentials: "same-origin", cache: "no-store" }),
+      ]);
       if (!dayResponse.ok) throw new Error(await errorText(dayResponse));
+      if (!threadResponse.ok) throw new Error(await errorText(threadResponse));
       const body = await dayResponse.json() as DayResponse;
+      const thread = await threadResponse.json() as ThreadResponse;
       const nextValues: Record<string, MetricValue> = Object.fromEntries(body.metrics.map((metric) => [metric.id, null]));
       for (const entry of body.entries) nextValues[entry.metricId] = entry.value;
       setMetrics(body.metrics);
       setValues(nextValues);
       setSavedValues({ ...nextValues });
       setJournals(body.journals);
+      setDayMessages(thread.messages ?? []);
       setJournalText("");
+      setReplyText({});
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Kunne ikke hente dagens check-in.");
     } finally { setLoading(false); }
@@ -121,9 +156,7 @@ export default function WellbeingPage() {
     setSaving(true); setMessage(null);
     try {
       const dayResponse = await fetch("/api/wellbeing/day", {
-        method: "PUT",
-        credentials: "same-origin",
-        headers: { "Content-Type": "application/json" },
+        method: "PUT", credentials: "same-origin", headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ date, values }),
       });
       if (!dayResponse.ok) throw new Error(await errorText(dayResponse));
@@ -132,9 +165,7 @@ export default function WellbeingPage() {
       const text = journalText.trim();
       if (text) {
         const journalResponse = await fetch("/api/wellbeing/journal", {
-          method: "POST",
-          credentials: "same-origin",
-          headers: { "Content-Type": "application/json" },
+          method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ date, body: text }),
         });
         if (!journalResponse.ok) throw new Error(await errorText(journalResponse));
@@ -142,31 +173,60 @@ export default function WellbeingPage() {
         const journal = body.journal;
         setJournals((current) => [journal, ...current]);
         setJournalText("");
-        setPendingJournal(journal);
-        setCheckInOpen(false);
-      }
 
-      setMessage("Check-in er gemt.");
+        try {
+          const miyagiResponse = await fetch("/api/wellbeing/miyagi/checkin", {
+            method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ journalId: journal.id }),
+          });
+          if (!miyagiResponse.ok) throw new Error(await errorText(miyagiResponse));
+          const miyagiBody = await miyagiResponse.json() as { messages: ConversationMessage[] };
+          setDayMessages((current) => mergeMessages(current, miyagiBody.messages ?? []));
+          setMessage("Check-in, kommentar og Miyagi-svar er gemt på dagen.");
+        } catch (error) {
+          setMessage(`Check-in og kommentar er gemt, men ${error instanceof Error ? error.message : "Miyagi kunne ikke svare."}`);
+        }
+      } else {
+        setMessage("Check-in er gemt.");
+      }
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Check-in kunne ikke gemmes.");
     } finally { setSaving(false); }
   }
 
+  async function sendThreadReply(journalId: string) {
+    const text = (replyText[journalId] ?? "").trim();
+    if (!text || replyBusy) return;
+    setReplyBusy(journalId);
+    setMessage(null);
+    try {
+      const response = await fetch("/api/wellbeing/miyagi/checkin-thread", {
+        method: "POST", credentials: "same-origin", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ journalId, message: text }),
+      });
+      if (!response.ok) throw new Error(await errorText(response));
+      const body = await response.json() as { messages: ConversationMessage[] };
+      setDayMessages((current) => mergeMessages(current, body.messages ?? []));
+      setReplyText((current) => ({ ...current, [journalId]: "" }));
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Miyagi kunne ikke svare lige nu.");
+    } finally { setReplyBusy(null); }
+  }
+
   async function removeJournal(id: string) {
-    if (!window.confirm("Slet dette journalnotat?")) return;
+    if (!window.confirm("Slet dette journalnotat og den tilhørende Miyagi-tråd?")) return;
     const response = await fetch(`/api/wellbeing/journal/${id}`, { method: "DELETE", credentials: "same-origin" });
-    if (response.ok) setJournals((current) => current.filter((item) => item.id !== id));
+    if (response.ok) {
+      setJournals((current) => current.filter((item) => item.id !== id));
+      setDayMessages((current) => current.filter((item) => item.journalEntryId !== id));
+    }
   }
 
   const checkInStatus = loading
     ? "Henter status…"
-    : metrics.length === 0
-      ? "Ingen aktive målepunkter"
-      : completeToday
-        ? "Færdig for i dag"
-        : hasTodayData
-          ? `${completed} af ${metrics.length} udfyldt`
-          : "Ikke udført i dag";
+    : metrics.length === 0 ? "Ingen aktive målepunkter"
+      : completeToday ? "Færdig for i dag"
+        : hasTodayData ? `${completed} af ${metrics.length} udfyldt` : "Ikke udført i dag";
 
   return <section className="wellbeing-page">
     <div className="wellbeing-command-list">
@@ -198,11 +258,7 @@ export default function WellbeingPage() {
       <div className="wellbeing-today-journal"><span>Kommentar</span>{todayJournal ? <p>{todayJournal.body}</p> : <p className="is-empty">Ingen kommentar i dag.</p>}</div>
     </section>}
 
-    <MiyagiWorkspace
-      expanded={miyagiOpen}
-      pendingJournal={pendingJournal}
-      onPendingJournalHandled={() => setPendingJournal(null)}
-    />
+    <MiyagiWorkspace expanded={miyagiOpen} />
     {historyOpen && <WellbeingHistory onClose={() => setHistoryOpen(false)} />}
 
     {checkInOpen && <div className="wellbeing-checkin-overlay" role="presentation" onMouseDown={(event) => { if (event.target === event.currentTarget) closeCheckIn(); }}>
@@ -245,17 +301,29 @@ export default function WellbeingPage() {
         </section>}
 
         <section className="wellbeing-journal wellbeing-journal-inline">
-          <div><p className="section-label">Kommentar</p><h3>Noter fra dagen</h3><p>Skriv frit. Hvis du skriver en kommentar, svarer Miyagi i den fælles chat med dagens check-in og relevante Nexus-data som kontekst.</p></div>
-          <textarea value={journalText} onChange={(event) => setJournalText(event.target.value)} rows={4} maxLength={20_000} placeholder="Hvad fyldte i dag? Hvad gik godt eller skidt?" />
+          <div><p className="section-label">Kommentar og Miyagi</p><h3>Dagstråd</h3><p>Alt her hører til {displayDate(date)}, også hvis du skriver svaret på et senere tidspunkt.</p></div>
+          <textarea value={journalText} onChange={(event) => setJournalText(event.target.value)} rows={4} maxLength={20_000} placeholder="Hvad fyldte denne dag? Hvad gik godt eller skidt?" />
 
-          {journals.length > 0 && <div className="wellbeing-journal-list">{journals.map((journal) => <article key={journal.id}>
-            <p>{journal.body}</p>
-            <div><small>{new Intl.DateTimeFormat("da-DK", { timeStyle: "short" }).format(new Date(journal.createdAt))}</small><button type="button" onClick={() => void removeJournal(journal.id)}>Slet</button></div>
-          </article>)}</div>}
+          {journals.length > 0 && <div className="wellbeing-journal-list">{journals.map((journal) => {
+            const thread = dayMessages.filter((item) => item.journalEntryId === journal.id && !(item.role === "user" && item.body === journal.body));
+            return <article key={journal.id}>
+              <strong>Dig</strong><p>{journal.body}</p>
+              <div><small>{displayTimestamp(journal.createdAt)}</small><button type="button" onClick={() => void removeJournal(journal.id)}>Slet</button></div>
+              {thread.map((item) => <section className={`miyagi-message ${item.role}`} key={item.id}>
+                <strong>{item.role === "assistant" ? "Miyagi" : "Dig"}</strong>
+                <MiyagiMarkdown text={item.body} />
+                <small>{displayTimestamp(item.createdAt)}</small>
+              </section>)}
+              <form className="miyagi-chat-compose" onSubmit={(event) => { event.preventDefault(); void sendThreadReply(journal.id); }}>
+                <textarea rows={2} maxLength={4000} value={replyText[journal.id] ?? ""} onChange={(event) => setReplyText((current) => ({ ...current, [journal.id]: event.target.value }))} placeholder="Svar Miyagi i denne dags tråd…" disabled={replyBusy === journal.id} />
+                <div className="miyagi-chat-compose-actions"><small>Gemmes på {displayDate(date)}</small><button type="submit" disabled={replyBusy === journal.id || !(replyText[journal.id] ?? "").trim()}>{replyBusy === journal.id ? "…" : "Send"}</button></div>
+              </form>
+            </article>;
+          })}</div>}
         </section>
 
         <div className="wellbeing-dialog-actions">
-          <button className="secondary-action" type="button" onClick={closeCheckIn}>Annuller</button>
+          <button className="secondary-action" type="button" onClick={closeCheckIn}>Luk</button>
           <button className="primary-action" type="button" disabled={saving || !hasUnsaved} onClick={() => void saveAll()}>{saving ? "Gemmer…" : "Gem"}</button>
         </div>
 
