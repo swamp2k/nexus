@@ -13,6 +13,7 @@ import { handleSettingsRoute } from "./settings/routes";
 import { handleEloverblikSettingsRoute } from "./sources/eloverblik-settings-routes";
 import { handleSourceRoute } from "./sources/routes";
 import { handleUnraidRoute } from "./unraid/routes";
+import { handleUserRoute } from "./users/routes";
 import { handleJournalAiRoute } from "./wellbeing/journal-ai";
 import { handleMiyagiConversationRoute } from "./wellbeing/miyagi-conversation";
 import { handleMiyagiHistoryRoute } from "./wellbeing/miyagi-history";
@@ -37,6 +38,7 @@ export default {
       if (displayDataResponse) return displayDataResponse;
 
       if (url.pathname.startsWith("/api/auth/")) { const response = await handleAuthRoute(request, env); if (response) return response; }
+      if (url.pathname.startsWith("/api/users")) { const response = await handleUserRoute(request, env); if (response) return response; }
       if (url.pathname.startsWith("/api/calendar/")) { const response = await handleCalendarRoute(request, env); if (response) return response; }
       if (url.pathname.startsWith("/api/garmin/")) {
         const credentialResponse = await handleGarminCredentialRoute(request, env); if (credentialResponse) return credentialResponse;
