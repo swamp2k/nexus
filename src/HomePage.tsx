@@ -6,6 +6,8 @@ import { changeRows, changeSize, cycleRows, effectiveRows, moveVisualWidget, ste
 import type { LayoutItem, WidgetRows } from "./dashboard/layoutEditing";
 import { resolveDashboardRefreshClass } from "./data/dashboardRefresh";
 import { useSettings } from "./data/settings";
+import { DEFAULT_INTEGRATIONS, fetchIntegrations, integrationKeyForWidgetId, widgetIntegrationEnabled } from "./data/integrations";
+import type { IntegrationMap } from "./data/integrations";
 import { discoverUnraidWidgets, widgetCatalog, widgetDefinitionById } from "./widgets/widgetCatalog";
 import type { UnraidOverview } from "./widgets/widgetCatalog";
 import { isUnraidContainerWidgetId, SelectedContainersWidget } from "./widgets/unraidWidgets";
@@ -43,6 +45,14 @@ function containerGroupRows(items: LayoutItem[]): WidgetRows {
   return explicit.length > 0 ? Math.max(...explicit) as WidgetRows : items.length > 6 ? 2 : 1;
 }
 
+function layoutItemEnabled(item: LayoutItem, integrations: IntegrationMap): boolean {
+  if (item.type === LINK_COLLECTION_TYPE || item.id.startsWith(`${LINK_COLLECTION_TYPE}.`)) return true;
+  const key = integrationKeyForWidgetId(item.id);
+  if (key) return integrations[key] !== false;
+  const widget = widgetDefinitionById(item.type ?? item.id);
+  return widget ? widgetIntegrationEnabled(widget, integrations) : true;
+}
+
 export default function HomePage({ onOpenPage }: { onOpenPage: (page: WidgetTargetPage) => void }) {
   const [layout, setLayout] = useState<LayoutItem[]>(FALLBACK_LAYOUT);
   const [draft, setDraft] = useState<LayoutItem[]>(FALLBACK_LAYOUT);
@@ -52,6 +62,7 @@ export default function HomePage({ onOpenPage }: { onOpenPage: (page: WidgetTarg
   const [message, setMessage] = useState<string | null>(null);
   const [unraidCatalog, setUnraidCatalog] = useState<UnraidOverview | null>(null);
   const [unraidCatalogLoading, setUnraidCatalogLoading] = useState(false);
+  const [integrations, setIntegrations] = useState<IntegrationMap>(DEFAULT_INTEGRATIONS);
   const { data: refreshSettings } = useSettings();
 
   useEffect(() => {
@@ -73,17 +84,28 @@ export default function HomePage({ onOpenPage }: { onOpenPage: (page: WidgetTarg
       });
   }, []);
 
+  useEffect(() => {
+    void fetchIntegrations().then(setIntegrations).catch(() => setIntegrations(DEFAULT_INTEGRATIONS));
+    function changed(event: Event) {
+      const next = (event as CustomEvent<IntegrationMap>).detail;
+      if (next) setIntegrations({ ...DEFAULT_INTEGRATIONS, ...next });
+    }
+    window.addEventListener("nexus-integrations-changed", changed);
+    return () => window.removeEventListener("nexus-integrations-changed", changed);
+  }, []);
+
   const selectedIds = useMemo(() => new Set(draft.map((item) => item.id)), [draft]);
   const availableWidgets = useMemo(() => {
-    const result: WidgetDefinition[] = [...widgetCatalog, ...discoverUnraidWidgets(unraidCatalog)];
+    const discovered = integrations.unraid ? discoverUnraidWidgets(unraidCatalog) : [];
+    const result: WidgetDefinition[] = [...widgetCatalog, ...discovered].filter((widget) => widgetIntegrationEnabled(widget, integrations));
     const seen = new Set(result.map((widget) => widget.id));
     for (const item of draft) {
-      if (seen.has(item.id)) continue;
+      if (seen.has(item.id) || !layoutItemEnabled(item, integrations)) continue;
       const widget = widgetDefinitionById(item.id);
-      if (widget) { result.push(widget); seen.add(item.id); }
+      if (widget && widgetIntegrationEnabled(widget, integrations)) { result.push(widget); seen.add(item.id); }
     }
     return result;
-  }, [draft, unraidCatalog]);
+  }, [draft, unraidCatalog, integrations]);
   const availableById = useMemo(() => new Map(availableWidgets.map((widget) => [widget.id, widget])), [availableWidgets]);
   const resolve = (id: string) => availableById.get(id) ?? widgetDefinitionById(id);
   const grouped = useMemo(() => {
@@ -98,6 +120,7 @@ export default function HomePage({ onOpenPage }: { onOpenPage: (page: WidgetTarg
   }, [availableWidgets]);
 
   async function loadUnraidCatalog() {
+    if (!integrations.unraid) return;
     setUnraidCatalogLoading(true);
     try {
       const response = await fetch("/api/unraid/overview", { credentials: "same-origin", cache: "no-store" });
@@ -175,7 +198,8 @@ export default function HomePage({ onOpenPage }: { onOpenPage: (page: WidgetTarg
     }
   }
 
-  const renderedLayout = editing ? draft : layout;
+  const sourceLayout = editing ? draft : layout;
+  const renderedLayout = sourceLayout.filter((item) => layoutItemEnabled(item, integrations));
   const selectedContainers = renderedLayout.filter((item) => isUnraidContainerWidgetId(item.id));
   const firstContainerIndex = renderedLayout.findIndex((item) => isUnraidContainerWidgetId(item.id));
   const selectedContainerIds = selectedContainers.map((item) => item.id);
