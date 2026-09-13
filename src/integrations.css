@@ -1,0 +1,16 @@
+.integrations-settings { max-width: none; }
+.integration-toggle-list { display: grid; gap: 10px; }
+.integration-toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 18px; padding: 14px 16px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface-soft); }
+.integration-toggle-row > div { display: grid; gap: 4px; min-width: 0; }
+.integration-toggle-row strong { font-size: 0.92rem; }
+.integration-toggle-row span { color: var(--muted); font-size: 0.78rem; line-height: 1.4; }
+.integration-toggle { position: relative; width: 48px; height: 28px; flex: 0 0 auto; padding: 0; border: 1px solid var(--border); border-radius: 999px; background: var(--surface); cursor: pointer; transition: background 140ms ease, border-color 140ms ease; }
+.integration-toggle.active { border-color: var(--accent); background: var(--accent); }
+.integration-toggle-knob { position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: white; box-shadow: 0 1px 3px rgb(0 0 0 / 18%); transition: transform 140ms ease; }
+.integration-toggle.active .integration-toggle-knob { transform: translateX(20px); }
+.integration-toggle:disabled { opacity: 0.6; cursor: wait; }
+.sr-only { position: absolute !important; width: 1px !important; height: 1px !important; padding: 0 !important; margin: -1px !important; overflow: hidden !important; clip: rect(0, 0, 0, 0) !important; white-space: nowrap !important; border: 0 !important; }
+
+@media (max-width: 650px) {
+  .integration-toggle-row { align-items: flex-start; }
+}
