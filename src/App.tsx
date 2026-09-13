@@ -17,6 +17,8 @@ type User = { id: string; email: string; displayName: string | null; role: "admi
 type SessionResponse = { authenticated: boolean; user: User | null };
 type NavPage = "Hjem" | "Garmin" | "Motion" | "Velbefindende" | "Vejr" | "Strøm" | "Kalender" | "Varmepumpe" | "DBA" | "Unraid" | "PC Watch" | "Notifikationer" | "Displays";
 type Page = NavPage | "Indstillinger";
+type IntegrationKey = "garmin" | "wellbeing" | "weather" | "electricity" | "calendar" | "melcloud" | "dba" | "unraid" | "pcwatch" | "notifications" | "displays";
+type IntegrationMap = Record<IntegrationKey, boolean>;
 
 type NavDefinition = { page: NavPage; icon: string; label: string };
 const NAV_DEFINITIONS: NavDefinition[] = [
@@ -29,6 +31,15 @@ const NAV_DEFINITIONS: NavDefinition[] = [
 const DEFAULT_NAV_ORDER = NAV_DEFINITIONS.map((item) => item.page);
 const NAV_BY_PAGE = new Map(NAV_DEFINITIONS.map((item) => [item.page, item]));
 const MOBILE_ALLOWED = new Set<NavPage>(["Hjem", "Garmin", "Motion", "Velbefindende", "Vejr", "Strøm", "Kalender", "Varmepumpe", "Unraid", "Displays"]);
+const DEFAULT_INTEGRATIONS: IntegrationMap = {
+  garmin: true, wellbeing: true, weather: true, electricity: true, calendar: true, melcloud: true,
+  dba: true, unraid: true, pcwatch: true, notifications: true, displays: true,
+};
+const PAGE_INTEGRATION: Partial<Record<NavPage, IntegrationKey>> = {
+  Garmin: "garmin", Motion: "garmin", Velbefindende: "wellbeing", Vejr: "weather", Strøm: "electricity",
+  Kalender: "calendar", Varmepumpe: "melcloud", DBA: "dba", Unraid: "unraid", "PC Watch": "pcwatch",
+  Notifikationer: "notifications", Displays: "displays",
+};
 
 function normalizeNavOrder(order: unknown): NavPage[] {
   const source = Array.isArray(order) ? order : [];
@@ -36,6 +47,11 @@ function normalizeNavOrder(order: unknown): NavPage[] {
   for (const item of source) if (typeof item === "string" && NAV_BY_PAGE.has(item as NavPage) && !next.includes(item as NavPage)) next.push(item as NavPage);
   for (const item of DEFAULT_NAV_ORDER) if (!next.includes(item)) next.push(item);
   return next;
+}
+
+function pageEnabled(page: NavPage, integrations: IntegrationMap): boolean {
+  const key = PAGE_INTEGRATION[page];
+  return !key || integrations[key];
 }
 
 function initials(user: User | null): string {
@@ -50,6 +66,7 @@ function App() {
   const [loginState, setLoginState] = useState<"idle" | "sending" | "sent" | "error">("idle");
   const [page, setPage] = useState<Page>("Hjem");
   const [navOrder, setNavOrder] = useState<NavPage[]>(DEFAULT_NAV_ORDER);
+  const [integrations, setIntegrations] = useState<IntegrationMap>(DEFAULT_INTEGRATIONS);
   const [editingNav, setEditingNav] = useState(false);
   const [draggedNav, setDraggedNav] = useState<NavPage | null>(null);
   const [navSaveState, setNavSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
@@ -75,18 +92,38 @@ function App() {
 
   useEffect(() => {
     if (!session?.authenticated) return;
-    void fetch("/api/navigation", { credentials: "same-origin", cache: "no-store" })
-      .then(async (response) => response.ok ? response.json() as Promise<{ order: NavPage[] }> : Promise.reject())
-      .then((body) => setNavOrder(normalizeNavOrder(body.order)))
-      .catch(() => setNavOrder(DEFAULT_NAV_ORDER));
+    void Promise.all([
+      fetch("/api/navigation", { credentials: "same-origin", cache: "no-store" })
+        .then(async (response) => response.ok ? response.json() as Promise<{ order: NavPage[] }> : Promise.reject()),
+      fetch("/api/integrations", { credentials: "same-origin", cache: "no-store" })
+        .then(async (response) => response.ok ? response.json() as Promise<{ integrations: IntegrationMap }> : Promise.reject()),
+    ]).then(([navigation, integrationSettings]) => {
+      setNavOrder(normalizeNavOrder(navigation.order));
+      setIntegrations(integrationSettings.integrations);
+    }).catch(() => {
+      setNavOrder(DEFAULT_NAV_ORDER);
+      setIntegrations(DEFAULT_INTEGRATIONS);
+    });
   }, [session?.authenticated]);
+
+  useEffect(() => {
+    function changed(event: Event) {
+      const next = (event as CustomEvent<IntegrationMap>).detail;
+      if (!next) return;
+      setIntegrations(next);
+      setPage((current) => current !== "Indstillinger" && current !== "Hjem" && !pageEnabled(current, next) ? "Hjem" : current);
+    }
+    window.addEventListener("nexus-integrations-changed", changed);
+    return () => window.removeEventListener("nexus-integrations-changed", changed);
+  }, []);
 
   const displayName = useMemo(() => {
     const user = session?.user;
     if (!user) return "Nexus";
     return user.displayName?.trim() || user.email.split("@")[0];
   }, [session]);
-  const mobileNav = navOrder.filter((item) => MOBILE_ALLOWED.has(item));
+  const visibleNav = navOrder.filter((item) => pageEnabled(item, integrations));
+  const mobileNav = visibleNav.filter((item) => MOBILE_ALLOWED.has(item));
 
   async function requestLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setLoginState("sending");
@@ -153,7 +190,7 @@ function App() {
   return <div className="app-frame">
     <aside className={`sidebar${editingNav ? " sidebar--editing" : ""}`}>
       <div className="sidebar-brand"><div className="brand-mark">N</div><span className="brand-word">NEXUS</span></div>
-      <nav className="sidebar-nav" aria-label="Primær navigation">{navOrder.map((item) => {
+      <nav className="sidebar-nav" aria-label="Primær navigation">{visibleNav.map((item) => {
         const definition = NAV_BY_PAGE.get(item)!;
         return <button className={`nav-item ${page === item ? "active" : ""}`} key={item} type="button" draggable={editingNav}
           onDragStart={() => setDraggedNav(item)} onDragOver={(event) => editingNav && event.preventDefault()} onDrop={(event) => editingNav && navDrop(event, item)}
@@ -171,7 +208,7 @@ function App() {
     <div className="content-shell">
       <header className="app-header"><div><h1>{heading}</h1></div><div className="header-actions"><button className="theme-toggle" onClick={toggleTheme} aria-label="Skift tema">{theme === "light" ? "☾" : "☀"}</button><details className="user-menu"><summary className="user-menu-summary" aria-label="Åbn brugermenu"><span className="avatar">{initials(session.user)}</span><span className="user-name">{displayName}</span></summary><div className="user-menu-popover"><button type="button" onClick={(event) => { setPage("Indstillinger"); closeUserMenu(event); }}>Indstillinger</button><button className="logout-button" type="button" onClick={logout}>Log ud</button></div></details></div></header>
       <main className="main-content">
-        {page === "Hjem" && <HomePage onOpenPage={setPage} />}{page === "Garmin" && <GarminPage />}{page === "Motion" && <MotionPage />}{page === "Velbefindende" && <WellbeingPage />}{page === "Vejr" && <WeatherPage />}{page === "Strøm" && <ElectricityPage />}{page === "Kalender" && <CalendarPage />}{page === "Varmepumpe" && <MelCloudPage />}{page === "Unraid" && <UnraidPage />}{page === "Displays" && <DisplaysPage />}{page === "Indstillinger" && <SettingsPage />}
+        {page === "Hjem" && <HomePage onOpenPage={setPage} />}{page === "Garmin" && integrations.garmin && <GarminPage />}{page === "Motion" && integrations.garmin && <MotionPage />}{page === "Velbefindende" && integrations.wellbeing && <WellbeingPage />}{page === "Vejr" && integrations.weather && <WeatherPage />}{page === "Strøm" && integrations.electricity && <ElectricityPage />}{page === "Kalender" && integrations.calendar && <CalendarPage />}{page === "Varmepumpe" && integrations.melcloud && <MelCloudPage />}{page === "Unraid" && integrations.unraid && <UnraidPage />}{page === "Displays" && integrations.displays && <DisplaysPage />}{page === "Indstillinger" && <SettingsPage />}
         {!isHome && page !== "Garmin" && page !== "Motion" && page !== "Velbefindende" && page !== "Vejr" && page !== "Strøm" && page !== "Kalender" && page !== "Varmepumpe" && page !== "Unraid" && page !== "Displays" && page !== "Indstillinger" && <section className="placeholder-card"><p className="section-label">Planlagt</p><h2>{page}</h2><p>Modulet er på vej ind i Nexus.</p></section>}
       </main>
       <footer><span>Nexus v0.1</span><span>Simple by design.</span></footer>
