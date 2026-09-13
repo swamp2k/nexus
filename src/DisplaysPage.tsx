@@ -5,6 +5,8 @@ import WidgetCard from "./dashboard/WidgetCard";
 import { changeRows, changeSize, cycleRows, effectiveRows, moveVisualWidget, moveWidget, removeWidget, ROW_OPTIONS, SIZE_LABELS, sizeIndex, stepSize, toggleWidget } from "./dashboard/layoutEditing";
 import type { LayoutItem, WidgetRows } from "./dashboard/layoutEditing";
 import { resolveDashboardRefreshClass } from "./data/dashboardRefresh";
+import { DEFAULT_INTEGRATIONS, fetchIntegrations, integrationKeyForWidgetId, widgetIntegrationEnabled } from "./data/integrations";
+import type { IntegrationMap } from "./data/integrations";
 import { useSettings } from "./data/settings";
 import { widgetCatalog, widgetDefinitionById } from "./widgets/widgetCatalog";
 import { widgetRefreshGroup, widgetSupportsSurface } from "./widgets/widgetRegistry";
@@ -13,7 +15,12 @@ import type { WidgetSize } from "./widgets/widgetRegistry";
 type Dashboard = { id: string; name: string; theme: "light" | "dark" | "system"; layout: LayoutItem[]; createdAt: string; updatedAt: string };
 type Device = { id: string; name: string; dashboardId: string | null; dashboardName: string | null; createdAt: string; lastSeenAt: string };
 
-const displayWidgets = widgetCatalog.filter((widget) => widgetSupportsSurface(widget, "display"));
+function displayLayoutItemEnabled(item: LayoutItem, integrations: IntegrationMap): boolean {
+  const key = integrationKeyForWidgetId(item.id);
+  if (key) return integrations[key] !== false;
+  const widget = widgetDefinitionById(item.type ?? item.id);
+  return widget ? widgetIntegrationEnabled(widget, integrations) : true;
+}
 
 export default function DisplaysPage() {
   const [dashboards, setDashboards] = useState<Dashboard[]>([]);
@@ -24,6 +31,7 @@ export default function DisplaysPage() {
   const [deviceName, setDeviceName] = useState("Køkken-iPad");
   const [message, setMessage] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [integrations, setIntegrations] = useState<IntegrationMap>(DEFAULT_INTEGRATIONS);
 
   const { data: refreshSettings } = useSettings();
 
@@ -45,15 +53,30 @@ export default function DisplaysPage() {
   useEffect(() => { void load().catch(() => setMessage("Displays kunne ikke hentes.")); }, []);
 
   useEffect(() => {
+    void fetchIntegrations().then(setIntegrations).catch(() => setIntegrations(DEFAULT_INTEGRATIONS));
+    function changed(event: Event) {
+      const next = (event as CustomEvent<IntegrationMap>).detail;
+      if (next) setIntegrations({ ...DEFAULT_INTEGRATIONS, ...next });
+    }
+    window.addEventListener("nexus-integrations-changed", changed);
+    return () => window.removeEventListener("nexus-integrations-changed", changed);
+  }, []);
+
+  useEffect(() => {
     setDraft(dashboards.find((item) => item.id === selectedId) ?? null);
     setPairCode(null);
   }, [selectedId]);
+
+  const displayWidgets = useMemo(() => widgetCatalog.filter((widget) =>
+    widgetSupportsSurface(widget, "display") && widgetIntegrationEnabled(widget, integrations)), [integrations]);
 
   const groupedWidgets = useMemo(() => {
     const groups = new Map<string, typeof displayWidgets>();
     for (const widget of displayWidgets) groups.set(widget.group, [...(groups.get(widget.group) ?? []), widget]);
     return [...groups.entries()];
-  }, []);
+  }, [displayWidgets]);
+
+  const visibleLayout = useMemo(() => draft?.layout.filter((item) => displayLayoutItemEnabled(item, integrations)) ?? [], [draft, integrations]);
 
   function updateLayout(update: (layout: LayoutItem[]) => LayoutItem[]) {
     setDraft((current) => current ? { ...current, layout: update(current.layout) } : current);
@@ -118,8 +141,8 @@ export default function DisplaysPage() {
 
         <section className="display-layout-preview">
           <div className="home-editor-copy"><strong>Layout</strong><span>Træk i ⠿ for at flytte, eller brug pilene. −/+ ændrer bredde, ↕ ændrer højde. Kolonnerne tilpasses pladsen her; displayet bruger sin egen skærmbredde.</span></div>
-          {draft.layout.length === 0 ? <div className="home-empty"><strong>Displayet er tomt.</strong><span>Tilføj widgets nedenfor.</span></div> : <div className="home-widget-grid display-dashboard-grid display-dashboard-grid--editing" ref={drag.gridRef}>
-            {draft.layout.map((item, index) => {
+          {visibleLayout.length === 0 ? <div className="home-empty"><strong>Displayet er tomt.</strong><span>Tilføj widgets nedenfor.</span></div> : <div className="home-widget-grid display-dashboard-grid display-dashboard-grid--editing" ref={drag.gridRef}>
+            {visibleLayout.map((item, index) => {
               const widget = widgetDefinitionById(item.type ?? item.id) ?? unavailableWidgetDefinition(item.type ?? item.id);
               const Widget = widget.component;
               const currentSize = sizeIndex(item, widget);
@@ -134,7 +157,7 @@ export default function DisplaysPage() {
                   rows,
                   onCycleRows: () => updateLayout((layout) => cycleRows(layout, item.id, widget.rows ?? 1)),
                   canMoveEarlier: index > 0,
-                  canMoveLater: index < draft.layout.length - 1,
+                  canMoveLater: index < visibleLayout.length - 1,
                   onShrink: () => updateLayout((layout) => stepSize(layout, item.id, -1, widgetDefinitionById)),
                   onGrow: () => updateLayout((layout) => stepSize(layout, item.id, 1, widgetDefinitionById)),
                   onMoveEarlier: () => updateLayout((layout) => moveWidget(layout, item.id, -1)),
@@ -147,7 +170,7 @@ export default function DisplaysPage() {
           </div>}
         </section>
 
-        <section className="home-editor"><div className="home-editor-copy"><strong>Tilgængelige widgets</strong><span>Samme komponenter og data som på Hjem.</span></div><div className="home-editor-groups">{groupedWidgets.map(([group, widgets]) => <fieldset key={group}><legend>{group}</legend>{widgets.map((widget) => { const item = draft.layout.find((entry) => entry.id === widget.id); const index = draft.layout.findIndex((entry) => entry.id === widget.id); return <div className="home-editor-row" key={widget.id}><label><input type="checkbox" checked={Boolean(item)} onChange={() => updateLayout((layout) => toggleWidget(layout, widget.id, widgetDefinitionById))} /><span><strong>{widget.title}</strong><small>{widget.description}</small></span></label>{item && <div className="home-editor-controls"><select aria-label={`Bredde for ${widget.title}`} value={item.size} onChange={(event) => updateLayout((layout) => changeSize(layout, widget.id, event.target.value as WidgetSize, widgetDefinitionById))}>{widget.supportedSizes.map((size) => <option key={size} value={size}>{SIZE_LABELS[size]}</option>)}</select><select aria-label={`Højde for ${widget.title}`} value={effectiveRows(item, widget)} onChange={(event) => updateLayout((layout) => changeRows(layout, widget.id, Number(event.target.value) as WidgetRows))}>{ROW_OPTIONS.map((rows) => <option key={rows} value={rows}>{rows} række{rows === 1 ? "" : "r"}</option>)}</select><button type="button" aria-label={`Flyt ${widget.title} op`} disabled={index <= 0} onClick={() => updateLayout((layout) => moveWidget(layout, widget.id, -1))}>↑</button><button type="button" aria-label={`Flyt ${widget.title} ned`} disabled={index >= draft.layout.length - 1} onClick={() => updateLayout((layout) => moveWidget(layout, widget.id, 1))}>↓</button></div>}</div>; })}</fieldset>)}</div></section>
+        <section className="home-editor"><div className="home-editor-copy"><strong>Tilgængelige widgets</strong><span>Samme komponenter og data som på Hjem. Deaktiverede integrationer vises ikke.</span></div><div className="home-editor-groups">{groupedWidgets.map(([group, widgets]) => <fieldset key={group}><legend>{group}</legend>{widgets.map((widget) => { const item = draft.layout.find((entry) => entry.id === widget.id); const index = visibleLayout.findIndex((entry) => entry.id === widget.id); return <div className="home-editor-row" key={widget.id}><label><input type="checkbox" checked={Boolean(item)} onChange={() => updateLayout((layout) => toggleWidget(layout, widget.id, widgetDefinitionById))} /><span><strong>{widget.title}</strong><small>{widget.description}</small></span></label>{item && <div className="home-editor-controls"><select aria-label={`Bredde for ${widget.title}`} value={item.size} onChange={(event) => updateLayout((layout) => changeSize(layout, widget.id, event.target.value as WidgetSize, widgetDefinitionById))}>{widget.supportedSizes.map((size) => <option key={size} value={size}>{SIZE_LABELS[size]}</option>)}</select><select aria-label={`Højde for ${widget.title}`} value={effectiveRows(item, widget)} onChange={(event) => updateLayout((layout) => changeRows(layout, widget.id, Number(event.target.value) as WidgetRows))}>{ROW_OPTIONS.map((rows) => <option key={rows} value={rows}>{rows} række{rows === 1 ? "" : "r"}</option>)}</select><button type="button" aria-label={`Flyt ${widget.title} op`} disabled={index <= 0} onClick={() => updateLayout((layout) => moveWidget(layout, widget.id, -1))}>↑</button><button type="button" aria-label={`Flyt ${widget.title} ned`} disabled={index < 0 || index >= visibleLayout.length - 1} onClick={() => updateLayout((layout) => moveWidget(layout, widget.id, 1))}>↓</button></div>}</div>; })}</fieldset>)}</div></section>
         <div className="display-editor-actions"><button className="secondary-action" type="button" onClick={() => void deleteDashboard()}>Slet</button><button className="primary-action" type="button" onClick={() => void saveDashboard()}>Gem dashboard</button></div>
         <section className="settings-card"><div className="settings-card-heading"><div><p className="section-label">Pairing</p><h2>Par en skærm til {draft.name}</h2></div></div><div className="settings-form"><label><span>Enhedsnavn</span><input value={deviceName} onChange={(event) => setDeviceName(event.target.value)} /></label><button className="primary-action" type="button" onClick={() => void createPairCode()}>Lav parringskode</button>{pairCode && <div className="display-pairing-code-panel"><span>Indtast på /display</span><strong className="display-pairing-code">{pairCode.code}</strong><small>Gyldig i 10 minutter.</small></div>}</div></section>
         <section className="settings-card"><div className="settings-card-heading"><div><p className="section-label">Enheder</p><h2>Parrede skærme</h2></div></div><div className="display-device-list">{devices.filter((device) => device.dashboardId === draft.id).map((device) => <div className="display-device-row" key={device.id}><div><strong>{device.name}</strong><small>Sidst set {new Date(device.lastSeenAt).toLocaleString("da-DK")}</small></div><button className="secondary-action" type="button" onClick={() => void revokeDevice(device.id)}>Fjern adgang</button></div>)}{devices.every((device) => device.dashboardId !== draft.id) && <p className="settings-help">Ingen skærme er parret endnu.</p>}</div></section>
