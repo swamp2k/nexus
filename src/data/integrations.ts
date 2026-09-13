@@ -40,14 +40,27 @@ export function pageIntegrationEnabled(page: WidgetTargetPage | "Displays", inte
   return !key || integrationEnabled(key, integrations);
 }
 
+export function integrationKeyForWidgetId(id: string): IntegrationKey | null {
+  if (id.startsWith("unraid.")) return "unraid";
+  if (id.startsWith("garmin.")) return "garmin";
+  if (id.startsWith("wellbeing.")) return "wellbeing";
+  if (id.startsWith("weather.")) return "weather";
+  if (id.startsWith("energy.")) return "electricity";
+  if (id.startsWith("calendar.")) return "calendar";
+  if (id.startsWith("melcloud.")) return "melcloud";
+  return null;
+}
+
 export function widgetIntegrationKey(widget: Pick<WidgetDefinition, "id" | "group" | "page">): IntegrationKey | null {
-  if (widget.id.startsWith("unraid.") || widget.group === "Unraid") return "unraid";
-  if (widget.id.startsWith("garmin.") || widget.group === "Garmin") return "garmin";
-  if (widget.id.startsWith("wellbeing.") || widget.group === "Velbefindende") return "wellbeing";
-  if (widget.id.startsWith("weather.") || widget.group === "Vejr") return "weather";
-  if (widget.id.startsWith("energy.") || widget.group === "Strøm") return "electricity";
-  if (widget.id.startsWith("calendar.") || widget.group === "Kalender") return "calendar";
-  if (widget.id.startsWith("melcloud.") || widget.group === "MELCloud") return "melcloud";
+  const byId = integrationKeyForWidgetId(widget.id);
+  if (byId) return byId;
+  if (widget.group === "Unraid") return "unraid";
+  if (widget.group === "Garmin") return "garmin";
+  if (widget.group === "Velbefindende") return "wellbeing";
+  if (widget.group === "Vejr") return "weather";
+  if (widget.group === "Strøm") return "electricity";
+  if (widget.group === "Kalender") return "calendar";
+  if (widget.group === "MELCloud") return "melcloud";
   if (widget.page) return PAGE_INTEGRATION[widget.page] ?? null;
   return null;
 }
