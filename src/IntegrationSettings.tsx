@@ -1,7 +1,6 @@
 import { useEffect, useState } from "react";
-
-type IntegrationKey = "garmin" | "wellbeing" | "weather" | "electricity" | "calendar" | "melcloud" | "dba" | "unraid" | "pcwatch" | "notifications" | "displays";
-type IntegrationMap = Record<IntegrationKey, boolean>;
+import { DEFAULT_INTEGRATIONS } from "./data/integrations";
+import type { IntegrationKey, IntegrationMap } from "./data/integrations";
 
 type IntegrationDefinition = {
   key: IntegrationKey;
@@ -23,10 +22,8 @@ const DEFINITIONS: IntegrationDefinition[] = [
   { key: "displays", label: "Displays", description: "Display-dashboard og pairing." },
 ];
 
-const DEFAULTS = Object.fromEntries(DEFINITIONS.map(({ key }) => [key, true])) as IntegrationMap;
-
 export default function IntegrationSettings() {
-  const [integrations, setIntegrations] = useState<IntegrationMap>(DEFAULTS);
+  const [integrations, setIntegrations] = useState<IntegrationMap>(DEFAULT_INTEGRATIONS);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<IntegrationKey | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -37,7 +34,7 @@ export default function IntegrationSettings() {
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         return response.json() as Promise<{ integrations: IntegrationMap }>;
       })
-      .then((body) => setIntegrations(body.integrations))
+      .then((body) => setIntegrations({ ...DEFAULT_INTEGRATIONS, ...body.integrations }))
       .catch(() => setError("Integrationerne kunne ikke hentes."))
       .finally(() => setLoading(false));
   }, []);
@@ -57,8 +54,9 @@ export default function IntegrationSettings() {
       });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const body = await response.json() as { integrations: IntegrationMap };
-      setIntegrations(body.integrations);
-      window.dispatchEvent(new CustomEvent("nexus-integrations-changed", { detail: body.integrations }));
+      const saved = { ...DEFAULT_INTEGRATIONS, ...body.integrations };
+      setIntegrations(saved);
+      window.dispatchEvent(new CustomEvent("nexus-integrations-changed", { detail: saved }));
     } catch {
       setIntegrations(previous);
       setError("Ændringen kunne ikke gemmes.");
@@ -70,7 +68,7 @@ export default function IntegrationSettings() {
   if (loading) return <p className="settings-loading">Henter integrationer…</p>;
 
   return <div className="settings-form integrations-settings">
-    <p className="settings-help">Slå moduler fra, som du ikke bruger. Det skjuler sider og indstillinger, men sletter ikke data eller credentials.</p>
+    <p className="settings-help">Slå moduler fra, som du ikke bruger. Det skjuler sider, widgets og tilhørende indstillinger, men sletter ikke data eller credentials.</p>
     <div className="integration-toggle-list">
       {DEFINITIONS.map((integration) => <div className="integration-toggle-row" key={integration.key}>
         <div><strong>{integration.label}</strong><span>{integration.description}</span></div>
