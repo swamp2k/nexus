@@ -24,6 +24,7 @@ import "./melcloud.css";
 import "./unraid.css";
 import "./audit-polish.css";
 import "./settings.css";
+import "./integrations.css";
 import "./display-pairing.css";
 import "./displays.css";
 
