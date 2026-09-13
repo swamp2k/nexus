@@ -1,9 +1,27 @@
 import { getAuthenticatedUser } from "../auth/session";
 
+type Row = Record<string, unknown>;
+
+type TimelineEntry = {
+  id: string;
+  subjectDate: string;
+  createdAt: string;
+  author: "user" | "miyagi" | "noteflow-ai" | "system";
+  type: "checkin" | "comment" | "checkin_reply" | "chat" | "legacy";
+  body?: string;
+  values?: Array<{ metricId: string; metricName: string; value: unknown }>;
+  journalEntryId?: string | null;
+  sourceRef?: string | null;
+};
+
 function json(body: unknown, init: ResponseInit = {}): Response {
   const headers = new Headers(init.headers);
   headers.set("Cache-Control", "no-store");
   return Response.json(body, { ...init, headers });
+}
+
+function stringValue(value: unknown): string {
+  return typeof value === "string" ? value : String(value ?? "");
 }
 
 export async function handleWellbeingExportRoute(request: Request, env: Env): Promise<Response | null> {
@@ -20,7 +38,7 @@ export async function handleWellbeingExportRoute(request: Request, env: Env): Pr
        FROM wellbeing_metrics
        WHERE user_id = ?
        ORDER BY sort_order, created_at`,
-    ).bind(user.id).all(),
+    ).bind(user.id).all<Row>(),
     env.DB.prepare(
       `SELECT e.id, e.metric_id AS metricId, m.name AS metricName,
               e.entry_date AS entryDate, e.value,
@@ -29,14 +47,14 @@ export async function handleWellbeingExportRoute(request: Request, env: Env): Pr
        JOIN wellbeing_metrics m ON m.id = e.metric_id AND m.user_id = e.user_id
        WHERE e.user_id = ?
        ORDER BY e.entry_date, e.created_at`,
-    ).bind(user.id).all(),
+    ).bind(user.id).all<Row>(),
     env.DB.prepare(
       `SELECT id, entry_date AS entryDate, body,
               created_at AS createdAt, updated_at AS updatedAt
        FROM journal_entries
        WHERE user_id = ?
-       ORDER BY created_at`,
-    ).bind(user.id).all(),
+       ORDER BY entry_date, created_at`,
+    ).bind(user.id).all<Row>(),
     env.DB.prepare(
       `SELECT id, period_days AS periodDays, period_start AS periodStart,
               period_end AS periodEnd, model, analysis, focus,
@@ -45,22 +63,90 @@ export async function handleWellbeingExportRoute(request: Request, env: Env): Pr
        FROM miyagi_analyses
        WHERE user_id = ?
        ORDER BY created_at`,
-    ).bind(user.id).all(),
+    ).bind(user.id).all<Row>(),
     env.DB.prepare(
-      `SELECT id, role, body, kind,
-              analysis_id AS analysisId,
-              journal_entry_id AS journalEntryId,
-              source_ref AS sourceRef,
-              created_at AS createdAt
-       FROM miyagi_conversation_messages
-       WHERE user_id = ?
-       ORDER BY created_at, id`,
-    ).bind(user.id).all(),
+      `SELECT m.id, m.role, m.body, m.kind,
+              m.analysis_id AS analysisId,
+              m.journal_entry_id AS journalEntryId,
+              m.source_ref AS sourceRef,
+              j.entry_date AS subjectDate,
+              m.created_at AS createdAt
+       FROM miyagi_conversation_messages m
+       LEFT JOIN journal_entries j ON j.id = m.journal_entry_id AND j.user_id = m.user_id
+       WHERE m.user_id = ?
+       ORDER BY m.created_at, m.id`,
+    ).bind(user.id).all<Row>(),
   ]);
+
+  const timeline: TimelineEntry[] = [];
+  const entriesByDate = new Map<string, Row[]>();
+  for (const entry of entries.results) {
+    const date = stringValue(entry.entryDate);
+    const rows = entriesByDate.get(date) ?? [];
+    rows.push(entry);
+    entriesByDate.set(date, rows);
+  }
+
+  for (const [subjectDate, rows] of entriesByDate) {
+    const createdAt = rows.map((row) => stringValue(row.createdAt)).filter(Boolean).sort()[0] ?? `${subjectDate}T00:00:00.000Z`;
+    timeline.push({
+      id: `checkin:${subjectDate}`,
+      subjectDate,
+      createdAt,
+      author: "user",
+      type: "checkin",
+      values: rows.map((row) => ({
+        metricId: stringValue(row.metricId),
+        metricName: stringValue(row.metricName),
+        value: row.value,
+      })),
+    });
+  }
+
+  for (const journal of journals.results) {
+    timeline.push({
+      id: `journal:${stringValue(journal.id)}`,
+      subjectDate: stringValue(journal.entryDate),
+      createdAt: stringValue(journal.createdAt),
+      author: "user",
+      type: "comment",
+      body: stringValue(journal.body),
+      journalEntryId: stringValue(journal.id),
+      sourceRef: `journal_entries:${stringValue(journal.id)}`,
+    });
+  }
+
+  for (const message of conversation.results) {
+    const sourceRef = stringValue(message.sourceRef) || null;
+    if (sourceRef?.startsWith("journal_entries:")) continue;
+    const createdAt = stringValue(message.createdAt);
+    const kind = stringValue(message.kind);
+    const role = stringValue(message.role);
+    const subjectDate = stringValue(message.subjectDate) || createdAt.slice(0, 10);
+    const legacy = kind === "legacy";
+    timeline.push({
+      id: `message:${stringValue(message.id)}`,
+      subjectDate,
+      createdAt,
+      author: legacy && role === "assistant" ? "noteflow-ai" : role === "assistant" ? "miyagi" : "user",
+      type: legacy ? "legacy" : kind === "checkin" ? "checkin_reply" : "chat",
+      body: stringValue(message.body),
+      journalEntryId: stringValue(message.journalEntryId) || null,
+      sourceRef,
+    });
+  }
+
+  timeline.sort((a, b) => {
+    const subject = a.subjectDate.localeCompare(b.subjectDate);
+    if (subject) return subject;
+    const created = a.createdAt.localeCompare(b.createdAt);
+    return created || a.id.localeCompare(b.id);
+  });
 
   return json({
     exportedAt: new Date().toISOString(),
-    formatVersion: 1,
+    formatVersion: 2,
+    journalTimeline: timeline,
     wellbeing: {
       metrics: metrics.results,
       entries: entries.results,
