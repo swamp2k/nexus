@@ -8,6 +8,7 @@ import { handleGarminRoute } from "./garmin/routes";
 import { handleGarminScheduleRoute, queueScheduledGarminSyncs } from "./garmin/scheduled-sync";
 import { handleMelCloudRoute } from "./melcloud/routes";
 import { handleHomeLayoutRoute } from "./settings/home-layout";
+import { handleIntegrationSettingsRoute } from "./settings/integrations";
 import { handleNavigationRoute } from "./settings/navigation";
 import { handleSettingsRoute } from "./settings/routes";
 import { handleEloverblikSettingsRoute } from "./sources/eloverblik-settings-routes";
@@ -39,6 +40,7 @@ export default {
 
       if (url.pathname.startsWith("/api/auth/")) { const response = await handleAuthRoute(request, env); if (response) return response; }
       if (url.pathname.startsWith("/api/users")) { const response = await handleUserRoute(request, env); if (response) return response; }
+      if (url.pathname === "/api/integrations") { const response = await handleIntegrationSettingsRoute(request, env); if (response) return response; }
       if (url.pathname.startsWith("/api/calendar/")) { const response = await handleCalendarRoute(request, env); if (response) return response; }
       if (url.pathname.startsWith("/api/garmin/")) {
         const credentialResponse = await handleGarminCredentialRoute(request, env); if (credentialResponse) return credentialResponse;
