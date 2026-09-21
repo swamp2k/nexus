@@ -47,11 +47,13 @@ export async function handleWellbeingExportRoute(request: Request, env: Env): Pr
        ORDER BY sort_order, created_at`,
     ).bind(user.id, subjectId).all<Row>(),
     env.DB.prepare(
-      `SELECT e.id, e.metric_id AS metricId, m.name AS metricName,
+      `SELECT e.id, e.checkin_id AS checkinId, e.metric_id AS metricId, m.name AS metricName,
               e.entry_date AS entryDate, e.value,
+              c.occurred_at AS occurredAt,
               e.created_at AS createdAt, e.updated_at AS updatedAt
        FROM wellbeing_entries e
        JOIN wellbeing_metrics m ON m.id = e.metric_id AND m.user_id = e.user_id
+       JOIN wellbeing_checkins c ON c.id = e.checkin_id AND c.user_id = e.user_id
        WHERE e.user_id = ? AND e.subject_id = ?
        ORDER BY e.entry_date, e.created_at`,
     ).bind(user.id, subjectId).all<Row>(),
@@ -86,18 +88,20 @@ export async function handleWellbeingExportRoute(request: Request, env: Env): Pr
   ]);
 
   const timeline: TimelineEntry[] = [];
-  const entriesByDate = new Map<string, Row[]>();
+  const entriesByCheckin = new Map<string, Row[]>();
   for (const entry of entries.results) {
-    const date = stringValue(entry.entryDate);
-    const rows = entriesByDate.get(date) ?? [];
+    const checkinId = stringValue(entry.checkinId);
+    const rows = entriesByCheckin.get(checkinId) ?? [];
     rows.push(entry);
-    entriesByDate.set(date, rows);
+    entriesByCheckin.set(checkinId, rows);
   }
 
-  for (const [subjectDate, rows] of entriesByDate) {
-    const createdAt = rows.map((row) => stringValue(row.createdAt)).filter(Boolean).sort()[0] ?? `${subjectDate}T00:00:00.000Z`;
+  for (const [checkinId, rows] of entriesByCheckin) {
+    const subjectDate = stringValue(rows[0]?.entryDate);
+    const occurredAt = stringValue(rows[0]?.occurredAt);
+    const createdAt = occurredAt || rows.map((row) => stringValue(row.createdAt)).filter(Boolean).sort()[0] ?? `${subjectDate}T00:00:00.000Z`;
     timeline.push({
-      id: `checkin:${subjectDate}`,
+      id: `checkin:${checkinId}`,
       subjectDate,
       createdAt,
       author: "user",
