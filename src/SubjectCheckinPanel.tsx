@@ -44,7 +44,7 @@ function face(metric: Metric, value: number): string {
   return list[Math.max(0, Math.min(4, value - 1))];
 }
 
-export default function SubjectCheckinPanel() {
+export default function SubjectCheckinPanel({ onSelectionChange }: { onSelectionChange?: (isDefault: boolean) => void }) {
   const [subjects, setSubjects] = useState<Subject[]>([]);
   const [selectedId, setSelectedId] = useState("");
   const [day, setDay] = useState<DayResponse | null>(null);
@@ -63,6 +63,8 @@ export default function SubjectCheckinPanel() {
   const selected = subjects.find((subject) => subject.id === selectedId) ?? subjects.find((subject) => Boolean(subject.isDefault)) ?? null;
   const isSelf = Boolean(selected?.isDefault);
   const today = localDate();
+
+  useEffect(() => { if (selected) onSelectionChange?.(Boolean(selected.isDefault)); }, [selected?.id, selected?.isDefault, onSelectionChange]);
 
   async function loadSubjects() {
     const response = await fetch("/api/wellbeing/subjects", { credentials: "same-origin", cache: "no-store" });
