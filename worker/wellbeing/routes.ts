@@ -103,8 +103,8 @@ async function updateMetric(request: Request, env: Env, metricId: string): Promi
 
   const existing = await env.DB.prepare(
     `SELECT id, name, emoji, direction, value_type AS valueType, sort_order AS sortOrder, active
-     FROM wellbeing_metrics WHERE id = ? AND user_id = ? LIMIT 1`,
-  ).bind(metricId, user.id).first<MetricRow>();
+     FROM wellbeing_metrics WHERE id = ? AND user_id = ? AND subject_id = ? LIMIT 1`,
+  ).bind(metricId, user.id, `self:${user.id}`).first<MetricRow>();
   if (!existing) return json({ error: "metric_not_found" }, { status: 404 });
 
   let body: { name?: unknown; emoji?: unknown; direction?: unknown; active?: unknown; sortOrder?: unknown } = {};
@@ -137,18 +137,18 @@ async function dayState(request: Request, env: Env): Promise<Response> {
     env.DB.prepare(
       `SELECT id, name, emoji, direction, value_type AS valueType, sort_order AS sortOrder, active,
               created_at AS createdAt, updated_at AS updatedAt
-       FROM wellbeing_metrics WHERE user_id = ? AND active = 1 ORDER BY sort_order, created_at`,
-    ).bind(user.id).all<MetricRow>(),
+       FROM wellbeing_metrics WHERE user_id = ? AND subject_id = ? AND active = 1 ORDER BY sort_order, created_at`,
+    ).bind(user.id, `self:${user.id}`).all<MetricRow>(),
     env.DB.prepare(
       `SELECT e.metric_id AS metricId, e.value
        FROM wellbeing_entries e
        JOIN wellbeing_metrics m ON m.id = e.metric_id AND m.user_id = e.user_id
-       WHERE e.user_id = ? AND e.entry_date = ? AND m.active = 1`,
-    ).bind(user.id, date).all<EntryRow>(),
+       WHERE e.user_id = ? AND e.subject_id = ? AND e.entry_date = ? AND m.active = 1`,
+    ).bind(user.id, `self:${user.id}`, date).all<EntryRow>(),
     env.DB.prepare(
       `SELECT id, entry_date AS entryDate, body, created_at AS createdAt, updated_at AS updatedAt
-       FROM journal_entries WHERE user_id = ? AND entry_date = ? ORDER BY created_at DESC`,
-    ).bind(user.id, date).all<JournalRow>(),
+       FROM journal_entries WHERE user_id = ? AND subject_id = ? AND entry_date = ? ORDER BY created_at DESC`,
+    ).bind(user.id, `self:${user.id}`, date).all<JournalRow>(),
   ]);
 
   return json({ date, metrics: metrics.results, entries: entries.results, journals: journals.results });
