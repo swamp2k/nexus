@@ -124,16 +124,16 @@ async function threadHistory(db: D1Database, userId: string, journalId: string):
   return boundMessages(rows.results);
 }
 
-async function dayThread(db: D1Database, userId: string, date: string): Promise<ChatMessage[]> {
+async function dayThread(db: D1Database, userId: string, subjectId: string, date: string): Promise<ChatMessage[]> {
   const rows = await db.prepare(
     `SELECT m.id, m.role, m.body, m.kind, m.analysis_id AS analysisId,
             m.journal_entry_id AS journalEntryId, j.entry_date AS subjectDate,
             m.created_at AS createdAt
      FROM miyagi_conversation_messages m
      JOIN journal_entries j ON j.id = m.journal_entry_id AND j.user_id = m.user_id
-     WHERE m.user_id = ? AND j.entry_date = ? AND m.kind = 'checkin'
+     WHERE m.user_id = ? AND m.subject_id = ? AND j.entry_date = ? AND m.kind = 'checkin'
      ORDER BY m.created_at, m.id`,
-  ).bind(userId, date).all<ChatMessage>();
+  ).bind(userId, subjectId, date).all<ChatMessage>();
   return rows.results;
 }
 
@@ -324,9 +324,9 @@ async function respondToCheckin(request: Request, env: MiyagiEnv): Promise<Respo
     };
     await env.DB.prepare(
       `INSERT INTO miyagi_conversation_messages
-         (id, user_id, role, body, kind, analysis_id, journal_entry_id, source_ref, created_at)
-       VALUES (?, ?, 'user', ?, 'checkin', NULL, ?, ?, ?)`,
-    ).bind(userMessage.id, user.id, userMessage.body, journal.id, `journal_entries:${journal.id}`, journal.createdAt).run();
+         (id, user_id, role, body, kind, analysis_id, journal_entry_id, source_ref, created_at, subject_id, checkin_id)
+       VALUES (?, ?, 'user', ?, 'checkin', NULL, ?, ?, ?, ?, ?)`,
+    ).bind(userMessage.id, user.id, userMessage.body, journal.id, `journal_entries:${journal.id}`, journal.createdAt, journal.subjectId, journal.checkinId).run();
     history = [...history, userMessage];
   }
 
@@ -396,13 +396,13 @@ async function replyToCheckin(request: Request, env: MiyagiEnv): Promise<Respons
   await env.DB.batch([
     env.DB.prepare(
       `INSERT INTO miyagi_conversation_messages
-         (id, user_id, role, body, kind, analysis_id, journal_entry_id, source_ref, created_at)
-       VALUES (?, ?, 'user', ?, 'checkin', ?, ?, NULL, ?)`,
-    ).bind(userMessage.id, user.id, userMessage.body, userMessage.analysisId, journal.id, userMessage.createdAt),
+         (id, user_id, role, body, kind, analysis_id, journal_entry_id, source_ref, created_at, subject_id, checkin_id)
+       VALUES (?, ?, 'user', ?, 'checkin', ?, ?, NULL, ?, ?, ?)`,
+    ).bind(userMessage.id, user.id, userMessage.body, userMessage.analysisId, journal.id, userMessage.createdAt, journal.subjectId, journal.checkinId),
     env.DB.prepare(
       `INSERT INTO miyagi_conversation_messages
-         (id, user_id, role, body, kind, analysis_id, journal_entry_id, source_ref, created_at)
-       VALUES (?, ?, 'assistant', ?, 'checkin', ?, ?, NULL, ?)`,
+         (id, user_id, role, body, kind, analysis_id, journal_entry_id, source_ref, created_at, subject_id, checkin_id)
+       VALUES (?, ?, 'assistant', ?, 'checkin', ?, ?, NULL, ?, ?, ?)`,
     ).bind(assistantMessage.id, user.id, assistantMessage.body, assistantMessage.analysisId, journal.id, assistantMessage.createdAt, journal.subjectId, journal.checkinId),
   ]);
   return json({ messages: [userMessage, assistantMessage], usage: provider.usage }, { status: 201 });
@@ -411,9 +411,14 @@ async function replyToCheckin(request: Request, env: MiyagiEnv): Promise<Respons
 async function getDayThread(request: Request, env: MiyagiEnv): Promise<Response> {
   const user = await getAuthenticatedUser(request, env.DB);
   if (!user) return json({ error: "unauthorized" }, { status: 401 });
-  const date = new URL(request.url).searchParams.get("date") ?? "";
+  const url = new URL(request.url);
+  const date = url.searchParams.get("date") ?? "";
+  const subjectId = url.searchParams.get("subjectId") ?? `self:${user.id}`;
   if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return json({ error: "invalid_date" }, { status: 400 });
-  return json({ date, messages: await dayThread(env.DB, user.id, date) });
+  const subject = await env.DB.prepare(`SELECT id FROM wellbeing_subjects WHERE id = ? AND user_id = ? AND active = 1 LIMIT 1`)
+    .bind(subjectId, user.id).first();
+  if (!subject) return json({ error: "subject_not_found" }, { status: 404 });
+  return json({ date, subjectId, messages: await dayThread(env.DB, user.id, subjectId, date) });
 }
 
 async function chat(request: Request, env: MiyagiEnv): Promise<Response> {
