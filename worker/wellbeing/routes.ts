@@ -169,11 +169,21 @@ async function saveDay(request: Request, env: Env): Promise<Response> {
   const metricIds = Object.keys(values);
   if (metricIds.length > 50) return json({ error: "too_many_values" }, { status: 400 });
 
-  const owned = await env.DB.prepare(`SELECT id, value_type AS valueType FROM wellbeing_metrics WHERE user_id = ? AND active = 1`)
-    .bind(user.id).all<{ id: string; valueType: MetricValueType }>();
-  const allowed = new Map(owned.results.map((row) => [row.id, row.valueType]));
+  const subjectId = `self:${user.id}`;
+  const checkinId = `legacy:${user.id}:${date}`;
   const now = new Date().toISOString();
-  const statements: D1PreparedStatement[] = [];
+  const owned = await env.DB.prepare(
+    `SELECT id, value_type AS valueType FROM wellbeing_metrics
+     WHERE user_id = ? AND subject_id = ? AND active = 1`,
+  ).bind(user.id, subjectId).all<{ id: string; valueType: MetricValueType }>();
+  const allowed = new Map(owned.results.map((row) => [row.id, row.valueType]));
+  const statements: D1PreparedStatement[] = [
+    env.DB.prepare(
+      `INSERT OR IGNORE INTO wellbeing_checkins
+         (id, user_id, subject_id, entry_date, occurred_at, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(checkinId, user.id, subjectId, date, now, now, now),
+  ];
 
   for (const metricId of metricIds) {
     const valueType = allowed.get(metricId);
@@ -181,8 +191,9 @@ async function saveDay(request: Request, env: Env): Promise<Response> {
     const raw = values[metricId];
     if (raw === null || raw === undefined || raw === "") {
       statements.push(env.DB.prepare(
-        `DELETE FROM wellbeing_entries WHERE user_id = ? AND metric_id = ? AND entry_date = ?`,
-      ).bind(user.id, metricId, date));
+        `DELETE FROM wellbeing_entries
+         WHERE user_id = ? AND subject_id = ? AND checkin_id = ? AND metric_id = ?`,
+      ).bind(user.id, subjectId, checkinId, metricId));
       continue;
     }
     const value = Number(raw);
@@ -191,17 +202,17 @@ async function saveDay(request: Request, env: Env): Promise<Response> {
       : Number.isInteger(value) && value >= 1 && value <= 5;
     if (!valid) return json({ error: "invalid_metric_value" }, { status: 400 });
     statements.push(env.DB.prepare(
-      `INSERT INTO wellbeing_entries (id, user_id, metric_id, entry_date, value, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?)
-       ON CONFLICT(user_id, metric_id, entry_date)
+      `INSERT INTO wellbeing_entries
+         (id, user_id, subject_id, checkin_id, metric_id, entry_date, value, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(checkin_id, metric_id)
        DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`,
-    ).bind(crypto.randomUUID(), user.id, metricId, date, value, now, now));
+    ).bind(crypto.randomUUID(), user.id, subjectId, checkinId, metricId, date, value, now, now));
   }
 
-  if (statements.length) await env.DB.batch(statements);
-  return json({ ok: true, date, saved: statements.length, updatedAt: now });
+  await env.DB.batch(statements);
+  return json({ ok: true, date, saved: statements.length - 1, updatedAt: now });
 }
-
 async function listRecent(request: Request, env: Env): Promise<Response> {
   const user = await requireUser(request, env);
   if (!user) return json({ error: "unauthorized" }, { status: 401 });
@@ -213,14 +224,13 @@ async function listRecent(request: Request, env: Env): Promise<Response> {
             m.name, m.emoji, m.direction, m.value_type AS valueType
      FROM wellbeing_entries e
      JOIN wellbeing_metrics m ON m.id = e.metric_id
-     WHERE e.user_id = ?
-     ORDER BY e.entry_date DESC, m.sort_order
+     WHERE e.user_id = ? AND e.subject_id = ?
+     ORDER BY e.entry_date DESC, e.created_at DESC, m.sort_order
      LIMIT ?`,
-  ).bind(user.id, days * 50).all();
+  ).bind(user.id, `self:${user.id}`, days * 50).all();
 
   return json({ days, entries: result.results });
 }
-
 async function createJournal(request: Request, env: Env): Promise<Response> {
   const user = await requireUser(request, env);
   if (!user) return json({ error: "unauthorized" }, { status: 401 });
@@ -236,20 +246,27 @@ async function createJournal(request: Request, env: Env): Promise<Response> {
   const id = crypto.randomUUID();
   const conversationId = crypto.randomUUID();
   const now = new Date().toISOString();
+  const subjectId = `self:${user.id}`;
+  const checkinId = `legacy:${user.id}:${date}`;
   await env.DB.batch([
     env.DB.prepare(
-      `INSERT INTO journal_entries (id, user_id, entry_date, body, created_at, updated_at)
-       VALUES (?, ?, ?, ?, ?, ?)`,
-    ).bind(id, user.id, date, text, now, now),
+      `INSERT OR IGNORE INTO wellbeing_checkins
+         (id, user_id, subject_id, entry_date, occurred_at, created_at, updated_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(checkinId, user.id, subjectId, date, now, now, now),
+    env.DB.prepare(
+      `INSERT INTO journal_entries
+         (id, user_id, entry_date, body, created_at, updated_at, subject_id, checkin_id)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+    ).bind(id, user.id, date, text, now, now, subjectId, checkinId),
     env.DB.prepare(
       `INSERT INTO miyagi_conversation_messages
-         (id, user_id, role, body, kind, analysis_id, journal_entry_id, source_ref, created_at)
-       VALUES (?, ?, 'user', ?, 'checkin', NULL, ?, ?, ?)`,
-    ).bind(conversationId, user.id, text, id, `journal_entries:${id}`, now),
+         (id, user_id, role, body, kind, analysis_id, journal_entry_id, source_ref, created_at, subject_id, checkin_id)
+       VALUES (?, ?, 'user', ?, 'checkin', NULL, ?, ?, ?, ?, ?)`,
+    ).bind(conversationId, user.id, text, id, `journal_entries:${id}`, now, subjectId, checkinId),
   ]);
   return json({ journal: { id, entryDate: date, body: text, createdAt: now, updatedAt: now } }, { status: 201 });
 }
-
 async function deleteJournal(request: Request, env: Env, journalId: string): Promise<Response> {
   const user = await requireUser(request, env);
   if (!user) return json({ error: "unauthorized" }, { status: 401 });
