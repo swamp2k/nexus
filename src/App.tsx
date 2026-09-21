@@ -41,6 +41,12 @@ const PAGE_INTEGRATION: Partial<Record<NavPage, IntegrationKey>> = {
   Notifikationer: "notifications", Displays: "displays",
 };
 
+function initialPageFromUrl(): Page {
+  const requested = new URLSearchParams(window.location.search).get("page");
+  if (requested === "wellbeing") return "Velbefindende";
+  return "Hjem";
+}
+
 function normalizeNavOrder(order: unknown): NavPage[] {
   const source = Array.isArray(order) ? order : [];
   const next: NavPage[] = [];
@@ -64,7 +70,7 @@ function App() {
   const [session, setSession] = useState<SessionResponse | null>(null);
   const [email, setEmail] = useState("");
   const [loginState, setLoginState] = useState<"idle" | "sending" | "sent" | "error">("idle");
-  const [page, setPage] = useState<Page>("Hjem");
+  const [page, setPage] = useState<Page>(initialPageFromUrl);
   const [navOrder, setNavOrder] = useState<NavPage[]>(DEFAULT_NAV_ORDER);
   const [integrations, setIntegrations] = useState<IntegrationMap>(DEFAULT_INTEGRATIONS);
   const [editingNav, setEditingNav] = useState(false);

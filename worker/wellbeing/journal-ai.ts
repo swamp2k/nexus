@@ -105,7 +105,7 @@ export async function refreshHistoricalSummary(env: AiEnv, userId: string): Prom
       `SELECT body, entryDate, createdAt FROM (
          SELECT body, entry_date AS entryDate, created_at AS createdAt
          FROM journal_entries
-         WHERE user_id = ? AND entry_date < ?
+         WHERE user_id = ? AND subject_id = 'self:' || user_id AND entry_date < ?
            AND (? IS NULL OR created_at > ?)
          UNION ALL
          SELECT body, substr(created_at, 1, 10) AS entryDate, created_at AS createdAt
@@ -191,13 +191,13 @@ export async function buildJournalContext(env: AiEnv, userId: string, journal: {
       `SELECT m.name, m.emoji, m.direction, e.value
        FROM wellbeing_entries e
        JOIN wellbeing_metrics m ON m.id = e.metric_id
-       WHERE e.user_id = ? AND e.entry_date = ?
+       WHERE e.user_id = ? AND e.subject_id = 'self:' || e.user_id AND e.entry_date = ?
        ORDER BY m.sort_order`,
     ).bind(userId, journal.entryDate).all<Row>(),
     env.DB.prepare(
       `SELECT entry_date AS entryDate, body
        FROM journal_entries
-       WHERE user_id = ? AND id <> ?
+       WHERE user_id = ? AND subject_id = 'self:' || user_id AND id <> ?
          AND entry_date >= date(?, '-30 days')
        ORDER BY created_at DESC
        LIMIT 12`,

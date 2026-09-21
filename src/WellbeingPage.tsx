@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import MiyagiWorkspace from "./MiyagiWorkspace";
 import MiyagiMarkdown from "./MiyagiMarkdown";
 import WellbeingHistory from "./WellbeingHistory";
+import SubjectCheckinPanel from "./SubjectCheckinPanel";
 
 type MetricValueType = "scale" | "boolean";
 type Metric = {
@@ -86,6 +87,8 @@ export default function WellbeingPage() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [miyagiOpen, setMiyagiOpen] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [selfSelected, setSelfSelected] = useState(true);
+  const [subjectSelectionReady, setSubjectSelectionReady] = useState(false);
 
   async function load(target = date) {
     setLoading(true);
@@ -114,6 +117,14 @@ export default function WellbeingPage() {
   }
 
   useEffect(() => { void load(date); }, [date]);
+
+  useEffect(() => {
+    if (!subjectSelectionReady || !selfSelected) return;
+    if (new URLSearchParams(window.location.search).get("checkin") === "1") {
+      setDate(today);
+      setCheckInOpen(true);
+    }
+  }, [subjectSelectionReady, selfSelected, today]);
 
   const valuesDirty = useMemo(() => metrics.some((metric) => (values[metric.id] ?? null) !== (savedValues[metric.id] ?? null)), [metrics, values, savedValues]);
   const hasUnsaved = valuesDirty || Boolean(journalText.trim());
@@ -229,6 +240,8 @@ export default function WellbeingPage() {
         : hasTodayData ? `${completed} af ${metrics.length} udfyldt` : "Ikke udført i dag";
 
   return <section className="wellbeing-page">
+    <SubjectCheckinPanel onSelectionChange={(isDefault) => { setSelfSelected(isDefault); setSubjectSelectionReady(true); }} />
+    {selfSelected && <>
     <div className="wellbeing-command-list">
       <article className="wellbeing-command-row">
         <div className={`wellbeing-command-icon ${completeToday ? "is-complete" : ""}`} aria-hidden="true">{completeToday ? "✓" : "☀"}</div>
@@ -332,5 +345,6 @@ export default function WellbeingPage() {
     </div>}
 
     {!checkInOpen && message && <p className={`settings-feedback ${message.includes("gemt") ? "success" : "error"}`}>{message}</p>}
+    </>}
   </section>;
 }
