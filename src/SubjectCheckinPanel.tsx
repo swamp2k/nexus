@@ -55,7 +55,6 @@ export default function SubjectCheckinPanel({ onSelectionChange }: { onSelection
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [miyagiReply, setMiyagiReply] = useState<string | null>(null);
-  const [reminders, setReminders] = useState<Reminder[]>([]);
   const [discordConfigured, setDiscordConfigured] = useState(false);
   const [reminderHour, setReminderHour] = useState(20);
   const [reminderEnabled, setReminderEnabled] = useState(false);
@@ -82,7 +81,6 @@ export default function SubjectCheckinPanel({ onSelectionChange }: { onSelection
     const response = await fetch("/api/wellbeing/reminder", { credentials: "same-origin", cache: "no-store" });
     if (!response.ok) return;
     const body = await response.json() as { reminders: Reminder[]; discordConfigured: boolean };
-    setReminders(body.reminders);
     setDiscordConfigured(body.discordConfigured);
     const current = body.reminders.find((item) => item.subjectId === subjectId);
     setReminderHour(current?.hourLocal ?? 20);
@@ -98,7 +96,6 @@ export default function SubjectCheckinPanel({ onSelectionChange }: { onSelection
     setDay(body);
     setValues(Object.fromEntries(body.metrics.map((metric) => [metric.id, null])));
     setComment("");
-    setMiyagiReply(null);
   }
 
   useEffect(() => { void loadSubjects().catch((error: Error) => setMessage(error.message)); }, []);
