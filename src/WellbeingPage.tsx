@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import MiyagiWorkspace from "./MiyagiWorkspace";
 import MiyagiMarkdown from "./MiyagiMarkdown";
 import WellbeingHistory from "./WellbeingHistory";
+import SubjectCheckinPanel from "./SubjectCheckinPanel";
 
 type MetricValueType = "scale" | "boolean";
 type Metric = {
@@ -229,6 +230,7 @@ export default function WellbeingPage() {
         : hasTodayData ? `${completed} af ${metrics.length} udfyldt` : "Ikke udført i dag";
 
   return <section className="wellbeing-page">
+    <SubjectCheckinPanel />
     <div className="wellbeing-command-list">
       <article className="wellbeing-command-row">
         <div className={`wellbeing-command-icon ${completeToday ? "is-complete" : ""}`} aria-hidden="true">{completeToday ? "✓" : "☀"}</div>
