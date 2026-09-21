@@ -87,6 +87,7 @@ export default function WellbeingPage() {
   const [historyOpen, setHistoryOpen] = useState(false);
   const [miyagiOpen, setMiyagiOpen] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [selfSelected, setSelfSelected] = useState(true);
 
   async function load(target = date) {
     setLoading(true);
@@ -230,7 +231,8 @@ export default function WellbeingPage() {
         : hasTodayData ? `${completed} af ${metrics.length} udfyldt` : "Ikke udført i dag";
 
   return <section className="wellbeing-page">
-    <SubjectCheckinPanel />
+    <SubjectCheckinPanel onSelectionChange={setSelfSelected} />
+    {selfSelected && <>
     <div className="wellbeing-command-list">
       <article className="wellbeing-command-row">
         <div className={`wellbeing-command-icon ${completeToday ? "is-complete" : ""}`} aria-hidden="true">{completeToday ? "✓" : "☀"}</div>
@@ -334,5 +336,6 @@ export default function WellbeingPage() {
     </div>}
 
     {!checkInOpen && message && <p className={`settings-feedback ${message.includes("gemt") ? "success" : "error"}`}>{message}</p>}
+    </>}
   </section>;
 }
