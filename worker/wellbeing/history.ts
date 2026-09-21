@@ -15,19 +15,24 @@ export async function handleWellbeingHistoryRoute(request: Request, env: Env): P
   const user = await getAuthenticatedUser(request, env.DB);
   if (!user) return json({ error: "unauthorized" }, { status: 401 });
 
+  const subjectId = url.searchParams.get("subjectId") ?? `self:${user.id}`;
+  const subject = await env.DB.prepare(`SELECT id FROM wellbeing_subjects WHERE id = ? AND user_id = ? AND active = 1 LIMIT 1`)
+    .bind(subjectId, user.id).first();
+  if (!subject) return json({ error: "subject_not_found" }, { status: 404 });
+
   const requested = Number(url.searchParams.get("limit") ?? 90);
   const limit = Math.max(1, Math.min(365, Number.isFinite(requested) ? Math.floor(requested) : 90));
 
   const dates = await env.DB.prepare(
     `SELECT entry_date AS entryDate
      FROM (
-       SELECT entry_date FROM wellbeing_entries WHERE user_id = ?
+       SELECT entry_date FROM wellbeing_entries WHERE user_id = ? AND subject_id = ?
        UNION
-       SELECT entry_date FROM journal_entries WHERE user_id = ?
+       SELECT entry_date FROM journal_entries WHERE user_id = ? AND subject_id = ?
      )
      ORDER BY entry_date DESC
      LIMIT ?`,
-  ).bind(user.id, user.id, limit).all<{ entryDate: string }>();
+  ).bind(user.id, subjectId, user.id, subjectId, limit).all<{ entryDate: string }>();
 
   if (!dates.results.length) return json({ days: [] });
 
@@ -41,15 +46,15 @@ export async function handleWellbeingHistoryRoute(request: Request, env: Env): P
               m.name, m.emoji, m.direction, m.value_type AS valueType, m.sort_order AS sortOrder
        FROM wellbeing_entries e
        JOIN wellbeing_metrics m ON m.id = e.metric_id
-       WHERE e.user_id = ? AND e.entry_date BETWEEN ? AND ?
+       WHERE e.user_id = ? AND e.subject_id = ? AND e.entry_date BETWEEN ? AND ?
        ORDER BY e.entry_date DESC, m.sort_order`,
-    ).bind(user.id, oldest, newest).all<Row>(),
+    ).bind(user.id, subjectId, oldest, newest).all<Row>(),
     env.DB.prepare(
       `SELECT id, entry_date AS entryDate, body, created_at AS createdAt, updated_at AS updatedAt
        FROM journal_entries
-       WHERE user_id = ? AND entry_date BETWEEN ? AND ?
+       WHERE user_id = ? AND subject_id = ? AND entry_date BETWEEN ? AND ?
        ORDER BY entry_date DESC, created_at`,
-    ).bind(user.id, oldest, newest).all<Row>(),
+    ).bind(user.id, subjectId, oldest, newest).all<Row>(),
     env.DB.prepare(
       `SELECT m.id, m.role, m.body, m.kind,
               m.analysis_id AS analysisId, m.journal_entry_id AS journalEntryId,
@@ -57,9 +62,9 @@ export async function handleWellbeingHistoryRoute(request: Request, env: Env): P
               m.created_at AS createdAt
        FROM miyagi_conversation_messages m
        JOIN journal_entries j ON j.id = m.journal_entry_id AND j.user_id = m.user_id
-       WHERE m.user_id = ? AND m.kind = 'checkin' AND j.entry_date BETWEEN ? AND ?
+       WHERE m.user_id = ? AND m.subject_id = ? AND m.kind = 'checkin' AND j.entry_date BETWEEN ? AND ?
        ORDER BY j.entry_date DESC, m.created_at, m.id`,
-    ).bind(user.id, oldest, newest).all<Row>(),
+    ).bind(user.id, subjectId, oldest, newest).all<Row>(),
   ]);
 
   const dateSet = new Set(selectedDates);
@@ -92,6 +97,7 @@ export async function handleWellbeingHistoryRoute(request: Request, env: Env): P
   }
 
   return json({
+    subjectId,
     days: selectedDates.map((date) => ({
       date,
       metrics: metricMap.get(date) ?? [],
