@@ -17,7 +17,7 @@ type ChatMessage = {
 };
 
 type AnalysisRow = { id: string; analysis: string };
-type JournalRow = { id: string; entryDate: string; body: string; createdAt: string };
+type JournalRow = { id: string; entryDate: string; body: string; createdAt: string; subjectId: string | null; checkinId: string | null };
 type AnthropicUsage = {
   input_tokens?: number;
   output_tokens?: number;
@@ -160,56 +160,82 @@ async function latestAnalysis(db: D1Database, userId: string, requestedId = ""):
 
 async function journalById(db: D1Database, userId: string, journalId: string): Promise<JournalRow | null> {
   return db.prepare(
-    `SELECT id, entry_date AS entryDate, body, created_at AS createdAt
+    `SELECT id, entry_date AS entryDate, body, created_at AS createdAt,
+            subject_id AS subjectId, checkin_id AS checkinId
      FROM journal_entries WHERE id = ? AND user_id = ? LIMIT 1`,
   ).bind(journalId, userId).first<JournalRow>();
 }
 
 async function checkinContext(db: D1Database, userId: string, journal: JournalRow): Promise<string> {
+  const subject = journal.subjectId
+    ? await db.prepare(
+        `SELECT id, name, is_default AS isDefault, garmin_enabled AS garminEnabled
+         FROM wellbeing_subjects WHERE id = ? AND user_id = ? LIMIT 1`,
+      ).bind(journal.subjectId, userId).first<{ id: string; name: string; isDefault: number; garminEnabled: number }>()
+    : null;
+  const useGarmin = Boolean(subject?.garminEnabled);
+
+  const healthPromise = useGarmin
+    ? db.prepare(
+        `SELECT steps, resting_hr AS restingHr, avg_stress AS avgStress,
+                body_battery_high AS bodyBatteryHigh, body_battery_low AS bodyBatteryLow,
+                body_battery_latest AS bodyBatteryLatest, active_seconds AS activeSeconds
+         FROM garmin_daily WHERE user_id = ? AND date = ? LIMIT 1`,
+      ).bind(userId, journal.entryDate).first<Record<string, unknown>>()
+    : Promise.resolve(null);
+  const sleepPromise = useGarmin
+    ? db.prepare(
+        `SELECT sleep_seconds AS sleepSeconds, deep_seconds AS deepSeconds,
+                light_seconds AS lightSeconds, rem_seconds AS remSeconds,
+                awake_seconds AS awakeSeconds
+         FROM garmin_sleep WHERE user_id = ? AND date = ? LIMIT 1`,
+      ).bind(userId, journal.entryDate).first<Record<string, unknown>>()
+    : Promise.resolve(null);
+  const activitiesPromise = useGarmin
+    ? db.prepare(
+        `SELECT name, type, duration_seconds AS durationSeconds, distance_m AS distanceM,
+                avg_hr AS avgHr, max_hr AS maxHr
+         FROM garmin_activities
+         WHERE user_id = ? AND substr(COALESCE(start_time_local, start_time_gmt), 1, 10) = ?
+         ORDER BY COALESCE(start_time_local, start_time_gmt) LIMIT 8`,
+      ).bind(userId, journal.entryDate).all<Record<string, unknown>>()
+    : Promise.resolve({ results: [] as Record<string, unknown>[] });
+
   const [health, sleep, activities, metrics, recent, summary] = await Promise.all([
-    db.prepare(
-      `SELECT steps, resting_hr AS restingHr, avg_stress AS avgStress,
-              body_battery_high AS bodyBatteryHigh, body_battery_low AS bodyBatteryLow,
-              body_battery_latest AS bodyBatteryLatest, active_seconds AS activeSeconds
-       FROM garmin_daily WHERE user_id = ? AND date = ? LIMIT 1`,
-    ).bind(userId, journal.entryDate).first<Record<string, unknown>>(),
-    db.prepare(
-      `SELECT sleep_seconds AS sleepSeconds, deep_seconds AS deepSeconds,
-              light_seconds AS lightSeconds, rem_seconds AS remSeconds,
-              awake_seconds AS awakeSeconds
-       FROM garmin_sleep WHERE user_id = ? AND date = ? LIMIT 1`,
-    ).bind(userId, journal.entryDate).first<Record<string, unknown>>(),
-    db.prepare(
-      `SELECT name, type, duration_seconds AS durationSeconds, distance_m AS distanceM,
-              avg_hr AS avgHr, max_hr AS maxHr
-       FROM garmin_activities
-       WHERE user_id = ? AND substr(COALESCE(start_time_local, start_time_gmt), 1, 10) = ?
-       ORDER BY COALESCE(start_time_local, start_time_gmt) LIMIT 8`,
-    ).bind(userId, journal.entryDate).all<Record<string, unknown>>(),
+    healthPromise,
+    sleepPromise,
+    activitiesPromise,
     db.prepare(
       `SELECT m.name, m.emoji, m.direction, m.value_type AS valueType, e.value
        FROM wellbeing_entries e
        JOIN wellbeing_metrics m ON m.id = e.metric_id
-       WHERE e.user_id = ? AND e.entry_date = ? ORDER BY m.sort_order`,
-    ).bind(userId, journal.entryDate).all<Record<string, unknown>>(),
+       WHERE e.user_id = ?
+         AND (? IS NULL OR e.subject_id = ?)
+         AND (? IS NULL OR e.checkin_id = ?)
+       ORDER BY m.sort_order`,
+    ).bind(userId, journal.subjectId, journal.subjectId, journal.checkinId, journal.checkinId).all<Record<string, unknown>>(),
     db.prepare(
       `SELECT entry_date AS entryDate, body
        FROM journal_entries
-       WHERE user_id = ? AND id <> ? AND entry_date >= date(?, '-14 days')
+       WHERE user_id = ? AND id <> ?
+         AND (? IS NULL OR subject_id = ?)
+         AND entry_date >= date(?, '-14 days')
        ORDER BY created_at DESC LIMIT 4`,
-    ).bind(userId, journal.id, journal.entryDate).all<{ entryDate: string; body: string }>(),
-    historicalSummary(db, userId),
+    ).bind(userId, journal.id, journal.subjectId, journal.subjectId, journal.entryDate).all<{ entryDate: string; body: string }>(),
+    subject?.isDefault ? historicalSummary(db, userId) : Promise.resolve(null),
   ]);
 
   return [
+    `PERSON: ${subject?.name ?? "Mig"}`,
     `DATO SOM TRÅDEN HANDLER OM: ${journal.entryDate}`,
     `OPRINDELIG KOMMENTAR: ${clip(journal.body, MAX_MESSAGE_CHARS)}`,
-    `DAGENS CHECK-IN: ${metrics.results.length ? compactJson(metrics.results) : "(ingen)"}`,
+    `CHECK-IN PÅ DETTE TIDSPUNKT: ${metrics.results.length ? compactJson(metrics.results) : "(ingen)"}`,
+    `GARMIN-DATA: ${useGarmin ? "tilgængelig for denne person" : "ikke tilkoblet denne person"}`,
     `DAGENS SUNDHED: ${health ? compactJson(health) : "(ingen)"}`,
     `SØVN: ${sleep ? compactJson(sleep) : "(ingen)"}`,
     `DAGENS AKTIVITETER: ${activities.results.length ? compactJson(activities.results) : "(ingen)"}`,
-    `KOMPAKT HISTORISK JOURNAL-SUMMARY:\n${summary ?? "(ingen endnu)"}`,
-    `SENESTE JOURNALNOTER:\n${recent.results.map((row) => `${row.entryDate}: ${clip(row.body, 500)}`).join("\n") || "(ingen)"}`,
+    `KOMPAKT HISTORISK JOURNAL-SUMMARY:\n${summary ?? "(ingen for denne person)"}`,
+    `SENESTE JOURNALNOTER FOR SAMME PERSON:\n${recent.results.map((row) => `${row.entryDate}: ${clip(row.body, 500)}`).join("\n") || "(ingen)"}`,
   ].join("\n\n");
 }
 
@@ -304,8 +330,12 @@ async function respondToCheckin(request: Request, env: MiyagiEnv): Promise<Respo
     history = [...history, userMessage];
   }
 
+  const subject = journal.subjectId
+    ? await env.DB.prepare(`SELECT is_default AS isDefault FROM wellbeing_subjects WHERE id = ? AND user_id = ? LIMIT 1`)
+        .bind(journal.subjectId, user.id).first<{ isDefault: number }>()
+    : null;
   const [analysis, dayContext] = await Promise.all([
-    latestAnalysis(env.DB, user.id),
+    subject?.isDefault ? latestAnalysis(env.DB, user.id) : Promise.resolve(null),
     checkinContext(env.DB, user.id, journal),
   ]);
   if (analysis && !userMessage.analysisId) {
@@ -323,9 +353,9 @@ async function respondToCheckin(request: Request, env: MiyagiEnv): Promise<Respo
   };
   await env.DB.prepare(
     `INSERT INTO miyagi_conversation_messages
-       (id, user_id, role, body, kind, analysis_id, journal_entry_id, source_ref, created_at)
-     VALUES (?, ?, 'assistant', ?, 'checkin', ?, ?, NULL, ?)`,
-  ).bind(assistantMessage.id, user.id, assistantMessage.body, assistantMessage.analysisId, journal.id, assistantMessage.createdAt).run();
+       (id, user_id, role, body, kind, analysis_id, journal_entry_id, source_ref, created_at, subject_id, checkin_id)
+     VALUES (?, ?, 'assistant', ?, 'checkin', ?, ?, NULL, ?, ?, ?)`,
+  ).bind(assistantMessage.id, user.id, assistantMessage.body, assistantMessage.analysisId, journal.id, assistantMessage.createdAt, journal.subjectId, journal.checkinId).run();
   return json({ messages: [userMessage, assistantMessage], usage: provider.usage }, { status: 201 });
 }
 
@@ -343,8 +373,12 @@ async function replyToCheckin(request: Request, env: MiyagiEnv): Promise<Respons
   const journal = await journalById(env.DB, user.id, journalId);
   if (!journal) return json({ error: "journal_not_found" }, { status: 404 });
 
+  const subject = journal.subjectId
+    ? await env.DB.prepare(`SELECT is_default AS isDefault FROM wellbeing_subjects WHERE id = ? AND user_id = ? LIMIT 1`)
+        .bind(journal.subjectId, user.id).first<{ isDefault: number }>()
+    : null;
   const [analysis, history, dayContext] = await Promise.all([
-    latestAnalysis(env.DB, user.id),
+    subject?.isDefault ? latestAnalysis(env.DB, user.id) : Promise.resolve(null),
     threadHistory(env.DB, user.id, journal.id),
     checkinContext(env.DB, user.id, journal),
   ]);
@@ -369,7 +403,7 @@ async function replyToCheckin(request: Request, env: MiyagiEnv): Promise<Respons
       `INSERT INTO miyagi_conversation_messages
          (id, user_id, role, body, kind, analysis_id, journal_entry_id, source_ref, created_at)
        VALUES (?, ?, 'assistant', ?, 'checkin', ?, ?, NULL, ?)`,
-    ).bind(assistantMessage.id, user.id, assistantMessage.body, assistantMessage.analysisId, journal.id, assistantMessage.createdAt),
+    ).bind(assistantMessage.id, user.id, assistantMessage.body, assistantMessage.analysisId, journal.id, assistantMessage.createdAt, journal.subjectId, journal.checkinId),
   ]);
   return json({ messages: [userMessage, assistantMessage], usage: provider.usage }, { status: 201 });
 }
