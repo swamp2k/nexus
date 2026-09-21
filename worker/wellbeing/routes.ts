@@ -58,9 +58,9 @@ async function listMetrics(request: Request, env: Env): Promise<Response> {
     `SELECT id, name, emoji, direction, value_type AS valueType, sort_order AS sortOrder, active,
             created_at AS createdAt, updated_at AS updatedAt
      FROM wellbeing_metrics
-     WHERE user_id = ?
+     WHERE user_id = ? AND subject_id = ?
      ORDER BY active DESC, sort_order, created_at`,
-  ).bind(user.id).all<MetricRow>();
+  ).bind(user.id, `self:${user.id}`).all<MetricRow>();
 
   return json({ metrics: result.results });
 }
@@ -79,8 +79,8 @@ async function createMetric(request: Request, env: Env): Promise<Response> {
   if (!name) return json({ error: "name_required" }, { status: 400 });
 
   const max = await env.DB.prepare(
-    `SELECT COALESCE(MAX(sort_order), -1) AS maxOrder FROM wellbeing_metrics WHERE user_id = ?`,
-  ).bind(user.id).first<{ maxOrder: number }>();
+    `SELECT COALESCE(MAX(sort_order), -1) AS maxOrder FROM wellbeing_metrics WHERE user_id = ? AND subject_id = ?`,
+  ).bind(user.id, `self:${user.id}`).first<{ maxOrder: number }>();
 
   const id = crypto.randomUUID();
   const now = new Date().toISOString();
@@ -89,9 +89,9 @@ async function createMetric(request: Request, env: Env): Promise<Response> {
 
   await env.DB.prepare(
     `INSERT INTO wellbeing_metrics
-       (id, user_id, name, emoji, direction, value_type, sort_order, active, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
-  ).bind(id, user.id, name, emoji, direction, valueType, sortOrder, now, now).run();
+       (id, user_id, name, emoji, direction, value_type, sort_order, active, created_at, updated_at, subject_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 1, ?, ?, ?)`,
+  ).bind(id, user.id, name, emoji, direction, valueType, sortOrder, now, now, `self:${user.id}`).run();
 
   return json({ metric: { id, name, emoji, direction, valueType, sortOrder, active: 1, createdAt: now, updatedAt: now } }, { status: 201 });
 }
