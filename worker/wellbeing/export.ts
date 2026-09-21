@@ -99,7 +99,7 @@ export async function handleWellbeingExportRoute(request: Request, env: Env): Pr
   for (const [checkinId, rows] of entriesByCheckin) {
     const subjectDate = stringValue(rows[0]?.entryDate);
     const occurredAt = stringValue(rows[0]?.occurredAt);
-    const createdAt = occurredAt || rows.map((row) => stringValue(row.createdAt)).filter(Boolean).sort()[0] ?? `${subjectDate}T00:00:00.000Z`;
+    const createdAt = occurredAt || (rows.map((row) => stringValue(row.createdAt)).filter(Boolean).sort()[0] ?? `${subjectDate}T00:00:00.000Z`);
     timeline.push({
       id: `checkin:${checkinId}`,
       subjectDate,
