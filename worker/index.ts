@@ -22,6 +22,8 @@ import { handleMiyagiRoute } from "./wellbeing/miyagi";
 import { handleWellbeingExportRoute } from "./wellbeing/export";
 import { handleWellbeingHistoryRoute } from "./wellbeing/history";
 import { handleWellbeingRoute } from "./wellbeing/routes";
+import { handleWellbeingSubjectRoute } from "./wellbeing/subjects";
+import { handleWellbeingReminderRoute, sendScheduledCheckinReminders } from "./wellbeing/reminders";
 
 type HealthResponse = { ok: true; service: "nexus"; version: string };
 
@@ -59,7 +61,11 @@ export default {
       if (url.pathname.startsWith("/api/wellbeing/journal-ai/")) { const response = await handleJournalAiRoute(request, env); if (response) return response; }
       if (url.pathname === "/api/wellbeing/history") { const response = await handleWellbeingHistoryRoute(request, env); if (response) return response; }
       if (url.pathname === "/api/wellbeing/export") { const response = await handleWellbeingExportRoute(request, env); if (response) return response; }
-      if (url.pathname.startsWith("/api/wellbeing/")) { const response = await handleWellbeingRoute(request, env); if (response) return response; }
+      if (url.pathname === "/api/wellbeing/reminder") { const response = await handleWellbeingReminderRoute(request, env); if (response) return response; }
+      if (url.pathname.startsWith("/api/wellbeing/")) {
+        const subjectResponse = await handleWellbeingSubjectRoute(request, env); if (subjectResponse) return subjectResponse;
+        const response = await handleWellbeingRoute(request, env); if (response) return response;
+      }
       if (url.pathname === "/api/home-layout") { const response = await handleHomeLayoutRoute(request, env); if (response) return response; }
       if (url.pathname === "/api/navigation") { const response = await handleNavigationRoute(request, env); if (response) return response; }
       if (url.pathname === "/api/settings/eloverblik") { const response = await handleEloverblikSettingsRoute(request, env); if (response) return response; }
@@ -76,8 +82,12 @@ export default {
     const now = new Date();
     ctx.waitUntil((async () => {
       try {
-        const result = await queueScheduledGarminSyncs(env);
+        const [result, reminderResult] = await Promise.all([
+          queueScheduledGarminSyncs(env),
+          sendScheduledCheckinReminders(env, now),
+        ]);
         console.log(JSON.stringify({ event: "garmin_scheduled_sync", at: now.toISOString(), ...result }));
+        if (reminderResult.checked || reminderResult.sent) console.log(JSON.stringify({ event: "wellbeing_reminders", at: now.toISOString(), ...reminderResult }));
       } catch (error) {
         console.error(JSON.stringify({ event: "garmin_scheduled_sync_failed", at: now.toISOString(), error: error instanceof Error ? error.message : "unknown_error" }));
       }
