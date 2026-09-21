@@ -78,6 +78,7 @@ async function recentConversation(db: D1Database, userId: string, limit = 50): P
               created_at AS createdAt
        FROM miyagi_conversation_messages
        WHERE user_id = ? AND kind <> 'legacy'
+         AND (subject_id IS NULL OR subject_id = 'self:' || user_id)
        ORDER BY created_at DESC
        LIMIT ?
      )
@@ -179,13 +180,15 @@ async function buildContext(
               m.id AS metricId, m.name, m.emoji, m.direction, m.value_type AS valueType
        FROM wellbeing_entries e
        JOIN wellbeing_metrics m ON m.id = e.metric_id
-       WHERE e.user_id = ? AND e.entry_date BETWEEN ? AND ?
+       WHERE e.user_id = ? AND e.subject_id = 'self:' || e.user_id
+         AND e.entry_date BETWEEN ? AND ?
        ORDER BY e.entry_date, m.sort_order`,
     ).bind(userId, period.start, period.end).all<DataRow>(),
     db.prepare(
       `SELECT entry_date AS entryDate, body, created_at AS createdAt
        FROM journal_entries
-       WHERE user_id = ? AND entry_date BETWEEN ? AND ?
+       WHERE user_id = ? AND subject_id = 'self:' || user_id
+         AND entry_date BETWEEN ? AND ?
        ORDER BY entry_date, created_at`,
     ).bind(userId, period.start, period.end).all<DataRow>(),
   ]);
@@ -511,12 +514,12 @@ async function createAnalysis(request: Request, env: MiyagiEnv): Promise<Respons
   await env.DB.prepare(
     `INSERT INTO miyagi_analyses
        (id, user_id, period_days, period_start, period_end, model, context_json,
-        context_hash, analysis, created_at, focus, response_length, tone)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        context_hash, analysis, created_at, focus, response_length, tone, subject_id)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).bind(
     id, user.id, days, context.period.start, context.period.end,
     config.model, contextJson, contextHash, analysisText, now,
-    focus || null, length, tone,
+    focus || null, length, tone, `self:${user.id}`,
   ).run();
 
   const messages = await recentConversation(env.DB, user.id, 50);
