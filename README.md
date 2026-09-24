@@ -97,16 +97,31 @@ Weather data from MET Norway with per-user location settings, caching, and stale
 
 Electricity-price module using Danish day-ahead prices plus configurable grid/provider components to estimate the actual variable household price.
 
+### Calendar
+
+Calendar is an authenticated family-facing calendar view used for shared schedule data and related day-to-day information.
+
+### MELCloud / heat pump
+
+The heat-pump module surfaces Mitsubishi/MELCloud state in Nexus while keeping the external system as the source of truth.
+
+### Unraid Watch
+
+Unraid server status is integrated from the separate Unraid Watch project through a versioned contract and Cloudflare Service Binding. Nexus does not duplicate Unraid API access or credentials.
+
+### PC Watch
+
+PC Watch is integrated as a shared family data set through the same contract/Service Binding pattern. Nexus exposes a dedicated PC Watch page plus reusable dashboard widgets for PC status, alerts, cloud backup, backup agents, and workstation backup.
+
+PC Watch access is explicit: admins always have access, while other Nexus users can be granted access from Users settings. The browser never receives the cross-service integration credential.
+
 ### Planned integrations
 
 - DBA Gold
-- Unraid Watch
-- PC Watch
-- waste calendar
-- Mitsubishi/MELCloud
+- Home Assistant
 - additional cross-module insights and notifications
 
-These are reusable domain components, not systems Nexus keeps at arm's length. Each stays the source of truth for its own domain, and Nexus reuses it rather than reimplementing it.
+External specialist projects remain the source of truth for their own domains. Nexus reuses them through narrow contracts rather than reimplementing their domain logic.
 
 ## Paired displays
 
