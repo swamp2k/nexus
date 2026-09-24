@@ -179,6 +179,6 @@ The MVP is successful when:
 7. At least one existing external project can surface useful information in Nexus without being absorbed into it.
 8. Adding the next module feels routine rather than architectural.
 
-## Immediate next action
+## Current status
 
-Follow `docs/ROADMAP.md`: finish the small application-shell cleanup, then implement the reusable widget registry and replace the current Home module-link grid with the per-user modular dashboard.
+The original MVP sequence is complete enough that active product direction now lives in `docs/ROADMAP.md`. The reusable widget registry, per-user Home dashboard, paired displays, Unraid Watch integration, and PC Watch integration all exist; use the roadmap and current source as the authority for next work.
