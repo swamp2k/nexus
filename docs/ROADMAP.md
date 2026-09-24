@@ -1,6 +1,6 @@
 # Nexus roadmap
 
-Updated: 2026-09-01
+Updated: 2026-09-24
 
 This roadmap captures the current UI direction after the Nexus Air Audit and the decision to replace the existing Home page with a user-configurable widget dashboard.
 
@@ -133,9 +133,16 @@ This means resizing a widget changes information density, not only card width.
 
 After direct reorder/resize is tested on real desktop/mobile layouts, next layout work can be driven by observed friction rather than introducing a heavier grid library pre-emptively. Candidates include row-height tuning, smarter packing, and pointer-based touch drag only if the button fallback proves insufficient.
 
-### Next widget work
+### Current widget/integration follow-up
 
-As new visualizations are built on Garmin, Strøm, Vejr, Velbefindende, Unraid and later integrations, create them as registered reusable widgets rather than page-only components where practical.
+The reusable-widget direction is now also proven by the external integrations:
+
+- Unraid widgets are discovered from Unraid Watch data rather than hard-coded per server/container.
+- PC Watch is integrated as a shared family data set with a dedicated page and reusable widgets.
+- PC Watch widgets support all dashboard widths and the three stored height levels (150px, 232px, 314px), with per-card height overrides in the editor.
+- PC Watch access is controlled independently of the generic integration-toggle settings; admins always have access and other users receive an explicit grant.
+
+As new visualizations are built on Garmin, Strøm, Vejr, Velbefindende, Unraid, PC Watch and later integrations, create them as registered reusable widgets rather than page-only components where practical.
 
 Existing page-owned visualizations do not all need to be refactored immediately; do that when each area is touched again.
 
@@ -162,7 +169,7 @@ With Modular Home v1 in place, the audit is now being applied selectively agains
 
 Root-cause fix for charts drifting inside widgets and widgets rendering out of stored order:
 
-- `src/dashboard/dashboard.css` is now the only owner of grid, card and chart-frame sizing. `grid-auto-flow: dense` and the fixed 56px rows with a per-widget-ID span table are gone; rows are `minmax(150px, auto)` and widgets that need two rows declare `rows: 2` in the registry.
+- `src/dashboard/dashboard.css` remains the owner of grid, card and chart-frame sizing. The dashboard now uses three persisted card-height levels (150px, 232px, 314px); each widget has a registry default and the editor may override the height per card. Content scrolls inside its allocated card instead of growing neighboring cards.
 - `src/dashboard/ChartFrame.tsx` measures its CSS-defined box with a ResizeObserver and charts draw in pixels, so axis text is a constant 10px on every screen and label density follows the available width. Used by the usage and price widgets, the Strøm page chart and the overnight sleep charts.
 - `src/dashboard/WidgetCard.tsx` and `src/dashboard/layoutEditing.ts` are shared by Home, the Displays editor and paired displays. Card headers show the title and one action; the source kicker only appears while editing. Order buttons read `↑/↓` in one-column layouts.
 - Paired displays fill the screen: one-line header, four columns from 900px, rows share the viewport height, charts grow into their cards.
