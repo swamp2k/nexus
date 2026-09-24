@@ -8,7 +8,8 @@ import { resolveDashboardRefreshClass } from "./data/dashboardRefresh";
 import { DEFAULT_INTEGRATIONS, fetchIntegrations, integrationKeyForWidgetId, widgetIntegrationEnabled } from "./data/integrations";
 import type { IntegrationMap } from "./data/integrations";
 import { useSettings } from "./data/settings";
-import { widgetCatalog, widgetDefinitionById } from "./widgets/widgetCatalog";
+import { discoverPcWatchWidgets, widgetCatalog, widgetDefinitionById } from "./widgets/widgetCatalog";
+import type { PcWatchOverview } from "./widgets/pcwatchWidgets";
 import { widgetRefreshGroup, widgetSupportsSurface } from "./widgets/widgetRegistry";
 import type { WidgetSize } from "./widgets/widgetRegistry";
 
@@ -32,6 +33,7 @@ export default function DisplaysPage() {
   const [message, setMessage] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [integrations, setIntegrations] = useState<IntegrationMap>(DEFAULT_INTEGRATIONS);
+  const [pcWatchCatalog, setPcWatchCatalog] = useState<PcWatchOverview | null>(null);
 
   const { data: refreshSettings } = useSettings();
 
@@ -67,8 +69,18 @@ export default function DisplaysPage() {
     setPairCode(null);
   }, [selectedId]);
 
-  const displayWidgets = useMemo(() => widgetCatalog.filter((widget) =>
-    widgetSupportsSurface(widget, "display") && widgetIntegrationEnabled(widget, integrations)), [integrations]);
+  useEffect(() => {
+    if (!integrations.pcwatch) { setPcWatchCatalog(null); return; }
+    void fetch("/api/pcwatch/overview", { credentials: "same-origin", cache: "no-store" })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("pcwatch_catalog_failed");
+        setPcWatchCatalog(await response.json() as PcWatchOverview);
+      })
+      .catch(() => setPcWatchCatalog(null));
+  }, [integrations.pcwatch]);
+
+  const displayWidgets = useMemo(() => [...widgetCatalog, ...discoverPcWatchWidgets(pcWatchCatalog)].filter((widget) =>
+    widgetSupportsSurface(widget, "display") && widgetIntegrationEnabled(widget, integrations)), [integrations, pcWatchCatalog]);
 
   const groupedWidgets = useMemo(() => {
     const groups = new Map<string, typeof displayWidgets>();
