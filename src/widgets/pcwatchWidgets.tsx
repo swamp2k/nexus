@@ -76,13 +76,13 @@ function backupWidget(id: string) { return function BackupWidget() {
 }; }
 
 export const pcWatchWidgetDefinitions: WidgetDefinition[] = [
-  { id: 'pcwatch.fleet', title: "PC'er", description: "Rapporterende PC'er og alarmer", group: 'PC Watch', page: 'PC Watch', defaultSize: 'small', supportedSizes: [...sizes], component: FleetWidget },
-  { id: 'pcwatch.alerts', title: 'PC alarmer', description: 'Aktive alarmer fra PC Watch', group: 'PC Watch', page: 'PC Watch', defaultSize: 'medium', supportedSizes: [...sizes], rows: 2, component: AlertsWidget },
+  { id: 'pcwatch.fleet', title: "PC'er", description: "Rapporterende PC'er og alarmer", group: 'PC Watch', page: 'PC Watch', surfaces: ['home', 'display'], defaultSize: 'small', supportedSizes: [...sizes], component: FleetWidget },
+  { id: 'pcwatch.alerts', title: 'PC alarmer', description: 'Aktive alarmer fra PC Watch', group: 'PC Watch', page: 'PC Watch', surfaces: ['home', 'display'], defaultSize: 'medium', supportedSizes: [...sizes], rows: 2, component: AlertsWidget },
 ];
 type Kind = keyof typeof prefixes;
 function definition(kind: Kind, id: string, name: string): WidgetDefinition {
   const component = kind === 'device' ? deviceWidget(id) : kind === 'task' ? taskWidget(id) : kind === 'agent' ? agentWidget(id) : backupWidget(id);
-  return { id: `${prefixes[kind]}${encodeURIComponent(id)}:${encodeURIComponent(name)}`, title: name, description: kind === 'device' ? 'PC-status' : kind === 'task' ? 'Cloud backup' : kind === 'agent' ? 'Backup-agent' : 'PC-backup', group: kind === 'device' ? 'PC Watch · PC’er' : 'PC Watch · Backup', refreshGroup: 'PC Watch', page: 'PC Watch', defaultSize: 'medium', supportedSizes: [...sizes], rows: kind === 'task' ? 2 : 1, component };
+  return { id: `${prefixes[kind]}${encodeURIComponent(id)}:${encodeURIComponent(name)}`, title: name, description: kind === 'device' ? 'PC-status' : kind === 'task' ? 'Cloud backup' : kind === 'agent' ? 'Backup-agent' : 'PC-backup', group: kind === 'device' ? 'PC Watch · PC’er' : 'PC Watch · Backup', refreshGroup: 'PC Watch', page: 'PC Watch', surfaces: ['home', 'display'], defaultSize: 'medium', supportedSizes: [...sizes], rows: kind === 'task' ? 2 : 1, component };
 }
 export function discoverPcWatchWidgets(data: PcWatchOverview | null): WidgetDefinition[] {
   if (!data) return [];
