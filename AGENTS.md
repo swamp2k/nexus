@@ -23,7 +23,7 @@ The product should feel simple enough for non-technical family members even when
    3. least operational complexity
    4. easiest maintenance
 
-   Do not optimize for theoretical service independence, and do not build a second transport before it is needed. See `docs/ARCHITECTURE.md` for the contract conventions and the Unraid Watch reference implementation.
+   Do not optimize for theoretical service independence, and do not build a second transport before it is needed. See `docs/ARCHITECTURE.md` for the contract conventions, the Unraid Watch reference implementation, and the PC Watch sibling integration.
 5. **Multi-user from day one.** User-owned data must always be scoped by `user_id` unless explicitly shared.
 6. **Raw and normalized data serve different jobs.** Normalize data Nexus needs to query/chart/correlate; retain useful source artifacts separately.
 7. **Do not add infrastructure speculatively.** No Kafka, Kubernetes, extra queues, services, or databases without a concrete requirement.
@@ -183,7 +183,7 @@ Preserve existing successful visual patterns unless there is a concrete reason t
 Dashboard-specific rules that must not regress:
 
 - stored widget order is visual order (no `grid-auto-flow: dense`)
-- the grid owns stable row heights; overflowing content scrolls inside the card, never grows neighboring cards; a widget that needs two rows declares `rows: 2` in the registry
+- the grid owns stable widget heights; overflowing content scrolls inside the card and never grows neighboring cards; widgets use the stored 150px, 232px, or 314px height levels, with a registry default and per-card editor override
 - every SVG chart renders through `src/dashboard/ChartFrame.tsx` in pixel coordinates with CSS-owned height
 - only `src/dashboard/dashboard.css` sizes `.home-widget` and `.chart-frame`
 
@@ -242,9 +242,13 @@ Electricity combines spot/day-ahead prices with configurable grid/provider compo
 
 Keep fixed subscriptions separate from variable per-kWh cost unless the UX explicitly asks for an all-in monthly calculation.
 
-### Future integrations
+### External specialist integrations
 
-DBA Gold, Unraid Watch, PC Watch, waste calendar, MELCloud, etc. should remain independent services/sources and integrate through narrow contracts.
+Unraid Watch and PC Watch are active examples of external specialist projects that remain the source of truth while Nexus consumes a narrow versioned contract. MELCloud is also integrated without moving its external responsibility into Nexus.
+
+PC Watch is a deliberately shared family data set rather than per-user device ownership. Admins always have access; non-admin access is granted explicitly through `pcwatch_access`. Nexus reads it through `worker/pcwatch/` and the `PCWATCH` Service Binding. Never expose the integration token to the browser.
+
+DBA Gold, Home Assistant, and future specialist projects should follow the same source-of-truth and narrow-contract principles when integrated.
 
 ## Garmin shared agent
 
