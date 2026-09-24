@@ -6,6 +6,8 @@ import { getElectricityUsage } from "../sources/eloverblik";
 import { getEloverblikCredentialStatus, getEloverblikCredentials } from "../sources/eloverblik-credentials";
 import { getEnergyPrices, resolveEnergySettings } from "../sources/energy-prices";
 import { getWeatherForecast, resolveWeatherLocation } from "../sources/weather";
+import { hasPcWatchAccess } from "../pcwatch/access";
+import { pcWatchOverview } from "../pcwatch/routes";
 
 const DISPLAY_COOKIE = "nexus_display";
 const DISPLAY_MAX_AGE_SECONDS = 60 * 60 * 24 * 365;
@@ -29,6 +31,7 @@ type DisplayEnv = Env & {
   WEATHER_LABEL?: string;
   MELCLOUD_CREDENTIALS_KEY?: string;
   GARMIN_CREDENTIALS_KEY?: string;
+  NEXUS_PCWATCH_TOKEN?: string;
 };
 
 type DisplayDevice = {
@@ -325,7 +328,7 @@ export async function handleDisplayDataAlias(request: Request, env: DisplayEnv):
   if (request.method !== "GET") return null;
   const url = new URL(request.url);
   const pathname = url.pathname;
-  const allowed = pathname === "/api/settings" || pathname.startsWith("/api/sources/") || pathname === "/api/calendar/events" || pathname === "/api/melcloud/devices";
+  const allowed = pathname === "/api/settings" || pathname.startsWith("/api/sources/") || pathname === "/api/calendar/events" || pathname === "/api/melcloud/devices" || pathname === "/api/pcwatch/overview";
   if (!allowed) return null;
   const regularUser = await getAuthenticatedUser(request, env.DB);
   if (regularUser) return null;
@@ -343,6 +346,15 @@ export async function handleDisplayDataAlias(request: Request, env: DisplayEnv):
       const message = error instanceof Error ? error.message : "melcloud_fetch_failed";
       const status = message === "melcloud_not_configured" ? 409 : message === "melcloud_login_throttled" ? 429 : 502;
       return json({ error: message }, { status });
+    }
+  }
+  if (pathname === "/api/pcwatch/overview") {
+    if (!await hasPcWatchAccess(env.DB, device.userId)) return json({ error: "forbidden" }, { status: 403 });
+    try { return json(await pcWatchOverview(env)); }
+    catch (error) {
+      const message = error instanceof Error ? error.message : "pcwatch_unavailable";
+      const status = message === "pcwatch_not_configured" ? 503 : 502;
+      return json({ error: message === "unauthorized" ? "pcwatch_unauthorized" : message }, { status });
     }
   }
   if (pathname === "/api/sources/weather") {
