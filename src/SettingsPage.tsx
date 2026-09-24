@@ -12,7 +12,9 @@ import { defaultRefreshClassForGroup, REFRESH_CLASS_LABELS } from "./data/dashbo
 import type { RefreshClass } from "./data/dashboardRefresh";
 import { DEFAULT_INTEGRATIONS, fetchIntegrations, widgetIntegrationEnabled } from "./data/integrations";
 import type { IntegrationMap } from "./data/integrations";
-import { widgetRegistry } from "./widgets/widgetRegistry";
+import { widgetRefreshGroup } from './widgets/widgetRegistry';
+import { widgetRegistry } from './widgets/widgetRegistry';
+import { pcWatchWidgetDefinitions } from './widgets/pcwatchWidgets';
 
 type GridProviderOption = { key: string; label: string };
 type SettingsResponse = {
@@ -102,7 +104,7 @@ export default function SettingsPage() {
   }, []);
 
   const refreshGroups = useMemo(() => [...new Set(
-    widgetRegistry.filter((widget) => widgetIntegrationEnabled(widget, integrations)).map((widget) => widget.group),
+    [...widgetRegistry, ...pcWatchWidgetDefinitions].filter((widget) => widgetIntegrationEnabled(widget, integrations)).map(widgetRefreshGroup),
   )], [integrations]);
 
   function changed() { setSaveState("idle"); setSaveError(null); }

@@ -199,6 +199,12 @@ Authorization is a per-consumer integration token minted in Unraid Watch, hashed
 
 Multi-user note: the token alone decides which Unraid Watch account a consumer may read. Nexus user IDs are never matched against Unraid Watch user IDs, and the two systems are never joined on email or ID.
 
+### PC Watch
+
+PC Watch uses the same versioned contract and Service Binding pattern. Its authoritative contract and plain integration service live in `pcwatch/worker/src/integration/`; Nexus mirrors the DTOs in `worker/pcwatch/contract.ts` and keeps the binding cast in `worker/pcwatch/transport.ts`. The two Workers use matching `NEXUS_INTEGRATION_TOKEN` (PC Watch) and `NEXUS_PCWATCH_TOKEN` (Nexus) secrets. No credential enters the browser.
+
+PC Watch is one shared family data set. Nexus admins always have access and may grant other users access in Users settings. Every `/api/pcwatch/overview` read checks that grant; the PC Watch module and widgets use the same permission. `pcwatch_access` stores grants, not device ownership. Apply Nexus migration `0035_pcwatch_access.sql` before deploying the Nexus Worker. Deploy the PC Watch Worker with its `NexusIntegration` entrypoint before deploying Nexus. PC Watch and Nexus must have matching secret values; configure them through Cloudflare Worker secrets, never source or Wrangler vars.
+
 ## Data strategy
 
 ### Normalized data

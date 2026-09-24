@@ -1,4 +1,5 @@
 import { getAuthenticatedUser } from "../auth/session";
+import { hasPcWatchAccess } from "../pcwatch/access";
 
 export const INTEGRATION_KEYS = [
   "garmin",
@@ -40,6 +41,7 @@ export async function getUserIntegrations(db: D1Database, userId: string): Promi
       integrations[row.integration_key as IntegrationKey] = row.enabled !== 0;
     }
   }
+  integrations.pcwatch = await hasPcWatchAccess(db, userId);
   return integrations;
 }
 
@@ -67,6 +69,7 @@ export async function handleIntegrationSettingsRoute(request: Request, env: Env)
 
     const now = new Date().toISOString();
     const statements = INTEGRATION_KEYS.flatMap((key) => {
+      if (key === 'pcwatch') return [];
       const value = body.integrations?.[key];
       if (value === undefined) return [];
       if (typeof value !== "boolean") return [];

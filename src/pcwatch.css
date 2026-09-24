@@ -1,0 +1,35 @@
+.pcwatch-widget { display: flex; flex-direction: column; gap: 5px; min-width: 0; width: 100%; }
+.pcwatch-widget > strong { font-size: 1.35rem; line-height: 1.15; }
+.pcwatch-widget > span, .pcwatch-widget > small { color: var(--muted); font-size: .75rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pcwatch-widget--fleet > strong { font-size: 2rem; }
+.pcwatch-widget-facts { display: grid; grid-template-columns: repeat(2, minmax(0,1fr)); gap: 4px 10px; margin-top: 5px; }
+.pcwatch-widget-facts span { display: flex; justify-content: space-between; gap: 5px; min-width: 0; color: var(--muted); font-size: .72rem; }
+.pcwatch-widget-facts b { color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pcwatch-widget--list { align-self: stretch; }
+.pcwatch-widget-row { display: flex; gap: 8px; border-bottom: 1px solid var(--border); padding: 4px 0; font-size: .72rem; }
+.pcwatch-widget-row b { flex: 0 0 32%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pcwatch-widget-row span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pcwatch-good { color: var(--success, #24865d) !important; }
+.pcwatch-warn { color: var(--danger) !important; }
+.pcwatch-progress { height: 5px; border-radius: 3px; background: var(--border); overflow: hidden; }
+.pcwatch-progress span { display: block; height: 100%; background: var(--accent); }
+@container home-widget (max-width: 300px) { .home-widget-content .pcwatch-widget-facts span:nth-child(n+3) { display: none; } .home-widget-content .pcwatch-widget > small { display: none; } .home-widget-content .pcwatch-widget-row:nth-child(n+4) { display: none; } }
+@container home-widget (min-width: 301px) and (max-width: 650px) { .home-widget-content .pcwatch-widget-row:nth-child(n+6) { display: none; } }
+@container home-widget (min-width: 651px) { .home-widget-content .pcwatch-widget-facts { grid-template-columns: repeat(4,minmax(0,1fr)); } }
+.home-widget--rows-1 .pcwatch-widget-facts span:nth-child(n+3), .home-widget--rows-1 .pcwatch-widget > small { display: none; }
+.pcwatch-page { display: grid; gap: 20px; }
+.pcwatch-page-heading { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; }
+.pcwatch-page-heading h2 { margin: 2px 0 4px; }
+.pcwatch-page-heading p:last-child { color: var(--muted); margin: 0; }
+.pcwatch-page-summary { display: grid; grid-template-columns: repeat(4,minmax(0,1fr)); gap: 10px; }
+.pcwatch-page-summary > div, .pcwatch-page-section { padding: 14px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); }
+.pcwatch-page-summary strong, .pcwatch-page-summary span { display: block; }
+.pcwatch-page-summary strong { font-size: 1.5rem; }
+.pcwatch-page-summary span, .pcwatch-page-section p { color: var(--muted); font-size: .8rem; }
+.pcwatch-page-section h3 { margin: 0 0 8px; font-size: 1rem; }
+.pcwatch-page-list { display: grid; gap: 2px; }
+.pcwatch-page-list article { display: grid; grid-template-columns: minmax(0,1fr) auto minmax(130px, 1fr); align-items: center; gap: 12px; padding: 8px 0; border-top: 1px solid var(--border); }
+.pcwatch-page-list article:first-child { border-top: 0; }
+.pcwatch-page-list strong, .pcwatch-page-list small { display: block; overflow: hidden; text-overflow: ellipsis; }
+.pcwatch-page-list small { color: var(--muted); font-size: .72rem; }
+@media (max-width: 700px) { .pcwatch-page-summary { grid-template-columns: repeat(2,minmax(0,1fr)); } .pcwatch-page-list article { grid-template-columns: minmax(0,1fr) auto; } .pcwatch-page-list article > small { grid-column: 1 / -1; } }

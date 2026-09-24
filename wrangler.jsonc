@@ -33,6 +33,11 @@
       "binding": "UNRAIDWATCH",
       "service": "unraidwatch-api",
       "entrypoint": "NexusIntegration"
+    },
+    {
+      "binding": "PCWATCH",
+      "service": "pcwatch-worker",
+      "entrypoint": "NexusIntegration"
     }
   ],
   "r2_buckets": [

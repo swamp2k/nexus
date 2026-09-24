@@ -1,6 +1,7 @@
 import { electricityUsageWidgetDefinitions } from "./electricityUsageWidgets";
 import { linkCollectionWidgetDefinition } from "./LinkCollectionWidget";
 import { widgetRegistry } from "./widgetRegistry";
+import { pcWatchWidgetDefinitions, discoverPcWatchWidgets, resolvePcWatchWidget } from './pcwatchWidgets';
 import {
   dynamicUnraidWidgetDefinitions,
   resolveDynamicUnraidWidget,
@@ -11,7 +12,7 @@ export type { UnraidOverview } from "./unraidWidgets";
 export { dynamicUnraidWidgetDefinitions } from "./unraidWidgets";
 
 /** Static widgets that are always available in the Home editor. */
-export const widgetCatalog = [...widgetRegistry, linkCollectionWidgetDefinition, ...electricityUsageWidgetDefinitions, ...unraidWidgetDefinitions];
+export const widgetCatalog = [...widgetRegistry, linkCollectionWidgetDefinition, ...electricityUsageWidgetDefinitions, ...unraidWidgetDefinitions, ...pcWatchWidgetDefinitions];
 const staticWidgetById = new Map(widgetCatalog.map((widget) => [widget.id, widget]));
 
 /**
@@ -20,9 +21,10 @@ const staticWidgetById = new Map(widgetCatalog.map((widget) => [widget.id, widge
  * temporarily unavailable and the editor cannot discover their friendly name.
  */
 export function widgetDefinitionById(id: string) {
-  return staticWidgetById.get(id) ?? resolveDynamicUnraidWidget(id);
+  return staticWidgetById.get(id) ?? resolveDynamicUnraidWidget(id) ?? resolvePcWatchWidget(id);
 }
 
 export function discoverUnraidWidgets(data: import("./unraidWidgets").UnraidOverview | null) {
   return dynamicUnraidWidgetDefinitions(data);
 }
+export { discoverPcWatchWidgets };

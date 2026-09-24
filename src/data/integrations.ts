@@ -12,7 +12,7 @@ export const DEFAULT_INTEGRATIONS: IntegrationMap = {
   melcloud: true,
   dba: true,
   unraid: true,
-  pcwatch: true,
+  pcwatch: false,
   notifications: true,
   displays: true,
 };
@@ -42,6 +42,7 @@ export function pageIntegrationEnabled(page: WidgetTargetPage | "Displays", inte
 
 export function integrationKeyForWidgetId(id: string): IntegrationKey | null {
   if (id.startsWith("unraid.")) return "unraid";
+  if (id.startsWith('pcwatch.')) return 'pcwatch';
   if (id.startsWith("garmin.")) return "garmin";
   if (id.startsWith("wellbeing.")) return "wellbeing";
   if (id.startsWith("weather.")) return "weather";

@@ -8,7 +8,8 @@ import { resolveDashboardRefreshClass } from "./data/dashboardRefresh";
 import { useSettings } from "./data/settings";
 import { DEFAULT_INTEGRATIONS, fetchIntegrations, integrationKeyForWidgetId, widgetIntegrationEnabled } from "./data/integrations";
 import type { IntegrationMap } from "./data/integrations";
-import { discoverUnraidWidgets, widgetCatalog, widgetDefinitionById } from "./widgets/widgetCatalog";
+import { discoverUnraidWidgets, discoverPcWatchWidgets, widgetCatalog, widgetDefinitionById } from "./widgets/widgetCatalog";
+import type { PcWatchOverview } from './widgets/pcwatchWidgets';
 import type { UnraidOverview } from "./widgets/widgetCatalog";
 import { isUnraidContainerWidgetId, SelectedContainersWidget } from "./widgets/unraidWidgets";
 import { createLinkCollectionConfig, LINK_COLLECTION_TYPE, LinkCollectionEditor } from "./widgets/LinkCollectionWidget";
@@ -61,6 +62,7 @@ export default function HomePage({ onOpenPage }: { onOpenPage: (page: WidgetTarg
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [unraidCatalog, setUnraidCatalog] = useState<UnraidOverview | null>(null);
+  const [pcWatchCatalog, setPcWatchCatalog] = useState<PcWatchOverview | null>(null);
   const [unraidCatalogLoading, setUnraidCatalogLoading] = useState(false);
   const [integrations, setIntegrations] = useState<IntegrationMap>(DEFAULT_INTEGRATIONS);
   const { data: refreshSettings } = useSettings();
@@ -97,7 +99,8 @@ export default function HomePage({ onOpenPage }: { onOpenPage: (page: WidgetTarg
   const selectedIds = useMemo(() => new Set(draft.map((item) => item.id)), [draft]);
   const availableWidgets = useMemo(() => {
     const discovered = integrations.unraid ? discoverUnraidWidgets(unraidCatalog) : [];
-    const result: WidgetDefinition[] = [...widgetCatalog, ...discovered].filter((widget) => widgetIntegrationEnabled(widget, integrations));
+    const pcWatchDiscovered = integrations.pcwatch ? discoverPcWatchWidgets(pcWatchCatalog) : [];
+    const result: WidgetDefinition[] = [...widgetCatalog, ...discovered, ...pcWatchDiscovered].filter((widget) => widgetIntegrationEnabled(widget, integrations));
     const seen = new Set(result.map((widget) => widget.id));
     for (const item of draft) {
       if (seen.has(item.id) || !layoutItemEnabled(item, integrations)) continue;
@@ -105,7 +108,7 @@ export default function HomePage({ onOpenPage }: { onOpenPage: (page: WidgetTarg
       if (widget && widgetIntegrationEnabled(widget, integrations)) { result.push(widget); seen.add(item.id); }
     }
     return result;
-  }, [draft, unraidCatalog, integrations]);
+  }, [draft, unraidCatalog, pcWatchCatalog, integrations]);
   const availableById = useMemo(() => new Map(availableWidgets.map((widget) => [widget.id, widget])), [availableWidgets]);
   const resolve = (id: string) => availableById.get(id) ?? widgetDefinitionById(id);
   const grouped = useMemo(() => {
@@ -133,11 +136,20 @@ export default function HomePage({ onOpenPage }: { onOpenPage: (page: WidgetTarg
     }
   }
 
+  async function loadPcWatchCatalog() {
+    if (!integrations.pcwatch) return;
+    try {
+      const response = await fetch('/api/pcwatch/overview', { credentials: 'same-origin', cache: 'no-store' });
+      if (response.ok) setPcWatchCatalog(await response.json() as PcWatchOverview);
+    } catch { /* Persisted widgets still resolve while the service is unavailable. */ }
+  }
+
   function beginEdit() {
     setDraft(layout);
     setMessage(null);
     setEditing(true);
     void loadUnraidCatalog();
+    void loadPcWatchCatalog();
   }
 
   // Selected containers are stored as individual items but edited as one card.

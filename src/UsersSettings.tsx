@@ -10,6 +10,7 @@ type NexusUser = {
   status: UserStatus;
   createdAt: string;
   updatedAt: string;
+  pcwatchAccess: boolean;
 };
 type UsersResponse = { users: NexusUser[]; currentUserId: string };
 
@@ -109,7 +110,7 @@ export default function UsersSettings() {
         method: "PATCH",
         credentials: "same-origin",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ displayName: user.displayName ?? "", email: user.email, role: user.role, status: user.status }),
+        body: JSON.stringify({ displayName: user.displayName ?? "", email: user.email, role: user.role, status: user.status, pcwatchAccess: user.pcwatchAccess }),
       });
       if (!response.ok) throw new Error(await responseError(response));
       setFeedback({ kind: "success", text: `${user.displayName || user.email} er gemt.` });
@@ -175,6 +176,7 @@ export default function UsersSettings() {
           <label><span>Mail</span><input type="email" value={user.email} onChange={(event) => updateLocal(user.id, { email: event.target.value })} /></label>
           <label><span>Rolle</span><select value={user.role} onChange={(event) => updateLocal(user.id, { role: event.target.value as UserRole })}><option value="admin">Admin</option><option value="member">Medlem</option><option value="viewer">Kun visning</option></select></label>
           <label><span>Status</span><select value={user.status} disabled={user.id === currentUserId} onChange={(event) => updateLocal(user.id, { status: event.target.value as UserStatus })}><option value="active">Aktiv</option><option value="disabled">Deaktiveret</option>{user.status === "invited" && <option value="invited">Inviteret</option>}</select></label>
+          <label><span>PC Watch</span><select value={user.pcwatchAccess ? 'yes' : 'no'} disabled={user.role === 'admin'} onChange={(event) => updateLocal(user.id, { pcwatchAccess: event.target.value === 'yes' })}><option value="no">Ingen adgang</option><option value="yes">Adgang til hele PC Watch</option></select></label>
         </div>
         <div className="user-row-actions">
           <button type="button" className="secondary-action" disabled={busyId === user.id} onClick={() => void saveUser(user)}>Gem</button>

@@ -1,6 +1,7 @@
 import { getAuthenticatedUser } from "../auth/session";
 import { createOpaqueToken, hashToken } from "../auth/tokens";
 import { createForwardEmailProvider } from "../mail/forward-email";
+import { hasPcWatchAccess } from "../pcwatch/access";
 
 type UserRole = "admin" | "member" | "viewer";
 type UserStatus = "active" | "invited" | "disabled";
@@ -113,7 +114,7 @@ async function listUsers(request: Request, env: Env): Promise<Response> {
   ).all<UserRow>();
 
   return json({
-    users: result.results.map((user) => ({
+    users: await Promise.all(result.results.map(async (user) => ({
       id: user.id,
       email: user.email,
       displayName: user.display_name,
@@ -121,7 +122,8 @@ async function listUsers(request: Request, env: Env): Promise<Response> {
       status: user.status,
       createdAt: user.created_at,
       updatedAt: user.updated_at,
-    })),
+      pcwatchAccess: await hasPcWatchAccess(env.DB, user.id, user.role),
+    }))),
     currentUserId: auth.user.id,
   });
 }
@@ -184,6 +186,7 @@ async function updateUser(request: Request, env: Env, id: string): Promise<Respo
   const displayName = body.displayName === undefined ? current.display_name : normalizeName(body.displayName);
   const role = body.role === undefined ? current.role : body.role;
   const status = body.status === undefined ? current.status : body.status;
+  if (body.pcwatchAccess !== undefined && typeof body.pcwatchAccess !== 'boolean') return json({ error: 'invalid_pcwatch_access' }, { status: 400 });
 
   if (!email) return json({ error: "invalid_email" }, { status: 400 });
   if (body.displayName != null && body.displayName !== "" && !displayName) return json({ error: "invalid_display_name" }, { status: 400 });
@@ -207,6 +210,13 @@ async function updateUser(request: Request, env: Env, id: string): Promise<Respo
 
   if (status !== "active") {
     await env.DB.prepare(`UPDATE auth_sessions SET revoked_at = ? WHERE user_id = ? AND revoked_at IS NULL`).bind(now, id).run();
+  }
+
+  if (body.pcwatchAccess !== undefined && role !== 'admin') {
+    if (body.pcwatchAccess) await env.DB.prepare(
+      'INSERT INTO pcwatch_access (user_id,granted_at) VALUES (?,?) ON CONFLICT(user_id) DO NOTHING'
+    ).bind(id, now).run();
+    else await env.DB.prepare('DELETE FROM pcwatch_access WHERE user_id = ?').bind(id).run();
   }
 
   return json({ ok: true });

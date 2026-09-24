@@ -94,7 +94,7 @@ Home, the Displays editor preview and paired displays all render `WidgetCard` (`
 | `medium` | 2 of 4 | full | full |
 | `wide` | full row | full | full |
 
-`rows` (1 or 2) is declared in the widget registry, not inferred from content. The grid uses 150px row units and 14px gaps: cards occupy 150px or 314px in all modes, including mobile. `small`, `medium`, and persisted `wide` (large) are width choices only. Forecasts, charts and longer lists declare two rows. Card headers reserve a stable 30px slot, so entering edit mode does not resize the card. Content has zero automatic minimum size and scrolls within its allocated area when it cannot fit.
+Widgets can use three stored height levels: 150px, 232px, or 314px. The registry declares a default and the editor can override it per card. `small`, `medium`, and `wide` control width only. PC Watch widgets offer all three widths and adapt their content using the existing container-width bands and height classes. Card headers reserve a stable 30px slot, so entering edit mode does not resize the card. Content has zero automatic minimum size and scrolls within its allocated area when it cannot fit.
 
 This deliberately replaces content-grown rows: those coupled neighboring widget heights to chart intrinsic sizing and wrapping. Long journals or unusually large lists may scroll inside the card; they never grow the dashboard grid.
 

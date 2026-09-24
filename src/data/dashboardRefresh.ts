@@ -25,6 +25,7 @@ export const DEFAULT_WIDGET_REFRESH_CLASSES: Record<string, RefreshClass> = {
   Kalender: "slow",
   MELCloud: "live",
   Unraid: "live",
+  'PC Watch': 'live',
   Velbefindende: "event",
 };
 

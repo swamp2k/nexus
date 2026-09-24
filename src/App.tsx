@@ -9,6 +9,9 @@ import ElectricityPage from "./ElectricityPage";
 import CalendarPage from "./CalendarPage";
 import MelCloudPage from "./MelCloudPage";
 import UnraidPage from "./UnraidPage";
+import PcWatchPage from './PcWatchPage';
+import { invalidateQuery } from './data/queryCache';
+import { pcWatchOverviewUrl } from './widgets/pcwatchWidgets';
 import DisplaysPage from "./DisplaysPage";
 import SettingsPage from "./SettingsPage";
 import DisplayGate from "./DisplayGate";
@@ -30,10 +33,10 @@ const NAV_DEFINITIONS: NavDefinition[] = [
 ];
 const DEFAULT_NAV_ORDER = NAV_DEFINITIONS.map((item) => item.page);
 const NAV_BY_PAGE = new Map(NAV_DEFINITIONS.map((item) => [item.page, item]));
-const MOBILE_ALLOWED = new Set<NavPage>(["Hjem", "Garmin", "Motion", "Velbefindende", "Vejr", "Strøm", "Kalender", "Varmepumpe", "Unraid", "Displays"]);
+const MOBILE_ALLOWED = new Set<NavPage>(["Hjem", "Garmin", "Motion", "Velbefindende", "Vejr", "Strøm", "Kalender", "Varmepumpe", "Unraid", "PC Watch", "Displays"]);
 const DEFAULT_INTEGRATIONS: IntegrationMap = {
   garmin: true, wellbeing: true, weather: true, electricity: true, calendar: true, melcloud: true,
-  dba: true, unraid: true, pcwatch: true, notifications: true, displays: true,
+  dba: true, unraid: true, pcwatch: false, notifications: true, displays: true,
 };
 const PAGE_INTEGRATION: Partial<Record<NavPage, IntegrationKey>> = {
   Garmin: "garmin", Motion: "garmin", Velbefindende: "wellbeing", Vejr: "weather", Strøm: "electricity",
@@ -142,6 +145,8 @@ function App() {
 
   async function logout() {
     await fetch("/api/auth/logout", { method: "POST", credentials: "same-origin" });
+    invalidateQuery(pcWatchOverviewUrl);
+    setIntegrations(DEFAULT_INTEGRATIONS);
     setSession({ authenticated: false, user: null });
   }
 
@@ -214,8 +219,8 @@ function App() {
     <div className="content-shell">
       <header className="app-header"><div><h1>{heading}</h1></div><div className="header-actions"><button className="theme-toggle" onClick={toggleTheme} aria-label="Skift tema">{theme === "light" ? "☾" : "☀"}</button><details className="user-menu"><summary className="user-menu-summary" aria-label="Åbn brugermenu"><span className="avatar">{initials(session.user)}</span><span className="user-name">{displayName}</span></summary><div className="user-menu-popover"><button type="button" onClick={(event) => { setPage("Indstillinger"); closeUserMenu(event); }}>Indstillinger</button><button className="logout-button" type="button" onClick={logout}>Log ud</button></div></details></div></header>
       <main className="main-content">
-        {page === "Hjem" && <HomePage onOpenPage={setPage} />}{page === "Garmin" && integrations.garmin && <GarminPage />}{page === "Motion" && integrations.garmin && <MotionPage />}{page === "Velbefindende" && integrations.wellbeing && <WellbeingPage />}{page === "Vejr" && integrations.weather && <WeatherPage />}{page === "Strøm" && integrations.electricity && <ElectricityPage />}{page === "Kalender" && integrations.calendar && <CalendarPage />}{page === "Varmepumpe" && integrations.melcloud && <MelCloudPage />}{page === "Unraid" && integrations.unraid && <UnraidPage />}{page === "Displays" && integrations.displays && <DisplaysPage />}{page === "Indstillinger" && <SettingsPage />}
-        {!isHome && page !== "Garmin" && page !== "Motion" && page !== "Velbefindende" && page !== "Vejr" && page !== "Strøm" && page !== "Kalender" && page !== "Varmepumpe" && page !== "Unraid" && page !== "Displays" && page !== "Indstillinger" && <section className="placeholder-card"><p className="section-label">Planlagt</p><h2>{page}</h2><p>Modulet er på vej ind i Nexus.</p></section>}
+        {page === "Hjem" && <HomePage onOpenPage={setPage} />}{page === "Garmin" && integrations.garmin && <GarminPage />}{page === "Motion" && integrations.garmin && <MotionPage />}{page === "Velbefindende" && integrations.wellbeing && <WellbeingPage />}{page === "Vejr" && integrations.weather && <WeatherPage />}{page === "Strøm" && integrations.electricity && <ElectricityPage />}{page === "Kalender" && integrations.calendar && <CalendarPage />}{page === "Varmepumpe" && integrations.melcloud && <MelCloudPage />}{page === "Unraid" && integrations.unraid && <UnraidPage />}{page === 'PC Watch' && integrations.pcwatch && <PcWatchPage />}{page === "Displays" && integrations.displays && <DisplaysPage />}{page === "Indstillinger" && <SettingsPage />}
+        {!isHome && page !== "Garmin" && page !== "Motion" && page !== "Velbefindende" && page !== "Vejr" && page !== "Strøm" && page !== "Kalender" && page !== "Varmepumpe" && page !== "Unraid" && page !== 'PC Watch' && page !== "Displays" && page !== "Indstillinger" && <section className="placeholder-card"><p className="section-label">Planlagt</p><h2>{page}</h2><p>Modulet er på vej ind i Nexus.</p></section>}
       </main>
       <footer><span>Nexus v0.1</span><span>Simple by design.</span></footer>
     </div>
