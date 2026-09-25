@@ -34,6 +34,8 @@ export default function DisplaysPage() {
   const [saving, setSaving] = useState(false);
   const [integrations, setIntegrations] = useState<IntegrationMap>(DEFAULT_INTEGRATIONS);
   const [pcWatchCatalog, setPcWatchCatalog] = useState<PcWatchOverview | null>(null);
+  const [pcWatchCatalogState, setPcWatchCatalogState] = useState<"idle" | "loading" | "ready" | "error">("idle");
+  const [pcWatchCatalogError, setPcWatchCatalogError] = useState<string | null>(null);
 
   const { data: refreshSettings } = useSettings();
 
@@ -69,15 +71,38 @@ export default function DisplaysPage() {
     setPairCode(null);
   }, [selectedId]);
 
-  useEffect(() => {
-    if (!integrations.pcwatch) { setPcWatchCatalog(null); return; }
-    void fetch("/api/pcwatch/overview", { credentials: "same-origin", cache: "no-store" })
-      .then(async (response) => {
-        if (!response.ok) throw new Error("pcwatch_catalog_failed");
-        setPcWatchCatalog(await response.json() as PcWatchOverview);
-      })
-      .catch(() => setPcWatchCatalog(null));
-  }, [integrations.pcwatch]);
+  async function loadPcWatchCatalog() {
+    if (!integrations.pcwatch) {
+      setPcWatchCatalog(null);
+      setPcWatchCatalogState("idle");
+      setPcWatchCatalogError(null);
+      return;
+    }
+    setPcWatchCatalogState("loading");
+    setPcWatchCatalogError(null);
+    let lastError = "PC Watch kunne ikke hentes.";
+    for (let attempt = 0; attempt < 3; attempt += 1) {
+      try {
+        const response = await fetch("/api/pcwatch/overview", { credentials: "same-origin", cache: "no-store" });
+        if (!response.ok) {
+          const body = await response.json().catch(() => null) as { error?: string } | null;
+          throw new Error(`HTTP ${response.status}${body?.error ? ` · ${body.error}` : ""}`);
+        }
+        const overview = await response.json() as PcWatchOverview;
+        setPcWatchCatalog(overview);
+        setPcWatchCatalogState("ready");
+        return;
+      } catch (error) {
+        lastError = error instanceof Error ? error.message : lastError;
+        if (attempt < 2) await new Promise((resolve) => window.setTimeout(resolve, 500 * (attempt + 1)));
+      }
+    }
+    setPcWatchCatalog(null);
+    setPcWatchCatalogState("error");
+    setPcWatchCatalogError(lastError);
+  }
+
+  useEffect(() => { void loadPcWatchCatalog(); }, [integrations.pcwatch]);
 
   const displayWidgets = useMemo(() => [...widgetCatalog, ...discoverPcWatchWidgets(pcWatchCatalog)].filter((widget) =>
     widgetSupportsSurface(widget, "display") && widgetIntegrationEnabled(widget, integrations)), [integrations, pcWatchCatalog]);
@@ -182,7 +207,10 @@ export default function DisplaysPage() {
           </div>}
         </section>
 
-        <section className="home-editor"><div className="home-editor-copy"><strong>Tilgængelige widgets</strong><span>Samme komponenter og data som på Hjem. Deaktiverede integrationer vises ikke.</span></div><div className="home-editor-groups">{groupedWidgets.map(([group, widgets]) => <fieldset key={group}><legend>{group}</legend>{widgets.map((widget) => { const item = draft.layout.find((entry) => entry.id === widget.id); const index = visibleLayout.findIndex((entry) => entry.id === widget.id); return <div className="home-editor-row" key={widget.id}><label><input type="checkbox" checked={Boolean(item)} onChange={() => updateLayout((layout) => toggleWidget(layout, widget.id, widgetDefinitionById))} /><span><strong>{widget.title}</strong><small>{widget.description}</small></span></label>{item && <div className="home-editor-controls"><select aria-label={`Bredde for ${widget.title}`} value={item.size} onChange={(event) => updateLayout((layout) => changeSize(layout, widget.id, event.target.value as WidgetSize, widgetDefinitionById))}>{widget.supportedSizes.map((size) => <option key={size} value={size}>{SIZE_LABELS[size]}</option>)}</select><select aria-label={`Højde for ${widget.title}`} value={effectiveRows(item, widget)} onChange={(event) => updateLayout((layout) => changeRows(layout, widget.id, Number(event.target.value) as WidgetRows))}>{ROW_OPTIONS.map((rows) => <option key={rows} value={rows}>{rows} række{rows === 1 ? "" : "r"}</option>)}</select><button type="button" aria-label={`Flyt ${widget.title} op`} disabled={index <= 0} onClick={() => updateLayout((layout) => moveWidget(layout, widget.id, -1))}>↑</button><button type="button" aria-label={`Flyt ${widget.title} ned`} disabled={index < 0 || index >= visibleLayout.length - 1} onClick={() => updateLayout((layout) => moveWidget(layout, widget.id, 1))}>↓</button></div>}</div>; })}</fieldset>)}</div></section>
+        <section className="home-editor"><div className="home-editor-copy"><strong>Tilgængelige widgets</strong><span>Samme komponenter og data som på Hjem. Deaktiverede integrationer vises ikke.</span></div>
+          {integrations.pcwatch && pcWatchCatalogState === "loading" && <p className="home-layout-note">Henter PC Watch-enheder og backups…</p>}
+          {integrations.pcwatch && pcWatchCatalogState === "error" && <p className="home-layout-note home-layout-note--error">PC Watch-katalog kunne ikke hentes: {pcWatchCatalogError ?? "ukendt fejl"} <button type="button" className="secondary-action" onClick={() => void loadPcWatchCatalog()}>Prøv igen</button></p>}
+          <div className="home-editor-groups">{groupedWidgets.map(([group, widgets]) => <fieldset key={group}><legend>{group}</legend>{widgets.map((widget) => { const item = draft.layout.find((entry) => entry.id === widget.id); const index = visibleLayout.findIndex((entry) => entry.id === widget.id); return <div className="home-editor-row" key={widget.id}><label><input type="checkbox" checked={Boolean(item)} onChange={() => updateLayout((layout) => toggleWidget(layout, widget.id, widgetDefinitionById))} /><span><strong>{widget.title}</strong><small>{widget.description}</small></span></label>{item && <div className="home-editor-controls"><select aria-label={`Bredde for ${widget.title}`} value={item.size} onChange={(event) => updateLayout((layout) => changeSize(layout, widget.id, event.target.value as WidgetSize, widgetDefinitionById))}>{widget.supportedSizes.map((size) => <option key={size} value={size}>{SIZE_LABELS[size]}</option>)}</select><select aria-label={`Højde for ${widget.title}`} value={effectiveRows(item, widget)} onChange={(event) => updateLayout((layout) => changeRows(layout, widget.id, Number(event.target.value) as WidgetRows))}>{ROW_OPTIONS.map((rows) => <option key={rows} value={rows}>{rows} række{rows === 1 ? "" : "r"}</option>)}</select><button type="button" aria-label={`Flyt ${widget.title} op`} disabled={index <= 0} onClick={() => updateLayout((layout) => moveWidget(layout, widget.id, -1))}>↑</button><button type="button" aria-label={`Flyt ${widget.title} ned`} disabled={index < 0 || index >= visibleLayout.length - 1} onClick={() => updateLayout((layout) => moveWidget(layout, widget.id, 1))}>↓</button></div>}</div>; })}</fieldset>)}</div></section>
         <div className="display-editor-actions"><button className="secondary-action" type="button" onClick={() => void deleteDashboard()}>Slet</button><button className="primary-action" type="button" onClick={() => void saveDashboard()}>Gem dashboard</button></div>
         <section className="settings-card"><div className="settings-card-heading"><div><p className="section-label">Pairing</p><h2>Par en skærm til {draft.name}</h2></div></div><div className="settings-form"><label><span>Enhedsnavn</span><input value={deviceName} onChange={(event) => setDeviceName(event.target.value)} /></label><button className="primary-action" type="button" onClick={() => void createPairCode()}>Lav parringskode</button>{pairCode && <div className="display-pairing-code-panel"><span>Indtast på /display</span><strong className="display-pairing-code">{pairCode.code}</strong><small>Gyldig i 10 minutter.</small></div>}</div></section>
         <section className="settings-card"><div className="settings-card-heading"><div><p className="section-label">Enheder</p><h2>Parrede skærme</h2></div></div><div className="display-device-list">{devices.filter((device) => device.dashboardId === draft.id).map((device) => <div className="display-device-row" key={device.id}><div><strong>{device.name}</strong><small>Sidst set {new Date(device.lastSeenAt).toLocaleString("da-DK")}</small></div><button className="secondary-action" type="button" onClick={() => void revokeDevice(device.id)}>Fjern adgang</button></div>)}{devices.every((device) => device.dashboardId !== draft.id) && <p className="settings-help">Ingen skærme er parret endnu.</p>}</div></section>
