@@ -1,6 +1,6 @@
 import type { WidgetDefinition, WidgetTargetPage } from "../widgets/widgetRegistry";
 
-export type IntegrationKey = "garmin" | "motion" | "wellbeing" | "weather" | "electricity" | "calendar" | "melcloud" | "dba" | "unraid" | "pcwatch" | "notifications" | "displays";
+export type IntegrationKey = "garmin" | "motion" | "wellbeing" | "weather" | "electricity" | "calendar" | "melcloud" | "dba" | "unraid" | "pcwatch" | "privateering" | "notifications" | "displays";
 export type IntegrationMap = Record<IntegrationKey, boolean>;
 
 export const DEFAULT_INTEGRATIONS: IntegrationMap = {
@@ -14,6 +14,7 @@ export const DEFAULT_INTEGRATIONS: IntegrationMap = {
   dba: true,
   unraid: true,
   pcwatch: false,
+  privateering: true,
   notifications: true,
   displays: true,
 };
@@ -44,6 +45,7 @@ export function pageIntegrationEnabled(page: WidgetTargetPage | "Displays", inte
 export function integrationKeyForWidgetId(id: string): IntegrationKey | null {
   if (id.startsWith("unraid.")) return "unraid";
   if (id.startsWith('pcwatch.')) return 'pcwatch';
+  if (id.startsWith('privateering.')) return 'privateering';
   if (id.startsWith("garmin.")) return "garmin";
   if (id.startsWith("wellbeing.")) return "wellbeing";
   if (id.startsWith("weather.")) return "weather";

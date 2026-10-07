@@ -18,6 +18,7 @@ const DEFINITIONS: IntegrationDefinition[] = [
   { key: "melcloud", label: "Varmepumpe", description: "MELCloud-integration og varmepumpeside." },
   { key: "dba", label: "DBA", description: "DBA-modul og overvågninger." },
   { key: "unraid", label: "Unraid", description: "UnraidWatch, serverstatus og containere." },
+  { key: "privateering", label: "Privateering", description: "rTorrent-torrents og Copyarr-overførsler." },
   { key: "notifications", label: "Notifikationer", description: "Notifikationsmodulet." },
   { key: "displays", label: "Displays", description: "Display-dashboard og pairing." },
 ];

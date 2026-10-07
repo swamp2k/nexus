@@ -10,6 +10,7 @@ import CalendarPage from "./CalendarPage";
 import MelCloudPage from "./MelCloudPage";
 import UnraidPage from "./UnraidPage";
 import PcWatchPage from './PcWatchPage';
+import PrivateeringPage from './PrivateeringPage';
 import { invalidateQuery } from './data/queryCache';
 import { pcWatchOverviewUrl } from './widgets/pcwatchWidgets';
 import DisplaysPage from "./DisplaysPage";
@@ -18,9 +19,9 @@ import DisplayGate from "./DisplayGate";
 
 type User = { id: string; email: string; displayName: string | null; role: "admin" | "member" | "viewer" };
 type SessionResponse = { authenticated: boolean; user: User | null };
-type NavPage = "Hjem" | "Garmin" | "Motion" | "Velbefindende" | "Vejr" | "Strøm" | "Kalender" | "Varmepumpe" | "DBA" | "Unraid" | "PC Watch" | "Notifikationer" | "Displays";
+type NavPage = "Hjem" | "Garmin" | "Motion" | "Velbefindende" | "Vejr" | "Strøm" | "Kalender" | "Varmepumpe" | "DBA" | "Unraid" | "PC Watch" | "Privateering" | "Notifikationer" | "Displays";
 type Page = NavPage | "Indstillinger";
-type IntegrationKey = "garmin" | "motion" | "wellbeing" | "weather" | "electricity" | "calendar" | "melcloud" | "dba" | "unraid" | "pcwatch" | "notifications" | "displays";
+type IntegrationKey = "garmin" | "motion" | "wellbeing" | "weather" | "electricity" | "calendar" | "melcloud" | "dba" | "unraid" | "pcwatch" | "privateering" | "notifications" | "displays";
 type IntegrationMap = Record<IntegrationKey, boolean>;
 
 type NavDefinition = { page: NavPage; icon: string; label: string };
@@ -28,7 +29,7 @@ const NAV_DEFINITIONS: NavDefinition[] = [
   { page: "Hjem", icon: "⌂", label: "Hjem" }, { page: "Garmin", icon: "⌖", label: "Garmin" }, { page: "Motion", icon: "↗", label: "Motion" },
   { page: "Velbefindende", icon: "♥", label: "Velbefindende" }, { page: "Vejr", icon: "☁", label: "Vejr" }, { page: "Strøm", icon: "ϟ", label: "Strøm" },
   { page: "Kalender", icon: "▦", label: "Kalender" }, { page: "Varmepumpe", icon: "♨", label: "Varmepumpe" }, { page: "DBA", icon: "◇", label: "DBA" },
-  { page: "Unraid", icon: "▤", label: "Unraid" }, { page: "PC Watch", icon: "▣", label: "PC Watch" }, { page: "Notifikationer", icon: "♧", label: "Notifikationer" },
+  { page: "Unraid", icon: "▤", label: "Unraid" }, { page: "PC Watch", icon: "▣", label: "PC Watch" }, { page: "Privateering", icon: "☠", label: "Privateering" }, { page: "Notifikationer", icon: "♧", label: "Notifikationer" },
   { page: "Displays", icon: "▣", label: "Displays" },
 ];
 const DEFAULT_NAV_ORDER = NAV_DEFINITIONS.map((item) => item.page);
@@ -36,12 +37,12 @@ const NAV_BY_PAGE = new Map(NAV_DEFINITIONS.map((item) => [item.page, item]));
 const MOBILE_ALLOWED = new Set<NavPage>(["Hjem", "Garmin", "Motion", "Velbefindende", "Vejr", "Strøm", "Kalender", "Varmepumpe", "Unraid", "PC Watch", "Displays"]);
 const DEFAULT_INTEGRATIONS: IntegrationMap = {
   garmin: true, motion: true, wellbeing: true, weather: true, electricity: true, calendar: true, melcloud: true,
-  dba: true, unraid: true, pcwatch: false, notifications: true, displays: true,
+  dba: true, unraid: true, pcwatch: false, privateering: true, notifications: true, displays: true,
 };
 const PAGE_INTEGRATION: Partial<Record<NavPage, IntegrationKey>> = {
   Garmin: "garmin", Motion: "motion", Velbefindende: "wellbeing", Vejr: "weather", Strøm: "electricity",
   Kalender: "calendar", Varmepumpe: "melcloud", DBA: "dba", Unraid: "unraid", "PC Watch": "pcwatch",
-  Notifikationer: "notifications", Displays: "displays",
+  Privateering: "privateering", Notifikationer: "notifications", Displays: "displays",
 };
 
 function initialPageFromUrl(): Page {
@@ -219,8 +220,8 @@ function App() {
     <div className="content-shell">
       <header className="app-header"><div><h1>{heading}</h1></div><div className="header-actions"><button className="theme-toggle" onClick={toggleTheme} aria-label="Skift tema">{theme === "light" ? "☾" : "☀"}</button><details className="user-menu"><summary className="user-menu-summary" aria-label="Åbn brugermenu"><span className="avatar">{initials(session.user)}</span><span className="user-name">{displayName}</span></summary><div className="user-menu-popover"><button type="button" onClick={(event) => { setPage("Indstillinger"); closeUserMenu(event); }}>Indstillinger</button><button className="logout-button" type="button" onClick={logout}>Log ud</button></div></details></div></header>
       <main className="main-content">
-        {page === "Hjem" && <HomePage onOpenPage={setPage} />}{page === "Garmin" && integrations.garmin && <GarminPage />}{page === "Motion" && integrations.motion && <MotionPage />}{page === "Velbefindende" && integrations.wellbeing && <WellbeingPage />}{page === "Vejr" && integrations.weather && <WeatherPage />}{page === "Strøm" && integrations.electricity && <ElectricityPage />}{page === "Kalender" && integrations.calendar && <CalendarPage />}{page === "Varmepumpe" && integrations.melcloud && <MelCloudPage />}{page === "Unraid" && integrations.unraid && <UnraidPage />}{page === 'PC Watch' && integrations.pcwatch && <PcWatchPage />}{page === "Displays" && integrations.displays && <DisplaysPage />}{page === "Indstillinger" && <SettingsPage />}
-        {!isHome && page !== "Garmin" && page !== "Motion" && page !== "Velbefindende" && page !== "Vejr" && page !== "Strøm" && page !== "Kalender" && page !== "Varmepumpe" && page !== "Unraid" && page !== 'PC Watch' && page !== "Displays" && page !== "Indstillinger" && <section className="placeholder-card"><p className="section-label">Planlagt</p><h2>{page}</h2><p>Modulet er på vej ind i Nexus.</p></section>}
+        {page === "Hjem" && <HomePage onOpenPage={setPage} />}{page === "Garmin" && integrations.garmin && <GarminPage />}{page === "Motion" && integrations.motion && <MotionPage />}{page === "Velbefindende" && integrations.wellbeing && <WellbeingPage />}{page === "Vejr" && integrations.weather && <WeatherPage />}{page === "Strøm" && integrations.electricity && <ElectricityPage />}{page === "Kalender" && integrations.calendar && <CalendarPage />}{page === "Varmepumpe" && integrations.melcloud && <MelCloudPage />}{page === "Unraid" && integrations.unraid && <UnraidPage />}{page === 'PC Watch' && integrations.pcwatch && <PcWatchPage />}{page === "Privateering" && integrations.privateering && <PrivateeringPage />}{page === "Displays" && integrations.displays && <DisplaysPage />}{page === "Indstillinger" && <SettingsPage />}
+        {!isHome && page !== "Garmin" && page !== "Motion" && page !== "Velbefindende" && page !== "Vejr" && page !== "Strøm" && page !== "Kalender" && page !== "Varmepumpe" && page !== "Unraid" && page !== 'PC Watch' && page !== "Privateering" && page !== "Displays" && page !== "Indstillinger" && <section className="placeholder-card"><p className="section-label">Planlagt</p><h2>{page}</h2><p>Modulet er på vej ind i Nexus.</p></section>}
       </main>
       <footer><span>Nexus v0.1</span><span>Simple by design.</span></footer>
     </div>

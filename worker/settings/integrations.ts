@@ -12,6 +12,7 @@ export const INTEGRATION_KEYS = [
   "dba",
   "unraid",
   "pcwatch",
+  "privateering",
   "notifications",
   "displays",
 ] as const;
