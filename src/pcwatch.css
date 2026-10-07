@@ -33,3 +33,7 @@
 .pcwatch-page-list strong, .pcwatch-page-list small { display: block; overflow: hidden; text-overflow: ellipsis; }
 .pcwatch-page-list small { color: var(--muted); font-size: .72rem; }
 @media (max-width: 700px) { .pcwatch-page-summary { grid-template-columns: repeat(2,minmax(0,1fr)); } .pcwatch-page-list article { grid-template-columns: minmax(0,1fr) auto; } .pcwatch-page-list article > small { grid-column: 1 / -1; } }
+.pcwatch-task-details { grid-column: 1 / -1; margin-top: 4px; }
+.pcwatch-task-details summary { cursor: pointer; color: var(--muted); font-size: .72rem; }
+.pcwatch-task-details .pcwatch-widget-facts { grid-template-columns: repeat(2, minmax(0,1fr)); margin-top: 8px; }
+.pcwatch-task-details small { display: block; color: var(--muted); font-size: .72rem; margin-top: 6px; }

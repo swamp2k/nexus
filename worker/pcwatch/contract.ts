@@ -12,7 +12,11 @@ export type PcWatchBackupTask = {
   id: string; name: string; agentId: string; agentName: string; remote: string | null; enabled: boolean;
   nextDueAt: string | null; scheduleIntervalHours: number | null; lastRunStatus: string | null;
   lastRunAt: string | null; lastRunProgressPct: number | null; lastRunBytesProcessed: number | null;
-  lastRunError: string | null; lastSuccessAt: string | null;
+  lastRunError: string | null; lastSuccessAt: string | null; lastRunMessage: string | null;
+  lastRunMirrorFiles: number | null; lastRunMirrorBytes: number | null;
+  lastRunVersionedFiles: number | null; lastRunVersionedBytes: number | null;
+  lastRunVersionFoldersRemoved: number | null; lastRunContentChecked: boolean | null;
+  lastRunDurationMs: number | null;
 };
 export type PcWatchDeviceBackup = { deviceId: string; deviceName: string; destinationName: string | null; lastStatus: string | null; lastAt: string | null; lastSizeBytes: number | null; nextDueAt: string | null };
 export type PcWatchOverview = { contractVersion: number; fetchedAt: string; devices: PcWatchDevice[]; alerts: PcWatchAlert[]; backupAgents: PcWatchBackupAgent[]; backupTasks: PcWatchBackupTask[]; deviceBackups: PcWatchDeviceBackup[] };

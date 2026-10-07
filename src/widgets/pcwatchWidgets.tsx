@@ -6,7 +6,7 @@ export type PcWatchOverview = {
   devices: Array<{ id: string; name: string; owner: string | null; lastSeenAt: string | null; metricsAt: string | null; cpuPct: number | null; ramPct: number | null; tempC: number | null; gpuPct: number | null; diskFreeGb: number | null; uptimeSeconds: number | null; openAlerts: number; agentOutdated: boolean }>;
   alerts: Array<{ id: number; deviceId: string; deviceName: string; type: string; triggeredAt: string; message: string | null }>;
   backupAgents: Array<{ id: string; name: string; status: string; version: string | null; lastSeenAt: string | null; remotes: string[] }>;
-  backupTasks: Array<{ id: string; name: string; agentId: string; agentName: string; remote: string | null; enabled: boolean; nextDueAt: string | null; scheduleIntervalHours: number | null; lastRunStatus: string | null; lastRunAt: string | null; lastRunProgressPct: number | null; lastRunBytesProcessed: number | null; lastRunError: string | null; lastSuccessAt: string | null }>;
+  backupTasks: Array<{ id: string; name: string; agentId: string; agentName: string; remote: string | null; enabled: boolean; nextDueAt: string | null; scheduleIntervalHours: number | null; lastRunStatus: string | null; lastRunAt: string | null; lastRunProgressPct: number | null; lastRunBytesProcessed: number | null; lastRunError: string | null; lastSuccessAt: string | null; lastRunMessage: string | null; lastRunMirrorFiles: number | null; lastRunMirrorBytes: number | null; lastRunVersionedFiles: number | null; lastRunVersionedBytes: number | null; lastRunVersionFoldersRemoved: number | null; lastRunContentChecked: boolean | null; lastRunDurationMs: number | null }>;
   deviceBackups: Array<{ deviceId: string; deviceName: string; destinationName: string | null; lastStatus: string | null; lastAt: string | null; lastSizeBytes: number | null; nextDueAt: string | null }>;
 };
 
@@ -20,6 +20,7 @@ export function usePcWatchOverview() {
 export function recent(value: string | null, minutes: number): boolean { const at = value ? Date.parse(value) : NaN; return Number.isFinite(at) && Date.now() - at >= 0 && Date.now() - at < minutes * 60_000; }
 export function when(value: string | null): string { return value ? new Date(value).toLocaleString('da-DK', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }) : 'Aldrig'; }
 function pct(value: number | null): string { return value === null ? '—' : `${Math.round(value)}%`; }
+export function bytes(value: number | null): string { return value === null ? '—' : `${(value / 1024 ** 3).toFixed(1)} GB`; }
 function State({ children }: { children: string }) { return <div className="home-widget-state">{children}</div>; }
 function useData() { return usePcWatchOverview(); }
 
@@ -72,7 +73,7 @@ function backupWidget(id: string) { return function BackupWidget() {
   if (error && !data) return <State>PC-backup kunne ikke hentes</State>;
   const backup = data?.deviceBackups.find(item => item.deviceId === id);
   if (!backup) return <State>Ingen PC-backup konfigureret</State>;
-  return <div className="pcwatch-widget"><strong className={backup.lastStatus === 'failure' ? 'pcwatch-warn' : 'pcwatch-good'}>{backup.lastStatus === 'success' ? 'Gennemført' : backup.lastStatus === 'failure' ? 'Fejlede' : 'Ingen kørsel'}</strong><span>Senest {when(backup.lastAt)}</span><div className="pcwatch-widget-facts"><span>Destination <b>{backup.destinationName ?? '—'}</b></span><span>Næste <b>{when(backup.nextDueAt)}</b></span><span>Størrelse <b>{backup.lastSizeBytes === null ? '—' : `${(backup.lastSizeBytes / 1024 ** 3).toFixed(1)} GB`}</b></span></div></div>;
+  return <div className="pcwatch-widget"><strong className={backup.lastStatus === 'failure' ? 'pcwatch-warn' : 'pcwatch-good'}>{backup.lastStatus === 'success' ? 'Gennemført' : backup.lastStatus === 'failure' ? 'Fejlede' : 'Ingen kørsel'}</strong><span>Senest {when(backup.lastAt)}</span><div className="pcwatch-widget-facts"><span>Destination <b>{backup.destinationName ?? '—'}</b></span><span>Næste <b>{when(backup.nextDueAt)}</b></span><span>Størrelse <b>{bytes(backup.lastSizeBytes)}</b></span></div></div>;
 }; }
 
 export const pcWatchWidgetDefinitions: WidgetDefinition[] = [
