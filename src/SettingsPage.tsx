@@ -5,6 +5,7 @@ import EloverblikSettings from "./EloverblikSettings";
 import GarminImportSettings from "./GarminImportSettings";
 import IntegrationSettings from "./IntegrationSettings";
 import MelCloudSettings from "./MelCloudSettings";
+import PrivateeringSettings from "./PrivateeringSettings";
 import UnraidSettings from "./UnraidSettings";
 import UsersSettings from "./UsersSettings";
 import WellbeingMetricSettings from "./WellbeingMetricSettings";
@@ -178,6 +179,7 @@ export default function SettingsPage() {
 
     {integrations.electricity && <details className="settings-card settings-collapsible settings-component-wrapper"><summary className="settings-card-heading"><div><p className="section-label">Datakilde</p><h2>Eloverblik</h2></div><span className="settings-icon" aria-hidden="true">ϟ</span></summary><EloverblikSettings /></details>}
     {integrations.unraid && <details className="settings-card settings-collapsible settings-component-wrapper"><summary className="settings-card-heading"><div><p className="section-label">Datakilde</p><h2>UnraidWatch</h2></div><span className="settings-icon" aria-hidden="true">▤</span></summary><UnraidSettings /></details>}
+    {integrations.privateering && <details className="settings-card settings-collapsible settings-component-wrapper"><summary className="settings-card-heading"><div><p className="section-label">Datakilde</p><h2>Privateering · ingest-token</h2></div><span className="settings-icon" aria-hidden="true">⚑</span></summary><PrivateeringSettings /></details>}
     {integrations.calendar && <details className="settings-card settings-collapsible settings-component-wrapper"><summary className="settings-card-heading"><div><p className="section-label">Datakilde</p><h2>Kalender · iCal</h2></div><span className="settings-icon" aria-hidden="true">▦</span></summary><CalendarSourceSettings /></details>}
     {integrations.melcloud && <details className="settings-card settings-collapsible settings-component-wrapper"><summary className="settings-card-heading"><div><p className="section-label">Datakilde</p><h2>MELCloud</h2></div><span className="settings-icon" aria-hidden="true">◫</span></summary><MelCloudSettings /></details>}
     {integrations.wellbeing && <WellbeingMetricSettings />}

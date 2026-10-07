@@ -1,25 +1,26 @@
 import { getAuthenticatedUser } from '../auth/session';
+import { createOpaqueToken, hashToken } from '../auth/tokens';
 import type { PrivateeringIngestPayload, PrivateeringOverview, PrivateeringTorrent, PrivateeringFile } from './contract';
-
-export type PrivateeringEnv = Env & { PRIVATEERING_INGEST_TOKEN?: string };
 
 function json(body: unknown, status = 200): Response {
   return Response.json(body, { status, headers: { 'Cache-Control': 'no-store' } });
 }
 
-async function authorizeIngest(env: PrivateeringEnv, request: Request): Promise<boolean> {
-  const expected = env.PRIVATEERING_INGEST_TOKEN;
-  if (!expected) return false;
+async function authorizeIngest(env: Env, request: Request): Promise<boolean> {
   const header = request.headers.get('Authorization') ?? '';
   const token = header.startsWith('Bearer ') ? header.slice(7) : '';
   if (!token || token.length > 500) return false;
+  const tokenHash = await hashToken(token);
+  const row = await env.DB.prepare(
+    `SELECT token_hash AS tokenHash FROM privateering_ingest_tokens WHERE token_hash = ?`,
+  ).bind(tokenHash).first<{ tokenHash: string }>();
+  if (!row) return false;
+  // Constant-time compare even though the lookup already matched exactly,
+  // to avoid any timing signal on the comparison itself.
   const encoder = new TextEncoder();
-  const [receivedHash, expectedHash] = await Promise.all([
-    crypto.subtle.digest('SHA-256', encoder.encode(token)),
-    crypto.subtle.digest('SHA-256', encoder.encode(expected)),
-  ]);
-  const received = new Uint8Array(receivedHash);
-  const target = new Uint8Array(expectedHash);
+  const received = encoder.encode(tokenHash);
+  const target = encoder.encode(row.tokenHash);
+  if (received.length !== target.length) return false;
   let difference = 0;
   for (let index = 0; index < target.length; index++) difference |= received[index] ^ target[index];
   return difference === 0;
@@ -47,8 +48,18 @@ function cleanFiles(value: unknown): PrivateeringFile[] {
   })).filter((f) => f.path);
 }
 
-export async function handlePrivateeringRoute(request: Request, env: PrivateeringEnv): Promise<Response | null> {
+type TokenInfo = { exists: boolean; createdAt: string | null };
+
+async function getTokenInfo(env: Env, userId: string): Promise<TokenInfo> {
+  const row = await env.DB.prepare(
+    `SELECT created_at AS createdAt FROM privateering_ingest_tokens WHERE user_id = ?`,
+  ).bind(userId).first<{ createdAt: string }>();
+  return row ? { exists: true, createdAt: row.createdAt } : { exists: false, createdAt: null };
+}
+
+export async function handlePrivateeringRoute(request: Request, env: Env): Promise<Response | null> {
   const pathname = new URL(request.url).pathname;
+
   if (pathname === '/api/privateering/ingest') {
     if (request.method !== 'POST') return json({ error: 'method_not_allowed' }, 405);
     if (!await authorizeIngest(env, request)) return json({ error: 'unauthorized' }, 401);
@@ -77,6 +88,36 @@ export async function handlePrivateeringRoute(request: Request, env: Privateerin
       ? { fetchedAt: row.fetchedAt, torrents: JSON.parse(row.torrentsJson), copyarrFiles: JSON.parse(row.copyarrFilesJson) }
       : { fetchedAt: null, torrents: [], copyarrFiles: [] };
     return json(overview);
+  }
+
+  if (pathname === '/api/privateering/ingest-token') {
+    const user = await getAuthenticatedUser(request, env.DB);
+    if (!user) return json({ error: 'unauthorized' }, 401);
+
+    if (request.method === 'GET') {
+      return json(await getTokenInfo(env, user.id));
+    }
+
+    if (request.method === 'POST') {
+      if (user.role === 'viewer') return json({ error: 'forbidden' }, 403);
+      const token = createOpaqueToken();
+      const tokenHash = await hashToken(token);
+      const createdAt = new Date().toISOString();
+      await env.DB.prepare(
+        `INSERT INTO privateering_ingest_tokens (user_id, token_hash, created_at)
+         VALUES (?, ?, ?)
+         ON CONFLICT(user_id) DO UPDATE SET token_hash = excluded.token_hash, created_at = excluded.created_at`,
+      ).bind(user.id, tokenHash, createdAt).run();
+      return json({ token, createdAt });
+    }
+
+    if (request.method === 'DELETE') {
+      if (user.role === 'viewer') return json({ error: 'forbidden' }, 403);
+      await env.DB.prepare(`DELETE FROM privateering_ingest_tokens WHERE user_id = ?`).bind(user.id).run();
+      return json({ ok: true });
+    }
+
+    return json({ error: 'method_not_allowed' }, 405);
   }
 
   return null;
