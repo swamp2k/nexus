@@ -1,10 +1,11 @@
 import type { WidgetDefinition, WidgetTargetPage } from "../widgets/widgetRegistry";
 
-export type IntegrationKey = "garmin" | "wellbeing" | "weather" | "electricity" | "calendar" | "melcloud" | "dba" | "unraid" | "pcwatch" | "notifications" | "displays";
+export type IntegrationKey = "garmin" | "motion" | "wellbeing" | "weather" | "electricity" | "calendar" | "melcloud" | "dba" | "unraid" | "pcwatch" | "notifications" | "displays";
 export type IntegrationMap = Record<IntegrationKey, boolean>;
 
 export const DEFAULT_INTEGRATIONS: IntegrationMap = {
   garmin: true,
+  motion: true,
   wellbeing: true,
   weather: true,
   electricity: true,
@@ -19,7 +20,7 @@ export const DEFAULT_INTEGRATIONS: IntegrationMap = {
 
 export const PAGE_INTEGRATION: Partial<Record<WidgetTargetPage | "Displays", IntegrationKey>> = {
   Garmin: "garmin",
-  Motion: "garmin",
+  Motion: "motion",
   Velbefindende: "wellbeing",
   Vejr: "weather",
   Strøm: "electricity",
@@ -57,6 +58,7 @@ export function widgetIntegrationKey(widget: Pick<WidgetDefinition, "id" | "grou
   if (byId) return byId;
   if (widget.group === "Unraid") return "unraid";
   if (widget.group === "Garmin") return "garmin";
+  if (widget.group === "Motion") return "motion";
   if (widget.group === "Velbefindende") return "wellbeing";
   if (widget.group === "Vejr") return "weather";
   if (widget.group === "Strøm") return "electricity";

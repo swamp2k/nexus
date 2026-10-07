@@ -9,7 +9,8 @@ type IntegrationDefinition = {
 };
 
 const DEFINITIONS: IntegrationDefinition[] = [
-  { key: "garmin", label: "Garmin + Motion", description: "Sundhedsdata, søvn, aktiviteter og Motion-siden." },
+  { key: "garmin", label: "Garmin", description: "Sundhedsdata, søvn og aktiviteter." },
+  { key: "motion", label: "Motion", description: "Motion-siden og aktivitetshistorik." },
   { key: "wellbeing", label: "Velbefindende + Miyagi", description: "Daglige check-ins, historik og Miyagi." },
   { key: "weather", label: "Vejr", description: "Vejrside og vejrdata." },
   { key: "electricity", label: "Strøm + Eloverblik", description: "Elpriser, elforbrug og Eloverblik." },

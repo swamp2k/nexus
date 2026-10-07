@@ -3,6 +3,7 @@ import { hasPcWatchAccess } from "../pcwatch/access";
 
 export const INTEGRATION_KEYS = [
   "garmin",
+  "motion",
   "wellbeing",
   "weather",
   "electricity",
@@ -36,10 +37,17 @@ export async function getUserIntegrations(db: D1Database, userId: string): Promi
      WHERE user_id = ?`,
   ).bind(userId).all<{ integration_key: string; enabled: number }>();
 
+  const explicitKeys = new Set<string>();
   for (const row of result.results) {
     if ((INTEGRATION_KEYS as readonly string[]).includes(row.integration_key)) {
       integrations[row.integration_key as IntegrationKey] = row.enabled !== 0;
+      explicitKeys.add(row.integration_key);
     }
+  }
+  // Migration: "motion" used to be bundled with "garmin". Users who never set
+  // motion explicitly keep following garmin's enabled state, preserving prior behavior.
+  if (!explicitKeys.has("motion")) {
+    integrations.motion = integrations.garmin;
   }
   integrations.pcwatch = await hasPcWatchAccess(db, userId);
   return integrations;
