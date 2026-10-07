@@ -19,6 +19,7 @@ const DEFINITIONS: IntegrationDefinition[] = [
   { key: "dba", label: "DBA", description: "DBA-modul og overvågninger." },
   { key: "unraid", label: "Unraid", description: "UnraidWatch, serverstatus og containere." },
   { key: "privateering", label: "Privateering", description: "rTorrent-torrents og Copyarr-overførsler." },
+  { key: "projects", label: "Projekter", description: "Projektoversigt over GitHub og Cloudflare (kun admin)." },
   { key: "notifications", label: "Notifikationer", description: "Notifikationsmodulet." },
   { key: "displays", label: "Displays", description: "Display-dashboard og pairing." },
 ];

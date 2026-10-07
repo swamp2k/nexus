@@ -2,7 +2,7 @@ import { getAuthenticatedUser } from "../auth/session";
 
 const NAV_ITEMS = [
   "Hjem", "Garmin", "Motion", "Velbefindende", "Vejr", "Strøm", "Kalender", "Varmepumpe",
-  "DBA", "Unraid", "PC Watch", "Privateering", "Notifikationer", "Displays",
+  "DBA", "Unraid", "PC Watch", "Privateering", "Projekter", "Notifikationer", "Displays",
 ] as const;
 
 type NavItem = typeof NAV_ITEMS[number];

@@ -55,6 +55,7 @@ src/                     React UI
 worker/                  Cloudflare Worker API
 worker/auth/             sessions/authentication
 worker/garmin/           Garmin routes/import/sync support
+worker/projects/         admin-only project registry + daily GitHub/Cloudflare discovery
 worker/settings/         per-user settings
 worker/sources/          external data sources
 worker/wellbeing/        wellbeing APIs

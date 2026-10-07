@@ -1,0 +1,48 @@
+.main-content:has(.projects-page) { width: min(1600px, calc(100% - 64px)); }
+@media (max-width: 1060px) { .main-content:has(.projects-page) { width: min(100% - 40px, 1600px); } }
+@media (max-width: 760px) { .main-content:has(.projects-page) { width: min(100% - 28px, 1600px); } }
+
+.projects-page { display: grid; gap: 12px; }
+.projects-heading { display: flex; align-items: baseline; gap: 10px 12px; flex-wrap: wrap; }
+.projects-heading h2 { margin: 0; font-size: 1.1rem; }
+.projects-heading .freshness { color: var(--muted); font-size: .76rem; }
+.projects-actions { display: flex; gap: 6px; margin-left: auto; }
+.projects-page input, .projects-page select { padding: 4px 8px; border: 1px solid var(--border); border-radius: var(--radius-sm, 6px); background: var(--surface-soft); color: var(--text); font-size: .8rem; min-width: 0; }
+.projects-page button { padding: 4px 10px; border: 1px solid var(--border); border-radius: var(--radius-sm, 6px); background: var(--surface); font-size: .78rem; cursor: pointer; }
+.projects-page button:disabled { opacity: .55; cursor: default; }
+.projects-actions input { width: 160px; }
+
+.projects-drift, .projects-group, .projects-editor { padding: 8px 12px; border: 1px solid var(--border); border-radius: var(--radius-md); background: var(--surface); min-width: 0; }
+.projects-drift { border-color: color-mix(in srgb, var(--warning) 45%, var(--border)); }
+.projects-drift summary { cursor: pointer; font-size: .82rem; font-weight: 700; color: var(--warning); }
+.projects-drift-list { list-style: none; margin: 6px 0 0; padding: 0; display: grid; gap: 4px; }
+.projects-drift-list li { display: flex; align-items: center; gap: 8px; font-size: .8rem; flex-wrap: wrap; }
+.projects-drift-name { font-weight: 600; overflow-wrap: anywhere; }
+.projects-muted { color: var(--muted); font-size: .74rem; }
+
+.projects-group h3, .projects-group summary { margin: 0 0 4px; font-size: .74rem; color: var(--muted); font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+.projects-group summary { cursor: pointer; margin: 0; }
+.projects-list { list-style: none; margin: 0; padding: 0; }
+.projects-row { display: flex; align-items: center; gap: 4px 12px; padding: 5px 0; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.projects-row:last-child { border-bottom: 0; }
+.projects-row-main { display: flex; align-items: baseline; gap: 8px; flex: 1 1 320px; min-width: 0; }
+.projects-page .projects-name { padding: 0; border: 0; background: none; font-weight: 700; font-size: .84rem; white-space: nowrap; }
+.projects-name:hover { color: var(--accent); }
+.projects-desc { color: var(--muted); font-size: .78rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.projects-flag { color: var(--warning); font-weight: 800; font-size: .8rem; cursor: help; }
+.projects-row-links { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; }
+.projects-row-links a { font-size: .74rem; color: var(--accent); text-decoration: none; padding: 1px 6px; border-radius: 999px; background: var(--accent-soft); }
+.projects-chip { display: inline-block; padding: 1px 7px; border-radius: 999px; font-size: .66rem; font-weight: 600; background: var(--surface-soft); color: var(--muted); white-space: nowrap; }
+.projects-chip--warn { background: color-mix(in srgb, var(--warning) 18%, transparent); color: var(--warning); }
+
+.projects-editor { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px 12px; }
+.projects-editor label { display: grid; gap: 2px; font-size: .7rem; color: var(--muted); }
+.projects-editor-wide { grid-column: 1 / -1; }
+.projects-editor-actions { grid-column: 1 / -1; display: flex; gap: 6px; justify-content: flex-end; }
+.projects-page .projects-danger { color: var(--danger); margin-right: auto; }
+.projects-page button[type="submit"] { background: var(--accent); border-color: var(--accent); color: white; }
+
+@media (max-width: 760px) {
+  .projects-actions { margin-left: 0; width: 100%; }
+  .projects-actions input { flex: 1; width: auto; }
+}
