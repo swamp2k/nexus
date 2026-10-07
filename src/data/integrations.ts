@@ -1,6 +1,6 @@
 import type { WidgetDefinition, WidgetTargetPage } from "../widgets/widgetRegistry";
 
-export type IntegrationKey = "garmin" | "motion" | "wellbeing" | "weather" | "electricity" | "calendar" | "melcloud" | "dba" | "unraid" | "pcwatch" | "privateering" | "notifications" | "displays";
+export type IntegrationKey = "garmin" | "motion" | "wellbeing" | "weather" | "electricity" | "calendar" | "melcloud" | "dba" | "unraid" | "pcwatch" | "privateering" | "projects" | "notifications" | "displays";
 export type IntegrationMap = Record<IntegrationKey, boolean>;
 
 export const DEFAULT_INTEGRATIONS: IntegrationMap = {
@@ -15,6 +15,7 @@ export const DEFAULT_INTEGRATIONS: IntegrationMap = {
   unraid: true,
   pcwatch: false,
   privateering: true,
+  projects: false,
   notifications: true,
   displays: true,
 };

@@ -13,6 +13,7 @@ export const INTEGRATION_KEYS = [
   "unraid",
   "pcwatch",
   "privateering",
+  "projects",
   "notifications",
   "displays",
 ] as const;
@@ -51,6 +52,11 @@ export async function getUserIntegrations(db: D1Database, userId: string): Promi
     integrations.motion = integrations.garmin;
   }
   integrations.pcwatch = await hasPcWatchAccess(db, userId);
+  // Projects describes Martin's infrastructure and its API is admin-only, so hide it from everyone else.
+  if (integrations.projects) {
+    const row = await db.prepare('SELECT role FROM users WHERE id = ?').bind(userId).first<{ role: string }>();
+    if (row?.role !== 'admin') integrations.projects = false;
+  }
   return integrations;
 }
 

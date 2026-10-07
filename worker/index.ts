@@ -16,6 +16,8 @@ import { handleSourceRoute } from "./sources/routes";
 import { handleUnraidRoute } from "./unraid/routes";
 import { handlePcWatchRoute } from "./pcwatch/routes";
 import { handlePrivateeringRoute } from "./privateering/routes";
+import { handleProjectsRoute } from "./projects/routes";
+import { runProjectsScanIfDue } from "./projects/discovery";
 import { handleUserRoute } from "./users/routes";
 import { handleJournalAiRoute } from "./wellbeing/journal-ai";
 import { handleMiyagiConversationRoute } from "./wellbeing/miyagi-conversation";
@@ -57,6 +59,7 @@ export default {
       if (url.pathname.startsWith("/api/unraid/")) { const response = await handleUnraidRoute(request, env); if (response) return response; }
       if (url.pathname.startsWith("/api/pcwatch/")) { const response = await handlePcWatchRoute(request, env); if (response) return response; }
       if (url.pathname.startsWith("/api/privateering/")) { const response = await handlePrivateeringRoute(request, env); if (response) return response; }
+      if (url.pathname === "/api/projects" || url.pathname.startsWith("/api/projects/")) { const response = await handleProjectsRoute(request, env); if (response) return response; }
       if (url.pathname.startsWith("/api/wellbeing/miyagi/history")) { const response = await handleMiyagiHistoryRoute(request, env); if (response) return response; }
       if (url.pathname.startsWith("/api/wellbeing/miyagi/")) {
         const conversationResponse = await handleMiyagiConversationRoute(request, env); if (conversationResponse) return conversationResponse;
@@ -96,5 +99,10 @@ export default {
         console.error(JSON.stringify({ event: "garmin_scheduled_sync_failed", at: now.toISOString(), error: error instanceof Error ? error.message : "unknown_error" }));
       }
     })());
+    ctx.waitUntil(runProjectsScanIfDue(env).then((result) => {
+      if (result.scanned) console.log(JSON.stringify({ event: "projects_scan", at: now.toISOString(), ...result }));
+    }).catch((error) => {
+      console.error(JSON.stringify({ event: "projects_scan_failed", at: now.toISOString(), error: error instanceof Error ? error.message : "unknown_error" }));
+    }));
   },
 } satisfies ExportedHandler<Env>;
