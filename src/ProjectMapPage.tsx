@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";\nimport type { ReactNode } from "react";
 
 type Project = {
   id: string;
@@ -25,7 +25,7 @@ type ProjectMapData = {
 
 type Filter = "all" | "attention" | "deployed" | "repo-only";
 
-function Node({ kind, children }: { kind: string; children: React.ReactNode }) {
+function Node({ kind, children }: { kind: string; children: ReactNode }) {
   return <span className={`project-node project-node--${kind}`}>{children}</span>;
 }
 
