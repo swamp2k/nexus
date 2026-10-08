@@ -30,6 +30,7 @@ type ProjectMapData = {
   registry: RegistryEntry[];
   inventory: ResourceInventory;
   workerPublicUrls: Record<string, string[]>;
+  workerRoutes: Record<string, string[]>;
 };
 
 type Filter = "all" | "attention" | "deployed" | "repo-only";
@@ -86,6 +87,7 @@ function normalizeData(value: unknown): ProjectMapData | null {
       repos: strings(entry.repos), workers: strings(entry.workers),
       pages: strings(entry.pages), domains: strings(entry.domains),
     })).filter((entry) => entry.id) : [],
+    workerRoutes: isRecord(value.workerRoutes) ? Object.fromEntries(Object.entries(value.workerRoutes).map(([name, routes]) => [name, strings(routes)])) : {},
     workerPublicUrls: isRecord(value.workerPublicUrls) ? Object.fromEntries(Object.entries(value.workerPublicUrls).map(([name, urls]) => [name, strings(urls)])) : {},
     inventory: isRecord(value.inventory) ? {
       repos: strings(value.inventory.repos), workers: strings(value.inventory.workers),
@@ -236,6 +238,13 @@ function ProjectMapContent() {
             <small>Offentlige adresser</small>
             <div>{publicUrls.map((url) => <a href={url} target="_blank" rel="noopener noreferrer" key={url}>{new URL(url).hostname} ↗</a>)}</div>
           </div>;
+        })()}
+        {(() => {
+          const patterns = [...new Set(project.workers.flatMap((worker) => data.workerRoutes[worker] ?? []))];
+          return patterns.length > 0 ? <div className="project-public-links">
+            <small>Worker routes (kan være interne)</small>
+            <div>{patterns.map((pattern) => <span className="project-node project-node--domain" key={pattern}>{pattern}</span>)}</div>
+          </div> : null;
         })()}
         {project.warnings.length > 0 && <ul className="project-warnings">{project.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul>}
       </article>)}

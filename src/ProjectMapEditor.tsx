@@ -64,7 +64,7 @@ function MultiSelect({
         {filtered.length === 0 && <p className="settings-help">Ingen matches.</p>}
         {filtered.map((name) => {
           const owner = owners[name];
-          const disabled = Boolean(owner) && !selected.includes(name);
+          const disabled = Boolean(owner) && !selected.includes(name) && label !== "GitHub repositories";
           return <label key={name} className={disabled ? "project-select-claimed" : ""}>
             <input type="checkbox" checked={selected.includes(name)} disabled={disabled}
               onChange={(event) => onChange(event.target.checked ? [...selected, name] : selected.filter((value) => value !== name))} />
@@ -153,7 +153,7 @@ export default function ProjectMapEditor({
       </header>
       <label className="project-editor-field"><span>Projektnavn</span><input value={title} maxLength={120} onChange={(event) => setTitle(event.target.value)} /></label>
       {!project && <label className="project-editor-field"><span>Projekt-ID (valgfrit)</span><input value={id} maxLength={100} placeholder={slugify(title) || "project-id"} onChange={(event) => setId(event.target.value)} /></label>}
-      <p className="settings-help">Vælg én eller flere ressourcer. Ressourcer, der allerede er manuelt tilknyttet et andet projekt, er låst.</p>
+      <p className="settings-help">Vælg én eller flere ressourcer. GitHub-repos kan deles mellem projekter. Andre ressourcer er låst, hvis de er manuelt tilknyttet et andet projekt.</p>
       {FIELDS.map(({ kind, label, hint }) => <MultiSelect key={kind} label={label} hint={hint}
         items={[...new Set([...(inventory[kind] ?? []), ...links[kind]])].sort()}
         selected={links[kind]} owners={owners[kind]}
