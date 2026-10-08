@@ -24,3 +24,24 @@
 @media(max-width:760px){.project-toolbar-actions{width:100%}.project-toolbar-actions button{flex:1}.project-editor{padding:15px;max-height:94vh}}
 
 .project-public-links{margin-top:12px;display:grid;gap:6px}.project-public-links>small{font-size:.68rem;font-weight:700;color:var(--muted)}.project-public-links>div{display:flex;flex-wrap:wrap;gap:6px}.project-public-links a{max-width:100%;overflow-wrap:anywhere;padding:5px 8px;border-radius:7px;background:var(--surface-soft);border:1px solid var(--border);font-size:.75rem;color:var(--accent);text-decoration:none}.project-public-links a:hover{text-decoration:underline}
+
+/* Compact phone layout: keep project controls and long resource names usable. */
+@media(max-width:520px){
+  .project-map-page{gap:12px;min-width:0}
+  .project-map-toolbar,.project-toolbar-actions{min-width:0}
+  .project-toolbar-actions{display:grid;grid-template-columns:minmax(0,1fr);gap:8px}
+  .project-toolbar-actions button{width:100%;min-width:0;white-space:normal}
+  .project-map-summary{gap:8px}
+  .project-map-summary>span{padding:9px 10px}
+  .project-map-grid{grid-template-columns:minmax(0,1fr);gap:10px}
+  .project-map-card{padding:12px;min-width:0}
+  .project-map-card header{flex-wrap:wrap}
+  .project-map-card h3{overflow-wrap:anywhere}
+  .project-flow{min-width:0}
+  .project-node{min-width:0;overflow-wrap:anywhere;word-break:break-word}
+  .project-map-filters button{flex:1 1 auto}
+  .project-editor-backdrop{padding:8px;align-items:center}
+  .project-editor{padding:12px;max-height:calc(100dvh - 16px);min-width:0}
+  .project-editor-actions button{max-width:100%}
+  .project-public-links a{word-break:break-word}
+}
