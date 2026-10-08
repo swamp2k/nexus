@@ -15,7 +15,8 @@ import { invalidateQuery } from './data/queryCache';
 import { pcWatchOverviewUrl } from './widgets/pcwatchWidgets';
 import DisplaysPage from "./DisplaysPage";
 import SettingsPage from "./SettingsPage";
-import DisplayGate from "./DisplayGate";\nimport ProjectMapPage from "./ProjectMapPage";
+import DisplayGate from "./DisplayGate";
+import ProjectMapPage from "./ProjectMapPage";
 
 type User = { id: string; email: string; displayName: string | null; role: "admin" | "member" | "viewer" };
 type SessionResponse = { authenticated: boolean; user: User | null };
