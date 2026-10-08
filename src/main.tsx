@@ -26,7 +26,7 @@ import "./audit-polish.css";
 import "./settings.css";
 import "./integrations.css";
 import "./display-pairing.css";
-import "./displays.css";
+import "./displays.css";\nimport "./project-map.css";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
