@@ -22,3 +22,5 @@
 .project-editor-actions{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
 .project-editor-spacer{flex:1}
 @media(max-width:760px){.project-toolbar-actions{width:100%}.project-toolbar-actions button{flex:1}.project-editor{padding:15px;max-height:94vh}}
+
+.project-public-links{margin-top:12px;display:grid;gap:6px}.project-public-links>small{font-size:.68rem;font-weight:700;color:var(--muted)}.project-public-links>div{display:flex;flex-wrap:wrap;gap:6px}.project-public-links a{max-width:100%;overflow-wrap:anywhere;padding:5px 8px;border-radius:7px;background:var(--surface-soft);border:1px solid var(--border);font-size:.75rem;color:var(--accent);text-decoration:none}.project-public-links a:hover{text-decoration:underline}
