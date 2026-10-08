@@ -47,7 +47,7 @@ export default {
       if (url.pathname.startsWith("/api/auth/")) { const response = await handleAuthRoute(request, env); if (response) return response; }
       if (url.pathname.startsWith("/api/users")) { const response = await handleUserRoute(request, env); if (response) return response; }
       if (url.pathname === "/api/project-map/settings") { const response = await handleProjectMapSettingsRoute(request, env); if (response) return response; }
-      if (url.pathname === "/api/project-map") { const response = await handleProjectMapRoute(request, env); if (response) return response; }
+      if (url.pathname === "/api/project-map" || url.pathname === "/api/project-map/registry") { const response = await handleProjectMapRoute(request, env); if (response) return response; }
       if (url.pathname === "/api/integrations") { const response = await handleIntegrationSettingsRoute(request, env); if (response) return response; }
       if (url.pathname.startsWith("/api/calendar/")) { const response = await handleCalendarRoute(request, env); if (response) return response; }
       if (url.pathname.startsWith("/api/garmin/")) {

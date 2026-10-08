@@ -1,10 +1,15 @@
 import { Component, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
+import ProjectMapEditor from "./ProjectMapEditor";
+import type { ResourceInventory, RegistryEntry } from "./ProjectMapEditor";
 
 type Project = {
   id: string;
   title: string;
   repo: string | null;
+  repos?: string[];
+  manual?: boolean;
+  confirmed?: boolean;
   workers: string[];
   pages: string[];
   domains: string[];
@@ -22,6 +27,8 @@ type ProjectMapData = {
   liveRefreshReady: boolean;
   missingSetup: string[];
   refreshError?: string;
+  registry: RegistryEntry[];
+  inventory: ResourceInventory;
 };
 
 type Filter = "all" | "attention" | "deployed" | "repo-only";
@@ -41,6 +48,9 @@ function normalizeProject(value: unknown, index: number): Project | null {
     id,
     title: typeof value.title === "string" && value.title.trim() ? value.title : id,
     repo: typeof value.repo === "string" && value.repo.trim() ? value.repo : null,
+    repos: strings(value.repos),
+    manual: value.manual === true,
+    confirmed: value.confirmed === true,
     workers: strings(value.workers),
     pages: strings(value.pages),
     domains: strings(value.domains),
@@ -70,6 +80,15 @@ function normalizeData(value: unknown): ProjectMapData | null {
     liveRefreshReady: value.liveRefreshReady === true,
     missingSetup: strings(value.missingSetup),
     refreshError: typeof value.refreshError === "string" ? value.refreshError : undefined,
+    registry: Array.isArray(value.registry) ? value.registry.filter(isRecord).map((entry) => ({
+      id: String(entry.id ?? ""), title: String(entry.title ?? ""), confirmed: entry.confirmed === true,
+      repos: strings(entry.repos), workers: strings(entry.workers),
+      pages: strings(entry.pages), domains: strings(entry.domains),
+    })).filter((entry) => entry.id) : [],
+    inventory: isRecord(value.inventory) ? {
+      repos: strings(value.inventory.repos), workers: strings(value.inventory.workers),
+      pages: strings(value.inventory.pages), domains: strings(value.inventory.domains),
+    } : { repos: [], workers: [], pages: [], domains: [] },
   };
 }
 
@@ -110,6 +129,7 @@ function ProjectMapContent() {
   const [error, setError] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<Filter>("all");
+  const [editing, setEditing] = useState<string | null>(null);
 
   async function load(method: "GET" | "POST" = "GET") {
     if (method === "POST") setRefreshing(true);
@@ -160,9 +180,9 @@ function ProjectMapContent() {
         <span><strong>{data.summary.pages}</strong><small>Pages</small></span>
         <span className={attentionCount ? "has-warning" : ""}><strong>{attentionCount}</strong><small>Kræver blik</small></span>
       </div>
-      <button type="button" className="secondary-action" disabled={refreshing || !data.liveRefreshReady} onClick={() => void load("POST")}>
+      <div className="project-toolbar-actions"><button type="button" className="secondary-action" onClick={() => setEditing("new")}>+ Opret projekt</button><button type="button" className="secondary-action" disabled={refreshing || !data.liveRefreshReady} onClick={() => void load("POST")}>
         {refreshing ? "Opdaterer…" : "Opdater fra GitHub + Cloudflare"}
-      </button>
+      </button></div>
     </div>
 
     {!data.liveRefreshReady && <div className="project-map-notice">
@@ -184,10 +204,10 @@ function ProjectMapContent() {
       {data.archivedRepoOnly.length > 0 && <div><p className="section-label">Arkiverede repos</p>{data.archivedRepoOnly.map((repo) => <Node key={repo} kind="muted">{repo}</Node>)}</div>}
     </section> : <div className="project-map-grid">
       {visibleProjects.map((project) => <article className={`project-map-card${project.warnings.length ? " project-map-card--warning" : ""}`} key={project.id}>
-        <header><div><h3>{project.title}</h3><small>{project.status === "unmapped" ? "Unmapped" : project.status}</small></div>{project.warnings.length > 0 && <span className="project-warning-count">{project.warnings.length}</span>}</header>
+        <header><div><h3>{project.title}</h3><small>{project.confirmed ? "Bekræftet" : project.manual ? "Manuelt redigeret" : project.status === "unmapped" ? "Forslag" : project.status}</small></div><div className="project-card-actions">{project.warnings.length > 0 && <span className="project-warning-count">{project.warnings.length}</span>}<button className="secondary-action" type="button" onClick={() => setEditing(project.id)}>Redigér</button></div></header>
         <div className="project-flow">
           <Node kind="project">{project.id}</Node>
-          {project.repo && <><span className="project-arrow">→</span><Node kind="repo">{project.repo}</Node></>}
+          {(project.repos?.length ? project.repos : project.repo ? [project.repo] : []).map((repo) => <span className="project-flow-step" key={repo}><span className="project-arrow">→</span><Node kind="repo">{repo}</Node></span>)}
           {project.workers.map((worker) => <span className="project-flow-step" key={worker}><span className="project-arrow">→</span><Node kind="worker">{worker}</Node></span>)}
           {project.pages.map((page) => <span className="project-flow-step" key={page}><span className="project-arrow">→</span><Node kind="pages">{page}</Node></span>)}
           {project.domains.map((domain) => <span className="project-flow-step" key={domain}><span className="project-arrow">→</span><Node kind="domain">{domain}</Node></span>)}
@@ -195,6 +215,8 @@ function ProjectMapContent() {
         {project.warnings.length > 0 && <ul className="project-warnings">{project.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul>}
       </article>)}
     </div>}
+    {editing !== null && <ProjectMapEditor key={editing} project={editing === "new" ? null : data.projects.find((project) => project.id === editing) ?? null} inventory={data.inventory}
+      registry={data.registry} onClose={() => setEditing(null)} onSaved={async () => { await load(); }} />}
   </div>;
 }
 
