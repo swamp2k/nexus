@@ -37,9 +37,8 @@ function slugify(value: string) {
 }
 
 function MultiSelect({
-  kind, label, hint, items, selected, owners, onChange,
+  label, hint, items, selected, owners, onChange,
 }: {
-  kind: ResourceKind;
   label: string;
   hint: string;
   items: string[];
@@ -155,7 +154,7 @@ export default function ProjectMapEditor({
       <label className="project-editor-field"><span>Projektnavn</span><input value={title} maxLength={120} onChange={(event) => setTitle(event.target.value)} /></label>
       {!project && <label className="project-editor-field"><span>Projekt-ID (valgfrit)</span><input value={id} maxLength={100} placeholder={slugify(title) || "project-id"} onChange={(event) => setId(event.target.value)} /></label>}
       <p className="settings-help">Vælg én eller flere ressourcer. Ressourcer, der allerede er manuelt tilknyttet et andet projekt, er låst.</p>
-      {FIELDS.map(({ kind, label, hint }) => <MultiSelect key={kind} kind={kind} label={label} hint={hint}
+      {FIELDS.map(({ kind, label, hint }) => <MultiSelect key={kind} label={label} hint={hint}
         items={[...new Set([...(inventory[kind] ?? []), ...links[kind]])].sort()}
         selected={links[kind]} owners={owners[kind]}
         onChange={(next) => { setLinks((old) => ({ ...old, [kind]: next })); setConfirmed(false); }} />)}
