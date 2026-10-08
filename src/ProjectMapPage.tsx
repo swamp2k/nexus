@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";\nimport type { ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
+import type { ReactNode } from "react";
 
 type Project = {
   id: string;
