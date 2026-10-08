@@ -122,7 +122,7 @@ function App() {
       const next = (event as CustomEvent<IntegrationMap>).detail;
       if (!next) return;
       setIntegrations(next);
-      setPage((current) => current !== "Indstillinger" && current !== "Hjem" && !pageEnabled(current, next) ? "Hjem" : current);
+      setPage((current) => current !== "Indstillinger" && current !== "Projects" && current !== "Hjem" && !pageEnabled(current, next) ? "Hjem" : current);
     }
     window.addEventListener("nexus-integrations-changed", changed);
     return () => window.removeEventListener("nexus-integrations-changed", changed);
