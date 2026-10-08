@@ -157,7 +157,7 @@ export function applyRegistry(snapshot: MapSnapshot, entries: RegistryEntry[]) {
     projects.push({
       ...entry, repo: entry.repos[0] ?? null, manual: true,
       status: entry.confirmed ? "confirmed" : "manual",
-      warnings: KIN.flatMap((kind) => entry[kind].filter((name) => !inventory[kind].includes(name)).map((name) => `Missing from latest scan: ${name}`)),
+      warnings: KINDS.flatMap((kind) => entry[kind].filter((name) => !inventory[kind].includes(name)).map((name) => `Missing from latest scan: ${name}`)),
     });
   }
 
