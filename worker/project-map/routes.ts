@@ -220,11 +220,13 @@ export async function handleProjectMapRoute(request: Request, env: ProjectMapEnv
   if (request.method === "POST") {
     try {
       const result = await refresh(env);
+      if (!result.snapshot) return json({ error: "snapshot_not_found", missingSetup: result.missing }, { status: 404 });
       return json({ ...result.snapshot, liveRefreshReady: result.missing.length === 0, missingSetup: result.missing });
     } catch (error) {
       console.error(JSON.stringify({ event: "project_map_refresh_failed", error: error instanceof Error ? error.message : "unknown_error" }));
       const snapshot = await readSnapshot(env);
-      return json({ ...snapshot, liveRefreshReady: true, refreshError: "refresh_failed" }, { status: snapshot ? 200 : 502 });
+      if (!snapshot) return json({ error: "refresh_failed" }, { status: 502 });
+      return json({ ...snapshot, liveRefreshReady: true, refreshError: "refresh_failed" });
     }
   }
 
