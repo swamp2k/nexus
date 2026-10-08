@@ -1,6 +1,6 @@
 import { getAuthenticatedUser } from "../auth/session";
 import { listCloudflareInventory, listGithubRepos } from "./client";
-import type { GithubRepo, PagesProject, Worker } from "./client";
+import type { GithubRepo, PagesProject, Worker, WorkerPublicUrls } from "./client";
 import { getProjectMapCredentials, getProjectMapCredentialStatus } from "./credentials";
 import { handleProjectMapSettingsRoute } from "./settings-routes";
 import { applyRegistry, deleteRegistry, inventoryOf, parseRegistryEntry, readRegistry, resourceConflict, saveRegistry } from "./registry";
@@ -23,6 +23,7 @@ type Snapshot = {
   }>;
   repoOnly: string[];
   archivedRepoOnly: string[];
+  workerPublicUrls?: WorkerPublicUrls;
 };
 
 const SNAPSHOT_KEY = "project-map/snapshot.json";
@@ -50,7 +51,7 @@ function titleFromId(value: string): string {
   return value.replace(/[-_]+/g, " ").replace(/\b\w/g, (char) => char.toUpperCase());
 }
 
-function rebuildSnapshot(base: Snapshot | null, repos: GithubRepo[], workers: Worker[], pages: PagesProject[]): Snapshot {
+function rebuildSnapshot(base: Snapshot | null, repos: GithubRepo[], workers: Worker[], pages: PagesProject[], workerPublicUrls: WorkerPublicUrls): Snapshot {
   const repoMap = new Map(repos.map((repo) => [repo.full_name.toLowerCase(), repo]));
   const workerNames = new Set(workers.map((worker) => worker.id));
   const pageMap = new Map(pages.map((page) => [page.name, page]));
@@ -130,6 +131,7 @@ function rebuildSnapshot(base: Snapshot | null, repos: GithubRepo[], workers: Wo
     projects: projects.sort((a, b) => a.title.localeCompare(b.title)),
     repoOnly,
     archivedRepoOnly,
+    workerPublicUrls,
   };
 }
 
@@ -142,7 +144,7 @@ async function refresh(env: ProjectMapEnv): Promise<{ snapshot: Snapshot | null;
     listGithubRepos(credentials.githubToken),
     listCloudflareInventory(credentials.cloudflareToken, credentials.cloudflareAccountId),
   ]);
-  const snapshot = rebuildSnapshot(current, repos, cf.workers, cf.pages);
+  const snapshot = rebuildSnapshot(current, repos, cf.workers, cf.pages, cf.publicUrls);
   await env.DATA.put(SNAPSHOT_KEY, JSON.stringify(snapshot), { httpMetadata: { contentType: "application/json" } });
   return { snapshot, missing: [] };
 }
