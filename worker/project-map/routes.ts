@@ -186,6 +186,8 @@ export async function handleProjectMapRoute(request: Request, env: ProjectMapEnv
     return json({ ok: true });
   }
 
+  if (request.method !== "GET" && request.method !== "POST") return json({ error: "method_not_allowed" }, { status: 405 });
+
   if (request.method === "POST") {
     try {
       const result = await refresh(env);
