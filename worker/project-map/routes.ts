@@ -1,10 +1,10 @@
 import { getAuthenticatedUser } from "../auth/session";
+import { listCloudflareInventory, listGithubRepos } from "./client";
+import type { GithubRepo, PagesProject, Worker } from "./client";
+import { getProjectMapCredentials, getProjectMapCredentialStatus } from "./credentials";
+import { handleProjectMapSettingsRoute } from "./settings-routes";
 
-type ProjectMapEnv = Env & {
-  GITHUB_TOKEN?: string;
-  CLOUDFLARE_API_TOKEN?: string;
-  CLOUDFLARE_ACCOUNT_ID?: string;
-};
+type ProjectMapEnv = Env & { ELOVERBLIK_CREDENTIALS_KEY?: string };
 
 type Snapshot = {
   generatedAt: string;
@@ -22,25 +22,6 @@ type Snapshot = {
   }>;
   repoOnly: string[];
   archivedRepoOnly: string[];
-};
-
-type GithubRepo = {
-  name: string;
-  full_name: string;
-  archived: boolean;
-  default_branch: string;
-};
-
-type Worker = { id: string };
-
-type PagesProject = {
-  name: string;
-  domains?: string[];
-  source?: { config?: { owner?: string; repo_name?: string; production_branch?: string } };
-  latest_deployment?: {
-    latest_stage?: { status?: string };
-    deployment_trigger?: { metadata?: { branch?: string } };
-  };
 };
 
 const SNAPSHOT_KEY = "project-map/snapshot.json";
@@ -62,46 +43,6 @@ async function readSnapshot(env: ProjectMapEnv): Promise<Snapshot | null> {
   const object = await env.DATA.get(SNAPSHOT_KEY);
   if (!object) return null;
   return object.json<Snapshot>();
-}
-
-async function githubRepos(token: string): Promise<GithubRepo[]> {
-  const response = await fetch("https://api.github.com/user/repos?affiliation=owner&per_page=100&sort=updated", {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      Accept: "application/vnd.github+json",
-      "User-Agent": "Nexus-Project-Map",
-      "X-GitHub-Api-Version": "2022-11-28",
-    },
-  });
-  if (!response.ok) throw new Error(`github_repos_${response.status}`);
-  return response.json<GithubRepo[]>();
-}
-
-async function cloudflareGet<T>(env: ProjectMapEnv, path: string): Promise<T> {
-  const response = await fetch(`https://api.cloudflare.com/client/v4${path}`, {
-    headers: { Authorization: `Bearer ${env.CLOUDFLARE_API_TOKEN}` },
-  });
-  if (!response.ok) throw new Error(`cloudflare_${response.status}`);
-  const body = await response.json() as { success: boolean; result: T };
-  if (!body.success) throw new Error("cloudflare_api_failed");
-  return body.result;
-}
-
-async function cloudflareInventory(env: ProjectMapEnv): Promise<{ workers: Worker[]; pages: PagesProject[] }> {
-  const accountId = encodeURIComponent(env.CLOUDFLARE_ACCOUNT_ID!);
-  const workers = await cloudflareGet<Worker[]>(env, `/accounts/${accountId}/workers/scripts`);
-  const pages: PagesProject[] = [];
-  for (let page = 1; page <= 10; page += 1) {
-    const response = await fetch(`https://api.cloudflare.com/client/v4/accounts/${accountId}/pages/projects?page=${page}`, {
-      headers: { Authorization: `Bearer ${env.CLOUDFLARE_API_TOKEN}` },
-    });
-    if (!response.ok) throw new Error(`cloudflare_pages_${response.status}`);
-    const body = await response.json() as { success: boolean; result: PagesProject[]; result_info?: { total_pages?: number } };
-    if (!body.success) throw new Error("cloudflare_pages_failed");
-    pages.push(...body.result);
-    if (page >= (body.result_info?.total_pages ?? 1)) break;
-  }
-  return { workers, pages };
 }
 
 function titleFromId(value: string): string {
@@ -192,17 +133,13 @@ function rebuildSnapshot(base: Snapshot | null, repos: GithubRepo[], workers: Wo
 }
 
 async function refresh(env: ProjectMapEnv): Promise<{ snapshot: Snapshot | null; missing: string[] }> {
-  const missing = [
-    !env.GITHUB_TOKEN && "GITHUB_TOKEN",
-    !env.CLOUDFLARE_API_TOKEN && "CLOUDFLARE_API_TOKEN",
-    !env.CLOUDFLARE_ACCOUNT_ID && "CLOUDFLARE_ACCOUNT_ID",
-  ].filter((value): value is string => Boolean(value));
   const current = await readSnapshot(env);
-  if (missing.length) return { snapshot: current, missing };
+  const credentials = await getProjectMapCredentials(env);
+  if (!credentials) return { snapshot: current, missing: ["Project Map credentials"] };
 
   const [repos, cf] = await Promise.all([
-    githubRepos(env.GITHUB_TOKEN!),
-    cloudflareInventory(env),
+    listGithubRepos(credentials.githubToken),
+    listCloudflareInventory(credentials.cloudflareToken, credentials.cloudflareAccountId),
   ]);
   const snapshot = rebuildSnapshot(current, repos, cf.workers, cf.pages);
   await env.DATA.put(SNAPSHOT_KEY, JSON.stringify(snapshot), { httpMetadata: { contentType: "application/json" } });
@@ -210,6 +147,9 @@ async function refresh(env: ProjectMapEnv): Promise<{ snapshot: Snapshot | null;
 }
 
 export async function handleProjectMapRoute(request: Request, env: ProjectMapEnv): Promise<Response | null> {
+  const settingsResponse = await handleProjectMapSettingsRoute(request, env);
+  if (settingsResponse) return settingsResponse;
+
   const url = new URL(request.url);
   if (url.pathname !== "/api/project-map") return null;
   if (request.method !== "GET" && request.method !== "POST") return json({ error: "method_not_allowed" }, { status: 405 });
@@ -232,10 +172,10 @@ export async function handleProjectMapRoute(request: Request, env: ProjectMapEnv
 
   const snapshot = await readSnapshot(env);
   if (!snapshot) return json({ error: "snapshot_not_found" }, { status: 404 });
-  const missing = [
-    !env.GITHUB_TOKEN && "GITHUB_TOKEN",
-    !env.CLOUDFLARE_API_TOKEN && "CLOUDFLARE_API_TOKEN",
-    !env.CLOUDFLARE_ACCOUNT_ID && "CLOUDFLARE_ACCOUNT_ID",
-  ].filter((value): value is string => Boolean(value));
-  return json({ ...snapshot, liveRefreshReady: missing.length === 0, missingSetup: missing });
+  const credentialStatus = await getProjectMapCredentialStatus(env);
+  return json({
+    ...snapshot,
+    liveRefreshReady: credentialStatus.configured,
+    missingSetup: credentialStatus.configured ? [] : ["Project Map credentials"],
+  });
 }
