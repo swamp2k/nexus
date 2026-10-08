@@ -16,7 +16,8 @@ import { handleSourceRoute } from "./sources/routes";
 import { handleUnraidRoute } from "./unraid/routes";
 import { handlePcWatchRoute } from "./pcwatch/routes";
 import { handlePrivateeringRoute } from "./privateering/routes";
-import { handleUserRoute } from "./users/routes";\nimport { handleProjectMapRoute } from "./project-map/routes";
+import { handleUserRoute } from "./users/routes";
+import { handleProjectMapRoute } from "./project-map/routes";
 import { handleJournalAiRoute } from "./wellbeing/journal-ai";
 import { handleMiyagiConversationRoute } from "./wellbeing/miyagi-conversation";
 import { handleMiyagiHistoryRoute } from "./wellbeing/miyagi-history";
@@ -43,7 +44,8 @@ export default {
       if (displayDataResponse) return displayDataResponse;
 
       if (url.pathname.startsWith("/api/auth/")) { const response = await handleAuthRoute(request, env); if (response) return response; }
-      if (url.pathname.startsWith("/api/users")) { const response = await handleUserRoute(request, env); if (response) return response; }\n      if (url.pathname === "/api/project-map") { const response = await handleProjectMapRoute(request, env); if (response) return response; }
+      if (url.pathname.startsWith("/api/users")) { const response = await handleUserRoute(request, env); if (response) return response; }
+      if (url.pathname === "/api/project-map") { const response = await handleProjectMapRoute(request, env); if (response) return response; }
       if (url.pathname === "/api/integrations") { const response = await handleIntegrationSettingsRoute(request, env); if (response) return response; }
       if (url.pathname.startsWith("/api/calendar/")) { const response = await handleCalendarRoute(request, env); if (response) return response; }
       if (url.pathname.startsWith("/api/garmin/")) {
