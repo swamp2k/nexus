@@ -3,6 +3,7 @@ import { listCloudflareInventory, listGithubRepos } from "./client";
 import type { GithubRepo, PagesProject, Worker } from "./client";
 import { getProjectMapCredentials, getProjectMapCredentialStatus } from "./credentials";
 import { handleProjectMapSettingsRoute } from "./settings-routes";
+import { applyRegistry, deleteRegistry, inventoryOf, parseRegistryEntry, readRegistry, resourceConflict, saveRegistry } from "./registry";
 
 type ProjectMapEnv = Env & { ELOVERBLIK_CREDENTIALS_KEY?: string };
 
@@ -151,30 +152,61 @@ export async function handleProjectMapRoute(request: Request, env: ProjectMapEnv
   if (settingsResponse) return settingsResponse;
 
   const url = new URL(request.url);
-  if (url.pathname !== "/api/project-map") return null;
-  if (request.method !== "GET" && request.method !== "POST") return json({ error: "method_not_allowed" }, { status: 405 });
+  if (url.pathname !== "/api/project-map" && url.pathname !== "/api/project-map/registry") return null;
+  if (!["GET", "POST", "PUT", "DELETE"].includes(request.method)) return json({ error: "method_not_allowed" }, { status: 405 });
 
   const auth = await requireAdmin(request, env);
   if (auth.response) return auth.response;
+
+  if (url.pathname === "/api/project-map/registry") {
+    if (request.method === "GET") return json({ entries: await readRegistry(env.DB) });
+    if (request.method === "DELETE") {
+      const id = url.searchParams.get("id") ?? "";
+      if (!/^[a-zA-Z0-9][a-zA-Z0-9_-]{0,99}$/.test(id)) return json({ error: "invalid_id" }, { status: 400 });
+      await deleteRegistry(env.DB, id);
+      return json({ ok: true });
+    }
+    if (request.method !== "PUT") return json({ error: "method_not_allowed" }, { status: 405 });
+
+    let entry;
+    try { entry = parseRegistryEntry(await request.json()); }
+    catch { return json({ error: "invalid_project_registry_entry" }, { status: 400 }); }
+    const snapshot = await readSnapshot(env);
+    if (!snapshot) return json({ error: "snapshot_not_found" }, { status: 404 });
+    const inventory = inventoryOf(snapshot);
+    const existing = await readRegistry(env.DB);
+    for (const kind of ["repos", "workers", "pages", "domains"] as const) {
+      if (entry[kind].some((value) => !inventory[kind].includes(value))) {
+        return json({ error: "resource_not_in_inventory", kind }, { status: 400 });
+      }
+    }
+    const conflict = resourceConflict(entry, existing);
+    if (conflict) return json({ error: "resource_already_assigned", detail: conflict }, { status: 409 });
+    await saveRegistry(env.DB, entry);
+    return json({ ok: true });
+  }
 
   if (request.method === "POST") {
     try {
       const result = await refresh(env);
       if (!result.snapshot) return json({ error: "snapshot_not_found", missingSetup: result.missing }, { status: 404 });
-      return json({ ...result.snapshot, liveRefreshReady: result.missing.length === 0, missingSetup: result.missing });
+      const registry = await readRegistry(env.DB);
+      return json({ ...applyRegistry(result.snapshot, registry), registry, liveRefreshReady: result.missing.length === 0, missingSetup: result.missing });
     } catch (error) {
       console.error(JSON.stringify({ event: "project_map_refresh_failed", error: error instanceof Error ? error.message : "unknown_error" }));
       const snapshot = await readSnapshot(env);
       if (!snapshot) return json({ error: "refresh_failed" }, { status: 502 });
-      return json({ ...snapshot, liveRefreshReady: true, refreshError: "refresh_failed" });
+      const registry = await readRegistry(env.DB);
+      return json({ ...applyRegistry(snapshot, registry), registry, liveRefreshReady: true, refreshError: "refresh_failed" });
     }
   }
 
   const snapshot = await readSnapshot(env);
   if (!snapshot) return json({ error: "snapshot_not_found" }, { status: 404 });
   const credentialStatus = await getProjectMapCredentialStatus(env);
+  const registry = await readRegistry(env.DB);
   return json({
-    ...snapshot,
+    ...applyRegistry(snapshot, registry), registry,
     liveRefreshReady: credentialStatus.configured,
     missingSetup: credentialStatus.configured ? [] : ["Project Map credentials"],
   });
