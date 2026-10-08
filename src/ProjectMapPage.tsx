@@ -29,6 +29,7 @@ type ProjectMapData = {
   refreshError?: string;
   registry: RegistryEntry[];
   inventory: ResourceInventory;
+  workerPublicUrls: Record<string, string[]>;
 };
 
 type Filter = "all" | "attention" | "deployed" | "repo-only";
@@ -85,6 +86,7 @@ function normalizeData(value: unknown): ProjectMapData | null {
       repos: strings(entry.repos), workers: strings(entry.workers),
       pages: strings(entry.pages), domains: strings(entry.domains),
     })).filter((entry) => entry.id) : [],
+    workerPublicUrls: isRecord(value.workerPublicUrls) ? Object.fromEntries(Object.entries(value.workerPublicUrls).map(([name, urls]) => [name, strings(urls)])) : {},
     inventory: isRecord(value.inventory) ? {
       repos: strings(value.inventory.repos), workers: strings(value.inventory.workers),
       pages: strings(value.inventory.pages), domains: strings(value.inventory.domains),
@@ -95,6 +97,17 @@ function normalizeData(value: unknown): ProjectMapData | null {
 function snapshotTime(value: string): string {
   const parsed = new Date(value);
   return Number.isNaN(parsed.getTime()) ? "ukendt tidspunkt" : parsed.toLocaleString("da-DK");
+}
+
+function safePublicUrl(value: string): string | null {
+  const raw = value.trim();
+  const address = raw.includes("://") ? raw : `https://${raw}`;
+  try {
+    const parsed = new URL(address);
+    if (parsed.protocol !== "https:" || !parsed.hostname.includes(".") || parsed.username || parsed.password) return null;
+    if (parsed.port || parsed.pathname !== "/" || parsed.search || parsed.hash) return null;
+    return parsed.origin;
+  } catch { return null; }
 }
 
 function Node({ kind, children }: { kind: string; children: ReactNode }) {
@@ -212,6 +225,18 @@ function ProjectMapContent() {
           {project.pages.map((page) => <span className="project-flow-step" key={page}><span className="project-arrow">→</span><Node kind="pages">{page}</Node></span>)}
           {project.domains.map((domain) => <span className="project-flow-step" key={domain}><span className="project-arrow">→</span><Node kind="domain">{domain}</Node></span>)}
         </div>
+        {(() => {
+          const rawUrls = [
+            ...project.workers.flatMap((worker) => data.workerPublicUrls[worker] ?? []),
+            ...project.domains,
+          ];
+          const publicUrls = [...new Set(rawUrls.map(safePublicUrl).filter((url): url is string => Boolean(url)))];
+          if (!publicUrls.length) return null;
+          return <div className="project-public-links">
+            <small>Offentlige adresser</small>
+            <div>{publicUrls.map((url) => <a href={url} target="_blank" rel="noopener noreferrer" key={url}>{new URL(url).hostname} ↗</a>)}</div>
+          </div>;
+        })()}
         {project.warnings.length > 0 && <ul className="project-warnings">{project.warnings.map((warning) => <li key={warning}>{warning}</li>)}</ul>}
       </article>)}
     </div>}
