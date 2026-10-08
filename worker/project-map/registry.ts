@@ -34,6 +34,7 @@ export type RegistryEntry = {
 };
 
 const KINDS: ResourceKind[] = ["repos", "workers", "pages", "domains"];
+const EXCLUSIVE: ResourceKind[] = ["workers", "pages", "domains"];
 
 function list(value: unknown): string[] {
   if (!Array.isArray(value) || value.length > 100) throw new Error("invalid_resource_list");
@@ -109,7 +110,7 @@ export async function deleteRegistry(db: D1Database, id: string): Promise<void> 
 export function resourceConflict(entry: RegistryEntry, others: RegistryEntry[]): string | null {
   for (const other of others) {
     if (other.id === entry.id) continue;
-    for (const kind of KINDS) {
+    for (const kind of EXCLUSIVE) {
       const overlap = entry[kind].find((item) => other[kind].includes(item));
       if (overlap) return `${overlap} is already assigned to ${other.title}`;
     }
@@ -121,7 +122,7 @@ export function applyRegistry(snapshot: MapSnapshot, entries: RegistryEntry[]) {
   const inventory = inventoryOf(snapshot);
   const byId = new Map(entries.map((entry) => [entry.id, entry]));
   const claimed: ResourceInventory = { repos: [], workers: [], pages: [], domains: [] };
-  for (const entry of entries) for (const kind of KINDS) claimed[kind].push(...entry[kind]);
+  for (const entry of entries) for (const kind of EXCLUSIVE) claimed[kind].push(...entry[kind]);
   const claimSets = Object.fromEntries(KINDS.map((kind) => [kind, new Set(claimed[kind])])) as Record<ResourceKind, Set<string>>;
   const projects: MapProject[] = [];
 
@@ -138,7 +139,7 @@ export function applyRegistry(snapshot: MapSnapshot, entries: RegistryEntry[]) {
       continue;
     }
 
-    const repos = (original.repos ?? (original.repo ? [original.repo] : [])).filter((name) => !claimSets.repos.has(name));
+    const repos = original.repos ?? (original.repo ? [original.repo] : []);
     const workers = (original.workers ?? []).filter((name) => !claimSets.workers.has(name));
     const pages = (original.pages ?? []).filter((name) => !claimSets.pages.has(name));
     const domains = (original.domains ?? []).filter((name) => !claimSets.domains.has(name));
@@ -164,8 +165,8 @@ export function applyRegistry(snapshot: MapSnapshot, entries: RegistryEntry[]) {
   return {
     ...snapshot,
     projects: projects.sort((a, b) => a.title.localeCompare(b.title)),
-    repoOnly: snapshot.repoOnly.filter((name) => !claimSets.repos.has(name)),
-    archivedRepoOnly: snapshot.archivedRepoOnly.filter((name) => !claimSets.repos.has(name)),
+    repoOnly: snapshot.repoOnly.filter((name) => !entries.some((entry) => entry.repos.includes(name))),
+    archivedRepoOnly: snapshot.archivedRepoOnly.filter((name) => !entries.some((entry) => entry.repos.includes(name))),
     inventory,
   };
 }
