@@ -117,6 +117,7 @@ export default function GarminPage() {
   const sleep = overview?.sleep ?? null;
   const latestRhr = numberValue(overview?.rhr ?? null, "resting_hr") ?? numberValue(daily, "resting_hr");
   const dailyDate = String(daily?.date ?? "");
+  const dailyLabel = dailyDate ? new Intl.DateTimeFormat("da-DK", { weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(new Date(`${dailyDate}T12:00:00Z`)) : "";
   const dailyCount = overview?.counts?.dailyCount ?? 0;
   const sleepCount = overview?.counts?.sleepCount ?? 0;
 
@@ -142,11 +143,11 @@ export default function GarminPage() {
       {daily && <>
         {deepDive ? <section className="garmin-health-overview garmin-health-collapsed">
           <div className="garmin-health-heading">
-            <div><p className="section-label">Seneste data</p><h3>{dailyDate}</h3></div>
+            <div><p className="section-label">Seneste data</p><h3>{dailyLabel}</h3></div>
             {headingActions}
           </div>
         </section> : <section className="garmin-health-overview">
-          <div className="garmin-health-heading"><div><p className="section-label">Seneste data</p><h3>{dailyDate}</h3></div>{headingActions}</div>
+          <div className="garmin-health-heading"><div><p className="section-label">Seneste data</p><h3>{dailyLabel}</h3></div>{headingActions}</div>
           <div className="garmin-metric-grid">
             <button className="garmin-metric-card garmin-metric-action" type="button" onClick={() => setDeepDive("steps")}><span>Skridt</span><strong>{numberValue(daily, "steps")?.toLocaleString("da-DK") ?? "—"}</strong><small>Mål {numberValue(daily, "step_goal")?.toLocaleString("da-DK") ?? "—"}</small><em>Se detaljer ›</em></button>
             <button className="garmin-metric-card garmin-metric-action" type="button" onClick={() => setDeepDive("heart")}><span>Hvilepuls</span><strong>{latestRhr === null ? "—" : `${Math.round(latestRhr)} bpm`}</strong><small>{numberValue(daily, "min_hr") ?? "—"}–{numberValue(daily, "max_hr") ?? "—"} bpm</small><em>Se detaljer ›</em></button>
