@@ -73,16 +73,74 @@
 }
 
 .health-bar {
-  fill: var(--accent);
+  fill: var(--sleep-light);
   opacity: .92;
+  cursor: pointer;
+}
+
+.health-bar.active {
+  fill: var(--accent);
+  opacity: 1;
 }
 
 .health-bar-primary {
-  fill: var(--accent);
+  fill: var(--sleep-light);
 }
 
 .health-bar-secondary {
-  fill: color-mix(in srgb, var(--muted) 62%, transparent);
+  fill: color-mix(in srgb, var(--muted) 45%, transparent);
+}
+
+.health-grid-line {
+  stroke: var(--border);
+  stroke-width: 1;
+}
+
+.health-y-label {
+  fill: var(--muted);
+  font-size: 11px;
+}
+
+.health-bar-legend {
+  display: flex;
+  gap: 14px;
+  color: var(--muted);
+  font-size: .7rem;
+}
+
+.health-bar-legend span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.health-bar-legend i {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  background: var(--sleep-light);
+}
+
+.health-bar-legend i.secondary {
+  background: color-mix(in srgb, var(--muted) 45%, transparent);
+}
+
+.health-chart-wrap {
+  position: relative;
+}
+
+.health-chart-labels {
+  position: relative;
+  height: 18px;
+  margin: 2px 20px 0 54px;
+}
+
+.health-chart-labels span {
+  position: absolute;
+  transform: translateX(-50%);
+  color: var(--muted);
+  font-size: .62rem;
+  white-space: nowrap;
 }
 
 .health-bar-goal {

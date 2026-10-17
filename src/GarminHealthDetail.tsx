@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import type { ReactNode } from "react";
 
 type RangeKey = "1d" | "7d" | "4w" | "1y";
 type MetricKey = "steps" | "heart" | "stress" | "bodyBattery" | "respiration";
@@ -78,8 +79,10 @@ function axisNumber(value: number): string {
   return Math.round(value).toLocaleString("da-DK");
 }
 
-function BarChart({ rows, primary, secondary, min = 0, max, stress = false, goalReached, primaryLabel = "Værdi", secondaryLabel = "Sekundær", aggregated = false }: {
+function BarChart({ rows, primary, secondary, min = 0, max, stress = false, goalReached, primaryLabel = "Værdi", secondaryLabel = "Sekundær", aggregated = false, selectedDate, onSelect }: {
   rows: HealthRow[];
+  selectedDate?: string;
+  onSelect?: (date: string) => void;
   primary: (row: HealthRow) => number | null;
   secondary?: (row: HealthRow) => number | null;
   min?: number;
@@ -148,25 +151,26 @@ function BarChart({ rows, primary, secondary, min = 0, max, stress = false, goal
   return <div ref={hostRef} className={`health-chart-wrap health-bar-chart-wrap ${expanded ? "is-expanded" : ""}`} onContextMenu={(event) => event.preventDefault()}>
     <div className="health-bar-meta">
       <div className="health-bar-legend"><span><i className="primary" />{primaryLabel}</span>{secondary && <span><i className="secondary" />{secondaryLabel}</span>}</div>
-      <div className="health-bar-actions">{aggregated && <small>Ugegennemsnit · 1 år</small>}<button type="button" className="health-chart-expand" onClick={() => void toggleExpanded()}>{expanded ? "Luk fuld skærm" : "⛶ Fuld skærm"}</button></div>
+      <div className="health-bar-actions"><button type="button" className="health-chart-expand" onClick={() => void toggleExpanded()}>{expanded ? "Luk fuld skærm" : "⛶ Fuld skærm"}</button></div>
     </div>
     <svg className="health-chart health-bar-chart" viewBox={`0 0 ${width} ${height}`} role="img" aria-label={aggregated ? "Historik som ugentlige gennemsnit" : "Historik som søjlediagram"}
       onPointerEnter={(e) => move(e.clientX, e.clientY, e.currentTarget)}
       onPointerMove={(e) => move(e.clientX, e.clientY, e.currentTarget)}
-      onPointerLeave={() => setHover(null)}>
+      onPointerLeave={() => setHover(null)}
+      onClick={() => hover !== null && onSelect?.(rows[hover.index].date)}>
       {ticks.map(({ step, value }) => <g key={step}><line x1={padLeft} x2={width - padRight} y1={padY + step * plotHeight} y2={padY + step * plotHeight} className="health-grid-line" /><text x={padLeft - 8} y={padY + step * plotHeight + 4} textAnchor="end" className="health-y-label">{axisNumber(value)}</text></g>)}
       {rows.map((row, index) => {
         const value = primaryValues[index];
         if (value === null) return null;
         const cx = x(index) - (grouped ? barWidth * 0.58 : barWidth / 2), topY = y(value);
         const cls = stress ? stressClass(value) : goalReached?.(row) ? "health-bar-goal" : "health-bar-primary";
-        return <rect key={`${row.date}-p`} x={cx} y={topY} width={barWidth} height={Math.max(2, baseline - topY)} rx="3" className={`health-bar ${cls} ${hover?.index === index ? "active" : ""}`} />;
+        return <rect key={`${row.date}-p`} x={cx} y={topY} width={barWidth} height={Math.max(2, baseline - topY)} rx="3" className={`health-bar ${cls} ${hover?.index === index || row.date === selectedDate ? "active" : ""}`} />;
       })}
       {secondary && rows.map((row, index) => {
         const value = secondaryValues[index];
         if (value === null) return null;
         const cx = x(index) + barWidth * 0.08, topY = y(value);
-        return <rect key={`${row.date}-s`} x={cx} y={topY} width={barWidth} height={Math.max(2, baseline - topY)} rx="3" className={`health-bar health-bar-secondary ${hover?.index === index ? "active" : ""}`} />;
+        return <rect key={`${row.date}-s`} x={cx} y={topY} width={barWidth} height={Math.max(2, baseline - topY)} rx="3" className={`health-bar health-bar-secondary ${hover?.index === index || row.date === selectedDate ? "active" : ""}`} />;
       })}
     </svg>
     {hover && hoveredRow && <div className="health-chart-tooltip cursor-tooltip" style={{ left: hover.x, top: hover.y }}>
@@ -179,82 +183,117 @@ function BarChart({ rows, primary, secondary, min = 0, max, stress = false, goal
 }
 
 function Stat({ value, label }: { value: string; label: string }) {
-  return <div className="health-stat"><strong>{value}</strong><span>{label}</span></div>;
+  return <div><strong>{value}</strong><span>{label}</span></div>;
 }
 
-function MetricContent({ metric, selected, history, range }: { metric: MetricKey; selected: HealthRow; history: HealthRow[]; range: RangeKey }) {
-  const ranged = range === "1d" ? [selected] : history;
+function Stats({ title, children }: { title: string; children: ReactNode }) {
+  return <article className="sleep-garmin-section"><h4>{title}</h4><div className="sleep-metrics-grid">{children}</div></article>;
+}
+
+function ChartSection({ title, aggregated, children }: { title: string; aggregated: boolean; children: ReactNode }) {
+  return <article className="sleep-garmin-section"><h4>{title} {aggregated && <small className="sleep-chart-period">· ugegennemsnit</small>}</h4>{children}</article>;
+}
+
+function MetricContent({ metric, selected, history, range, onSelect }: { metric: MetricKey; selected: HealthRow; history: HealthRow[]; range: RangeKey; onSelect: (date: string) => void }) {
+  const day = range === "1d";
+  const ranged = day ? [selected] : history;
   const plotted = chartRows(history, range);
   const aggregated = range === "1y";
+  const chart = { selectedDate: day ? selected.date : undefined, onSelect, aggregated };
+  const period = day ? "Seneste 7 dage" : "Udvikling";
 
   if (metric === "steps") {
-    const avgSteps = mean(ranged, "steps"), avgGoal = mean(ranged, "step_goal");
     const totalSteps = ranged.reduce((sum, row) => sum + (row.steps ?? 0), 0);
     const distance = ranged.reduce((sum, row) => sum + (row.distance_m ?? 0), 0) / 1000;
-    return <><div className="health-stats-grid">
-      <Stat value={fmt(range === "1d" ? selected.steps : avgSteps)} label={range === "1d" ? "Skridt" : "Gns. pr. dag"} />
-      <Stat value={fmt(range === "1d" ? selected.step_goal : avgGoal)} label={range === "1d" ? "Mål" : "Gns. mål"} />
-      <Stat value={range === "1d" ? fmt((selected.distance_m ?? 0) / 1000, " km", 2) : fmt(distance, " km", 1)} label={range === "1d" ? "Distance" : "Total distance"} />
-      {range !== "1d" && <Stat value={fmt(totalSteps)} label="Skridt i perioden" />}
-    </div>{range !== "1d" && <BarChart rows={plotted} primary={(row) => row.steps} secondary={(row) => row.step_goal} primaryLabel="Skridt" secondaryLabel="Mål" goalReached={(row) => row.steps !== null && row.step_goal !== null && row.steps >= row.step_goal} aggregated={aggregated} />}</>;
+    return <>
+      <Stats title="Skridt">
+        <Stat value={fmt(day ? selected.steps : mean(ranged, "steps"))} label={day ? "Skridt" : "Gns. pr. dag"} />
+        <Stat value={fmt(day ? selected.step_goal : mean(ranged, "step_goal"))} label={day ? "Mål" : "Gns. mål"} />
+        <Stat value={day ? fmt((selected.distance_m ?? 0) / 1000, " km", 2) : fmt(distance, " km", 1)} label={day ? "Distance" : "Total distance"} />
+        {!day && <Stat value={fmt(totalSteps)} label="Skridt i perioden" />}
+      </Stats>
+      <ChartSection title={period} aggregated={aggregated}><BarChart rows={plotted} primary={(row) => row.steps} secondary={(row) => row.step_goal} primaryLabel="Skridt" secondaryLabel="Mål" goalReached={(row) => row.steps !== null && row.step_goal !== null && row.steps >= row.step_goal} {...chart} /></ChartSection>
+    </>;
   }
 
-  if (metric === "heart") return <><div className="health-stats-grid">
-    <Stat value={fmt(range === "1d" ? selected.resting_hr : mean(ranged, "resting_hr"), " bpm")} label={range === "1d" ? "Hvilepuls" : "Gns. hvilepuls"} />
-    <Stat value={fmt(range === "1d" ? selected.max_hr : mean(ranged, "max_hr"), " bpm")} label={range === "1d" ? "Højeste" : "Gns. dagshøj"} />
-    {range === "1d" && <Stat value={fmt(selected.min_hr, " bpm")} label="Laveste" />}
-  </div>{range !== "1d" && <BarChart rows={plotted} primary={(row) => row.resting_hr} secondary={(row) => row.max_hr} primaryLabel="Hvilepuls" secondaryLabel="Dagshøj" aggregated={aggregated} />}</>;
+  if (metric === "heart") return <>
+    <Stats title="Puls">
+      <Stat value={fmt(day ? selected.resting_hr : mean(ranged, "resting_hr"), " bpm")} label={day ? "Hvilepuls" : "Gns. hvilepuls"} />
+      <Stat value={fmt(day ? selected.max_hr : mean(ranged, "max_hr"), " bpm")} label={day ? "Højeste" : "Gns. dagshøj"} />
+      {day && <Stat value={fmt(selected.min_hr, " bpm")} label="Laveste" />}
+    </Stats>
+    <ChartSection title={period} aggregated={aggregated}><BarChart rows={plotted} primary={(row) => row.resting_hr} secondary={(row) => row.max_hr} primaryLabel="Hvilepuls" secondaryLabel="Dagshøj" {...chart} /></ChartSection>
+  </>;
 
-  if (metric === "stress") {
-    const avg = range === "1d" ? selected.avg_stress : mean(ranged, "avg_stress"), maxStress = range === "1d" ? selected.max_stress : mean(ranged, "max_stress");
-    return <><div className="health-stats-grid"><Stat value={fmt(avg)} label={range === "1d" ? "Stressniveau" : "Gns. stress"} /><Stat value={fmt(maxStress)} label={range === "1d" ? "Maks" : "Gns. daglig maks"} /></div>
-      {range !== "1d" && <><BarChart rows={plotted} primary={(row) => row.avg_stress} primaryLabel="Stress" max={100} stress aggregated={aggregated} /><div className="health-stress-legend"><span className="health-bar-stress-rest">0–25 Hvile</span><span className="health-bar-stress-low">26–50 Lav</span><span className="health-bar-stress-medium">51–75 Medium</span><span className="health-bar-stress-high">76–100 Høj</span></div></>}</>;
-  }
+  if (metric === "stress") return <>
+    <Stats title="Stress">
+      <Stat value={fmt(day ? selected.avg_stress : mean(ranged, "avg_stress"))} label={day ? "Stressniveau" : "Gns. stress"} />
+      <Stat value={fmt(day ? selected.max_stress : mean(ranged, "max_stress"))} label={day ? "Maks" : "Gns. daglig maks"} />
+    </Stats>
+    <ChartSection title={period} aggregated={aggregated}>
+      <BarChart rows={plotted} primary={(row) => row.avg_stress} primaryLabel="Stress" max={100} stress {...chart} />
+      <div className="health-stress-legend"><span className="health-bar-stress-rest">0–25 Hvile</span><span className="health-bar-stress-low">26–50 Lav</span><span className="health-bar-stress-medium">51–75 Medium</span><span className="health-bar-stress-high">76–100 Høj</span></div>
+    </ChartSection>
+  </>;
 
   if (metric === "bodyBattery") {
-    const high = range === "1d" ? selected.body_battery_high : mean(ranged, "body_battery_high"), low = range === "1d" ? selected.body_battery_low : mean(ranged, "body_battery_low");
-    const span = high !== null && low !== null ? high - low : null;
-    return <><div className="health-stats-grid"><Stat value={fmt(high)} label={range === "1d" ? "Høj" : "Gns. high"} /><Stat value={fmt(low)} label={range === "1d" ? "Lav" : "Gns. low"} /><Stat value={fmt(span)} label={range === "1d" ? "Spænd" : "Gns. spænd"} />{range === "1d" && <Stat value={fmt(selected.body_battery_latest)} label="Seneste" />}</div>
-      {range !== "1d" && <BarChart rows={plotted} primary={(row) => row.body_battery_high} secondary={(row) => row.body_battery_low} primaryLabel="High" secondaryLabel="Low" max={100} aggregated={aggregated} />}</>;
+    const high = day ? selected.body_battery_high : mean(ranged, "body_battery_high"), low = day ? selected.body_battery_low : mean(ranged, "body_battery_low");
+    return <>
+      <Stats title="Body Battery">
+        <Stat value={fmt(high)} label={day ? "Høj" : "Gns. høj"} />
+        <Stat value={fmt(low)} label={day ? "Lav" : "Gns. lav"} />
+        <Stat value={fmt(high !== null && low !== null ? high - low : null)} label={day ? "Spænd" : "Gns. spænd"} />
+        {day && <Stat value={fmt(selected.body_battery_latest)} label="Seneste" />}
+      </Stats>
+      <ChartSection title={period} aggregated={aggregated}><BarChart rows={plotted} primary={(row) => row.body_battery_high} secondary={(row) => row.body_battery_low} primaryLabel="Høj" secondaryLabel="Lav" max={100} {...chart} /></ChartSection>
+    </>;
   }
 
-  return <><div className="health-stats-grid"><Stat value={fmt(range === "1d" ? selected.waking_respiration : mean(ranged, "waking_respiration"), " brpm")} label={range === "1d" ? "Vågen" : "Gns. vågen"} /><Stat value={fmt(range === "1d" ? selected.sleeping_respiration : mean(ranged, "sleeping_respiration"), " brpm")} label={range === "1d" ? "Søvn" : "Gns. søvn"} /></div>
-    {range !== "1d" && <BarChart rows={plotted} primary={(row) => row.sleeping_respiration} secondary={(row) => row.waking_respiration} primaryLabel="Søvn" secondaryLabel="Vågen" min={6} max={24} aggregated={aggregated} />}</>;
+  return <>
+    <Stats title="Respiration">
+      <Stat value={fmt(day ? selected.waking_respiration : mean(ranged, "waking_respiration"), " brpm")} label={day ? "Vågen" : "Gns. vågen"} />
+      <Stat value={fmt(day ? selected.sleeping_respiration : mean(ranged, "sleeping_respiration"), " brpm")} label={day ? "Søvn" : "Gns. søvn"} />
+    </Stats>
+    <ChartSection title={period} aggregated={aggregated}><BarChart rows={plotted} primary={(row) => row.sleeping_respiration} secondary={(row) => row.waking_respiration} primaryLabel="Søvn" secondaryLabel="Vågen" min={6} max={24} {...chart} /></ChartSection>
+  </>;
 }
 
 export default function GarminHealthDetail({ metric, initialDate, onClose }: { metric: MetricKey; initialDate: string; onClose: () => void }) {
-  const [range, setRange] = useState<RangeKey>("4w");
+  const [range, setRange] = useState<RangeKey>("1d");
   const [selectedDate, setSelectedDate] = useState(initialDate);
   const [data, setData] = useState<HealthResponse | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
-  const [calendarOpen, setCalendarOpen] = useState(false);
 
   async function load(date: string, nextRange = range) {
     setState("loading");
     try {
-      const query = new URLSearchParams({ date, days: String(RANGE_DAYS[nextRange]) });
+      // The single-day view also loads a week so it can show the small trend chart.
+      const days = nextRange === "1d" ? 7 : RANGE_DAYS[nextRange];
+      const query = new URLSearchParams({ date, days: String(days) });
       const response = await fetch(`/api/garmin/health?${query}`, { credentials: "same-origin", cache: "no-store" });
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       setData(await response.json() as HealthResponse); setSelectedDate(date); setState("ready");
     } catch { setState("error"); }
   }
 
-  useEffect(() => { setRange("4w"); void load(initialDate, "4w"); }, [initialDate, metric]);
+  useEffect(() => { setRange("1d"); void load(initialDate, "1d"); }, [initialDate, metric]);
   const history = data?.history ?? [], selected = data?.selected ?? null;
   const rangeLabel = useMemo(() => range === "1d" || !history.length ? longDate(selectedDate) : `${shortDate(history[0].date)} – ${shortDate(history.at(-1)!.date)}`, [history, range, selectedDate]);
+  const previousDate = data?.navigation.previousDate ?? null, nextDate = data?.navigation.nextDate ?? null;
   function changeRange(next: RangeKey) { setRange(next); void load(selectedDate, next); }
-  function selectDate(date: string) { setCalendarOpen(false); void load(date, range); }
+  function selectDate(date: string) { setRange("1d"); void load(date, "1d"); }
 
-  return <section className="garmin-deep-dive health-detail" aria-label={TITLES[metric]}>
-    <div className="garmin-deep-heading"><div><p className="section-label">Sundhed</p><h3>{TITLES[metric]}</h3></div><button className="secondary-action" type="button" onClick={onClose}>Luk</button></div>
-    <div className="health-toolbar"><div className="health-date-nav">
-      <button type="button" disabled={!data?.navigation.previousDate} onClick={() => data?.navigation.previousDate && void load(data.navigation.previousDate, range)}>‹</button>
-      <div className="health-calendar-anchor"><button className="health-date-button" type="button" onClick={() => setCalendarOpen((value) => !value)}>▣ {rangeLabel}</button>{calendarOpen && <div className="health-date-popover"><input type="date" value={selectedDate} max={new Date().toISOString().slice(0, 10)} onChange={(event) => event.target.value && selectDate(event.target.value)} /><button type="button" onClick={() => setCalendarOpen(false)}>Luk</button></div>}</div>
-      <button type="button" disabled={!data?.navigation.nextDate} onClick={() => data?.navigation.nextDate && void load(data.navigation.nextDate, range)}>›</button>
-    </div><div className="health-range-tabs">{(["1d", "7d", "4w", "1y"] as RangeKey[]).map((item) => <button key={item} type="button" className={range === item ? "active" : ""} onClick={() => changeRange(item)}>{item}</button>)}</div></div>
+  return <section className="garmin-deep-dive garmin-sleep-screen" aria-label={TITLES[metric]}>
+    <div className="garmin-deep-heading"><div><p className="section-label">Dig deeper</p><h3>{TITLES[metric]}</h3></div><button className="secondary-action" type="button" onClick={onClose}>Luk</button></div>
+    <div className="sleep-range-tabs" role="tablist">{(["1d", "7d", "4w", "1y"] as RangeKey[]).map((key) => <button key={key} type="button" role="tab" aria-selected={range === key} className={range === key ? "active" : ""} onClick={() => changeRange(key)}>{key}</button>)}</div>
+    {range === "1d" ? <div className="sleep-date-nav">
+      <button type="button" className="sleep-date-arrow" aria-label="Forrige dag" title="Forrige dag" disabled={!previousDate || state === "loading"} onClick={() => previousDate && selectDate(previousDate)}>←</button>
+      <div className="sleep-range-label">{rangeLabel}</div>
+      <button type="button" className="sleep-date-arrow" aria-label="Næste dag" title="Næste dag" disabled={!nextDate || state === "loading"} onClick={() => nextDate && selectDate(nextDate)}>→</button>
+    </div> : <div className="sleep-range-label">{rangeLabel}</div>}
     {state === "loading" && <p className="empty-state">Henter data…</p>}
     {state === "error" && <p className="empty-state">Data kunne ikke hentes.</p>}
-    {state === "ready" && selected && <MetricContent metric={metric} selected={selected} history={history} range={range} />}
+    {state === "ready" && selected && <div className={range === "1d" ? "sleep-daily-view" : "sleep-range-view"}><MetricContent metric={metric} selected={selected} history={history} range={range} onSelect={selectDate} /></div>}
   </section>;
 }
 
