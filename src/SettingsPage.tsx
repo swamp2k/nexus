@@ -4,6 +4,7 @@ import CalendarSourceSettings from "./CalendarSourceSettings";
 import EloverblikSettings from "./EloverblikSettings";
 import GarminImportSettings from "./GarminImportSettings";
 import IntegrationSettings from "./IntegrationSettings";
+import MenuSettings from "./MenuSettings";
 import MelCloudSettings from "./MelCloudSettings";
 import PrivateeringSettings from "./PrivateeringSettings";
 import ProjectMapSettings from "./ProjectMapSettings";
@@ -172,6 +173,7 @@ export default function SettingsPage() {
 
     <details className="settings-card settings-collapsible"><summary className="settings-card-heading"><div><p className="section-label">Adgang</p><h2>Brugere</h2></div><span className="settings-icon" aria-hidden="true">♙</span></summary><UsersSettings /></details>
 
+    <details className="settings-card settings-collapsible settings-component-wrapper"><summary className="settings-card-heading"><div><p className="section-label">Personligt</p><h2>Menu og kategorier</h2></div><span className="settings-icon" aria-hidden="true">☰</span></summary><MenuSettings /></details>
     <details className="settings-card settings-collapsible"><summary className="settings-card-heading"><div><p className="section-label">Personligt</p><h2>Integrationer og moduler</h2></div><span className="settings-icon" aria-hidden="true">◈</span></summary><IntegrationSettings /></details>
 
     <details className="settings-card settings-collapsible"><summary className="settings-card-heading"><div><p className="section-label">Dashboard</p><h2>Widget-opdatering</h2></div><span className="settings-icon" aria-hidden="true">↻</span></summary>{loading ? <p className="settings-loading">Henter indstillinger…</p> : <div className="settings-form"><p className="settings-help">Hver widgetgruppe har én opdateringsklasse. Polling kører kun mens browserfanen er synlig.</p><div className="settings-coordinate-grid">{refreshGroups.map((group) => { const defaultClass = defaultRefreshClassForGroup(group); const value = dashboardRefreshClasses[group] ?? defaultClass; return <label key={group}><span>{group}</span><select value={value} onChange={(event) => setRefreshClass(group, event.target.value as RefreshClass)}>{REFRESH_CLASSES.map((refreshClass) => <option value={refreshClass} key={refreshClass}>{REFRESH_CLASS_LABELS[refreshClass]}</option>)}</select><small>Standard: {REFRESH_CLASS_LABELS[defaultClass]}</small></label>; })}</div><p className="settings-help"><strong>Live</strong> = 1 min · <strong>Normal</strong> = 5 min · <strong>Langsom</strong> = 30 min · <strong>Ved åbning / event</strong> = ingen periodisk polling.</p></div>}</details>
