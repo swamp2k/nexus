@@ -1,3 +1,5 @@
+import { CATEGORY_ICON, DEFAULT_LAYOUT, NAVIGATION_CHANGED_EVENT, NAV_BY_PAGE, entryKey } from "./data/navigation";
+import type { NavEntry, NavPage } from "./data/navigation";
 import { useEffect, useMemo, useState } from "react";
 import type { DragEvent, FormEvent, MouseEvent } from "react";
 import HomePage from "./HomePage";
@@ -20,21 +22,10 @@ import ProjectMapPage from "./ProjectMapPage";
 
 type User = { id: string; email: string; displayName: string | null; role: "admin" | "member" | "viewer" };
 type SessionResponse = { authenticated: boolean; user: User | null };
-type NavPage = "Hjem" | "Garmin" | "Motion" | "Velbefindende" | "Vejr" | "Strøm" | "Kalender" | "Varmepumpe" | "DBA" | "Unraid" | "PC Watch" | "Privateering" | "Notifikationer" | "Displays";
 type Page = NavPage | "Projects" | "Indstillinger";
 type IntegrationKey = "garmin" | "motion" | "wellbeing" | "weather" | "electricity" | "calendar" | "melcloud" | "dba" | "unraid" | "pcwatch" | "privateering" | "notifications" | "displays";
 type IntegrationMap = Record<IntegrationKey, boolean>;
 
-type NavDefinition = { page: NavPage; icon: string; label: string };
-const NAV_DEFINITIONS: NavDefinition[] = [
-  { page: "Hjem", icon: "⌂", label: "Hjem" }, { page: "Garmin", icon: "⌖", label: "Garmin" }, { page: "Motion", icon: "↗", label: "Motion" },
-  { page: "Velbefindende", icon: "♥", label: "Velbefindende" }, { page: "Vejr", icon: "☁", label: "Vejr" }, { page: "Strøm", icon: "ϟ", label: "Strøm" },
-  { page: "Kalender", icon: "▦", label: "Kalender" }, { page: "Varmepumpe", icon: "♨", label: "Varmepumpe" }, { page: "DBA", icon: "◇", label: "DBA" },
-  { page: "Unraid", icon: "▤", label: "Unraid" }, { page: "PC Watch", icon: "▣", label: "PC Watch" }, { page: "Privateering", icon: "☠", label: "Privateering" }, { page: "Notifikationer", icon: "♧", label: "Notifikationer" },
-  { page: "Displays", icon: "▣", label: "Displays" },
-];
-const DEFAULT_NAV_ORDER = NAV_DEFINITIONS.map((item) => item.page);
-const NAV_BY_PAGE = new Map(NAV_DEFINITIONS.map((item) => [item.page, item]));
 const MOBILE_ALLOWED = new Set<NavPage>(["Hjem", "Garmin", "Motion", "Velbefindende", "Vejr", "Strøm", "Kalender", "Varmepumpe", "Unraid", "PC Watch", "Displays"]);
 const DEFAULT_INTEGRATIONS: IntegrationMap = {
   garmin: true, motion: true, wellbeing: true, weather: true, electricity: true, calendar: true, melcloud: true,
@@ -50,14 +41,6 @@ function initialPageFromUrl(): Page {
   const requested = new URLSearchParams(window.location.search).get("page");
   if (requested === "wellbeing") return "Velbefindende";
   return "Hjem";
-}
-
-function normalizeNavOrder(order: unknown): NavPage[] {
-  const source = Array.isArray(order) ? order : [];
-  const next: NavPage[] = [];
-  for (const item of source) if (typeof item === "string" && NAV_BY_PAGE.has(item as NavPage) && !next.includes(item as NavPage)) next.push(item as NavPage);
-  for (const item of DEFAULT_NAV_ORDER) if (!next.includes(item)) next.push(item);
-  return next;
 }
 
 function pageEnabled(page: NavPage, integrations: IntegrationMap): boolean {
@@ -76,10 +59,10 @@ function App() {
   const [email, setEmail] = useState("");
   const [loginState, setLoginState] = useState<"idle" | "sending" | "sent" | "error">("idle");
   const [page, setPage] = useState<Page>(initialPageFromUrl);
-  const [navOrder, setNavOrder] = useState<NavPage[]>(DEFAULT_NAV_ORDER);
+  const [layout, setLayout] = useState<NavEntry[]>(DEFAULT_LAYOUT);
   const [integrations, setIntegrations] = useState<IntegrationMap>(DEFAULT_INTEGRATIONS);
   const [editingNav, setEditingNav] = useState(false);
-  const [draggedNav, setDraggedNav] = useState<NavPage | null>(null);
+  const [draggedNav, setDraggedNav] = useState<string | null>(null);
   const [navSaveState, setNavSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [theme, setTheme] = useState<"light" | "dark">(() => {
     const saved = localStorage.getItem("nexus-theme");
@@ -105,14 +88,14 @@ function App() {
     if (!session?.authenticated) return;
     void Promise.all([
       fetch("/api/navigation", { credentials: "same-origin", cache: "no-store" })
-        .then(async (response) => response.ok ? response.json() as Promise<{ order: NavPage[] }> : Promise.reject()),
+        .then(async (response) => response.ok ? response.json() as Promise<{ layout: NavEntry[] }> : Promise.reject()),
       fetch("/api/integrations", { credentials: "same-origin", cache: "no-store" })
         .then(async (response) => response.ok ? response.json() as Promise<{ integrations: IntegrationMap }> : Promise.reject()),
     ]).then(([navigation, integrationSettings]) => {
-      setNavOrder(normalizeNavOrder(navigation.order));
+      setLayout(navigation.layout);
       setIntegrations(integrationSettings.integrations);
     }).catch(() => {
-      setNavOrder(DEFAULT_NAV_ORDER);
+      setLayout(DEFAULT_LAYOUT);
       setIntegrations(DEFAULT_INTEGRATIONS);
     });
   }, [session?.authenticated]);
@@ -124,8 +107,13 @@ function App() {
       setIntegrations(next);
       setPage((current) => current !== "Indstillinger" && current !== "Projects" && current !== "Hjem" && !pageEnabled(current, next) ? "Hjem" : current);
     }
+    function navigationChanged(event: Event) {
+      const next = (event as CustomEvent<NavEntry[]>).detail;
+      if (next) setLayout(next);
+    }
     window.addEventListener("nexus-integrations-changed", changed);
-    return () => window.removeEventListener("nexus-integrations-changed", changed);
+    window.addEventListener(NAVIGATION_CHANGED_EVENT, navigationChanged);
+    return () => { window.removeEventListener("nexus-integrations-changed", changed); window.removeEventListener(NAVIGATION_CHANGED_EVENT, navigationChanged); };
   }, []);
 
   const displayName = useMemo(() => {
@@ -133,8 +121,15 @@ function App() {
     if (!user) return "Nexus";
     return user.displayName?.trim() || user.email.split("@")[0];
   }, [session]);
-  const visibleNav = navOrder.filter((item) => pageEnabled(item, integrations));
-  const mobileNav = visibleNav.filter((item) => MOBILE_ALLOWED.has(item));
+  // Each layout entry becomes one menu item; a category opens on its first enabled tab.
+  const menu = layout.flatMap((entry) => {
+    const tabs = (typeof entry === "string" ? [entry] : entry.tabs).filter((tab) => pageEnabled(tab, integrations));
+    if (!tabs.length) return [];
+    return [typeof entry === "string"
+      ? { key: entry, icon: NAV_BY_PAGE.get(entry)!.icon, label: NAV_BY_PAGE.get(entry)!.label, tabs, isCategory: false }
+      : { key: entry.id, icon: CATEGORY_ICON, label: entry.label, tabs, isCategory: true }];
+  });
+  const mobileMenu = menu.filter((item) => item.tabs.some((tab) => MOBILE_ALLOWED.has(tab)));
 
   async function requestLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault(); setLoginState("sending");
@@ -152,30 +147,30 @@ function App() {
     setSession({ authenticated: false, user: null });
   }
 
-  async function saveNavOrder(order: NavPage[]) {
+  async function saveLayout(next: NavEntry[]) {
     setNavSaveState("saving");
     try {
-      const response = await fetch("/api/navigation", { method: "PUT", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ order }) });
+      const response = await fetch("/api/navigation", { method: "PUT", credentials: "same-origin", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ layout: next }) });
       if (!response.ok) throw new Error("save_failed");
-      const body = await response.json() as { order: NavPage[] };
-      setNavOrder(normalizeNavOrder(body.order));
+      const body = await response.json() as { layout: NavEntry[] };
+      setLayout(body.layout);
       setNavSaveState("saved");
       window.setTimeout(() => setNavSaveState("idle"), 1200);
     } catch { setNavSaveState("error"); }
   }
 
-  function moveNav(source: NavPage, target: NavPage) {
+  function moveNav(source: string, target: string) {
     if (source === target) return;
-    const next = [...navOrder];
-    const from = next.indexOf(source), to = next.indexOf(target);
+    const next = [...layout];
+    const from = next.findIndex((entry) => entryKey(entry) === source), to = next.findIndex((entry) => entryKey(entry) === target);
     if (from < 0 || to < 0) return;
-    next.splice(from, 1);
-    next.splice(to, 0, source);
-    setNavOrder(next);
-    void saveNavOrder(next);
+    const [moved] = next.splice(from, 1);
+    next.splice(to, 0, moved);
+    setLayout(next);
+    void saveLayout(next);
   }
 
-  function navDrop(event: DragEvent<HTMLButtonElement>, target: NavPage) {
+  function navDrop(event: DragEvent<HTMLButtonElement>, target: string) {
     event.preventDefault();
     if (draggedNav) moveNav(draggedNav, target);
     setDraggedNav(null);
@@ -198,29 +193,31 @@ function App() {
   }
 
   const isHome = page === "Hjem";
-  const heading = isHome ? "Hjem" : page;
+  const activeMenu = menu.find((item) => item.tabs.includes(page as NavPage));
+  const groupTabs = activeMenu?.isCategory ? activeMenu.tabs : [];
+  const heading = isHome ? "Hjem" : activeMenu?.label ?? page;
 
   return <div className="app-frame">
     <aside className={`sidebar${editingNav ? " sidebar--editing" : ""}`}>
       <div className="sidebar-brand"><div className="brand-mark">N</div><span className="brand-word">NEXUS</span></div>
-      <nav className="sidebar-nav" aria-label="Primær navigation">{visibleNav.map((item) => {
-        const definition = NAV_BY_PAGE.get(item)!;
-        return <button className={`nav-item ${page === item ? "active" : ""}`} key={item} type="button" draggable={editingNav}
-          onDragStart={() => setDraggedNav(item)} onDragOver={(event) => editingNav && event.preventDefault()} onDrop={(event) => editingNav && navDrop(event, item)}
-          onClick={() => { if (!editingNav) setPage(item); }}>
-          {editingNav && <span className="nav-drag-handle" aria-hidden="true">⋮⋮</span>}<span className="nav-icon">{definition.icon}</span><span>{definition.label}</span>
+      <nav className="sidebar-nav" aria-label="Primær navigation">{menu.map((item) => {
+        return <button className={`nav-item ${activeMenu === item ? "active" : ""}`} key={item.key} type="button" draggable={editingNav}
+          onDragStart={() => setDraggedNav(item.key)} onDragOver={(event) => editingNav && event.preventDefault()} onDrop={(event) => editingNav && navDrop(event, item.key)}
+          onClick={() => { if (!editingNav) setPage(item.tabs[0]); }}>
+          {editingNav && <span className="nav-drag-handle" aria-hidden="true">⋮⋮</span>}<span className="nav-icon">{item.icon}</span><span>{item.label}</span>
         </button>;
       })}</nav>
       <div className="sidebar-nav-edit-row"><button type="button" className="sidebar-nav-edit" onClick={() => setEditingNav((current) => !current)}>{editingNav ? "Færdig" : "Tilpas menu"}</button>{editingNav && navSaveState !== "idle" && <small>{navSaveState === "saving" ? "Gemmer…" : navSaveState === "saved" ? "Gemt" : "Kunne ikke gemme"}</small>}</div>
       <div className="sidebar-divider" />
       <nav className="sidebar-nav sidebar-nav--secondary" aria-label="Sekundær navigation">{session.user?.role === "admin" && <button className={`nav-item ${page === "Projects" ? "active" : ""}`} type="button" onClick={() => setPage("Projects")}><span className="nav-icon">⌘</span><span>Projects</span></button>}<button className={`nav-item ${page === "Indstillinger" ? "active" : ""}`} type="button" onClick={() => setPage("Indstillinger")}><span className="nav-icon">⚙</span><span>Indstillinger</span></button></nav>
-      <nav className="mobile-nav" aria-label="Mobil navigation">{mobileNav.map((item) => { const definition = NAV_BY_PAGE.get(item)!; return <button className={page === item ? "active" : ""} key={item} type="button" onClick={() => setPage(item)} aria-current={page === item ? "page" : undefined}><span>{definition.icon}</span><strong>{definition.label}</strong></button>; })}{session.user?.role === "admin" && <button className={page === "Projects" ? "active" : ""} type="button" onClick={() => setPage("Projects")} aria-current={page === "Projects" ? "page" : undefined}><span>⌘</span><strong>Projects</strong></button>}<button className={page === "Indstillinger" ? "active" : ""} type="button" onClick={() => setPage("Indstillinger")}><span>⚙</span><strong>Indstillinger</strong></button></nav>
+      <nav className="mobile-nav" aria-label="Mobil navigation">{mobileMenu.map((item) => <button className={activeMenu === item ? "active" : ""} key={item.key} type="button" onClick={() => setPage(item.tabs[0])} aria-current={activeMenu === item ? "page" : undefined}><span>{item.icon}</span><strong>{item.label}</strong></button>)}{session.user?.role === "admin" && <button className={page === "Projects" ? "active" : ""} type="button" onClick={() => setPage("Projects")} aria-current={page === "Projects" ? "page" : undefined}><span>⌘</span><strong>Projects</strong></button>}<button className={page === "Indstillinger" ? "active" : ""} type="button" onClick={() => setPage("Indstillinger")}><span>⚙</span><strong>Indstillinger</strong></button></nav>
       <div className="system-status"><span className="status-dot" /><div><small>Systemstatus</small><strong>Alt kører</strong></div></div>
     </aside>
 
     <div className="content-shell">
       <header className="app-header"><div><h1>{heading}</h1></div><div className="header-actions"><button className="theme-toggle" onClick={toggleTheme} aria-label="Skift tema">{theme === "light" ? "☾" : "☀"}</button><details className="user-menu"><summary className="user-menu-summary" aria-label="Åbn brugermenu"><span className="avatar">{initials(session.user)}</span><span className="user-name">{displayName}</span></summary><div className="user-menu-popover">{session.user?.role === "admin" && <button type="button" onClick={(event) => { setPage("Projects"); closeUserMenu(event); }}>Projects</button>}<button type="button" onClick={(event) => { setPage("Indstillinger"); closeUserMenu(event); }}>Indstillinger</button><button className="logout-button" type="button" onClick={logout}>Log ud</button></div></details></div></header>
       <main className="main-content">
+        {groupTabs.length > 0 && <div className="page-tabs" role="tablist">{groupTabs.map((tab) => <button key={tab} type="button" role="tab" aria-selected={tab === page} className={tab === page ? "active" : ""} onClick={() => setPage(tab)}>{NAV_BY_PAGE.get(tab)!.label}</button>)}</div>}
         {page === "Hjem" && <HomePage onOpenPage={setPage} />}{page === "Projects" && session.user?.role === "admin" && <ProjectMapPage />}{page === "Garmin" && integrations.garmin && <GarminPage />}{page === "Motion" && integrations.motion && <MotionPage />}{page === "Velbefindende" && integrations.wellbeing && <WellbeingPage />}{page === "Vejr" && integrations.weather && <WeatherPage />}{page === "Strøm" && integrations.electricity && <ElectricityPage />}{page === "Kalender" && integrations.calendar && <CalendarPage />}{page === "Varmepumpe" && integrations.melcloud && <MelCloudPage />}{page === "Unraid" && integrations.unraid && <UnraidPage />}{page === 'PC Watch' && integrations.pcwatch && <PcWatchPage />}{page === "Privateering" && integrations.privateering && <PrivateeringPage />}{page === "Displays" && integrations.displays && <DisplaysPage />}{page === "Indstillinger" && <SettingsPage />}
         {!isHome && page !== "Garmin" && page !== "Motion" && page !== "Velbefindende" && page !== "Vejr" && page !== "Strøm" && page !== "Kalender" && page !== "Varmepumpe" && page !== "Unraid" && page !== 'PC Watch' && page !== "Privateering" && page !== "Displays" && page !== "Projects" && page !== "Indstillinger" && <section className="placeholder-card"><p className="section-label">Planlagt</p><h2>{page}</h2><p>Modulet er på vej ind i Nexus.</p></section>}
       </main>
