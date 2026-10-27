@@ -126,8 +126,8 @@ function App() {
     const tabs = (typeof entry === "string" ? [entry] : entry.tabs).filter((tab) => pageEnabled(tab, integrations));
     if (!tabs.length) return [];
     return [typeof entry === "string"
-      ? { key: entry, icon: NAV_BY_PAGE.get(entry)!.icon, label: NAV_BY_PAGE.get(entry)!.label, tabs }
-      : { key: entry.id, icon: CATEGORY_ICON, label: entry.label, tabs }];
+      ? { key: entry, icon: NAV_BY_PAGE.get(entry)!.icon, label: NAV_BY_PAGE.get(entry)!.label, tabs, isCategory: false }
+      : { key: entry.id, icon: CATEGORY_ICON, label: entry.label, tabs, isCategory: true }];
   });
   const mobileMenu = menu.filter((item) => item.tabs.some((tab) => MOBILE_ALLOWED.has(tab)));
 
@@ -194,7 +194,7 @@ function App() {
 
   const isHome = page === "Hjem";
   const activeMenu = menu.find((item) => item.tabs.includes(page as NavPage));
-  const groupTabs = activeMenu && activeMenu.tabs.length > 1 ? activeMenu.tabs : [];
+  const groupTabs = activeMenu?.isCategory ? activeMenu.tabs : [];
   const heading = isHome ? "Hjem" : activeMenu?.label ?? page;
 
   return <div className="app-frame">
@@ -217,7 +217,8 @@ function App() {
     <div className="content-shell">
       <header className="app-header"><div><h1>{heading}</h1></div><div className="header-actions"><button className="theme-toggle" onClick={toggleTheme} aria-label="Skift tema">{theme === "light" ? "☾" : "☀"}</button><details className="user-menu"><summary className="user-menu-summary" aria-label="Åbn brugermenu"><span className="avatar">{initials(session.user)}</span><span className="user-name">{displayName}</span></summary><div className="user-menu-popover">{session.user?.role === "admin" && <button type="button" onClick={(event) => { setPage("Projects"); closeUserMenu(event); }}>Projects</button>}<button type="button" onClick={(event) => { setPage("Indstillinger"); closeUserMenu(event); }}>Indstillinger</button><button className="logout-button" type="button" onClick={logout}>Log ud</button></div></details></div></header>
       <main className="main-content">
-        {page === "Hjem" && <HomePage onOpenPage={setPage} />}{page === "Projects" && session.user?.role === "admin" && <ProjectMapPage />}{page === "Garmin" && integrations.garmin && <GarminPage />}{page === "Motion" && integrations.motion && <MotionPage />}{page === "Velbefindende" && integrations.wellbeing && <WellbeingPage />}{page === "Vejr" && integrations.weather && <WeatherPage />}{page === "Strøm" && integrations.electricity && <ElectricityPage />}{page === "Kalender" && integrations.calendar && <CalendarPage />}{page === "Varmepumpe" && integrations.melcloud && <MelCloudPage />}{groupTabs.length > 0 && <div className="page-tabs" role="tablist">{groupTabs.map((tab) => <button key={tab} type="button" role="tab" aria-selected={tab === page} className={tab === page ? "active" : ""} onClick={() => setPage(tab)}>{NAV_BY_PAGE.get(tab)!.label}</button>)}</div>}{page === "Unraid" && integrations.unraid && <UnraidPage />}{page === 'PC Watch' && integrations.pcwatch && <PcWatchPage />}{page === "Privateering" && integrations.privateering && <PrivateeringPage />}{page === "Displays" && integrations.displays && <DisplaysPage />}{page === "Indstillinger" && <SettingsPage />}
+        {groupTabs.length > 0 && <div className="page-tabs" role="tablist">{groupTabs.map((tab) => <button key={tab} type="button" role="tab" aria-selected={tab === page} className={tab === page ? "active" : ""} onClick={() => setPage(tab)}>{NAV_BY_PAGE.get(tab)!.label}</button>)}</div>}
+        {page === "Hjem" && <HomePage onOpenPage={setPage} />}{page === "Projects" && session.user?.role === "admin" && <ProjectMapPage />}{page === "Garmin" && integrations.garmin && <GarminPage />}{page === "Motion" && integrations.motion && <MotionPage />}{page === "Velbefindende" && integrations.wellbeing && <WellbeingPage />}{page === "Vejr" && integrations.weather && <WeatherPage />}{page === "Strøm" && integrations.electricity && <ElectricityPage />}{page === "Kalender" && integrations.calendar && <CalendarPage />}{page === "Varmepumpe" && integrations.melcloud && <MelCloudPage />}{page === "Unraid" && integrations.unraid && <UnraidPage />}{page === 'PC Watch' && integrations.pcwatch && <PcWatchPage />}{page === "Privateering" && integrations.privateering && <PrivateeringPage />}{page === "Displays" && integrations.displays && <DisplaysPage />}{page === "Indstillinger" && <SettingsPage />}
         {!isHome && page !== "Garmin" && page !== "Motion" && page !== "Velbefindende" && page !== "Vejr" && page !== "Strøm" && page !== "Kalender" && page !== "Varmepumpe" && page !== "Unraid" && page !== 'PC Watch' && page !== "Privateering" && page !== "Displays" && page !== "Projects" && page !== "Indstillinger" && <section className="placeholder-card"><p className="section-label">Planlagt</p><h2>{page}</h2><p>Modulet er på vej ind i Nexus.</p></section>}
       </main>
       <footer><span>Nexus v0.1</span><span>Simple by design.</span></footer>
