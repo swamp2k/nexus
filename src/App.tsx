@@ -19,10 +19,11 @@ import DisplaysPage from "./DisplaysPage";
 import SettingsPage from "./SettingsPage";
 import DisplayGate from "./DisplayGate";
 import ProjectMapPage from "./ProjectMapPage";
+import RepoBoardPage from "./RepoBoardPage";
 
 type User = { id: string; email: string; displayName: string | null; role: "admin" | "member" | "viewer" };
 type SessionResponse = { authenticated: boolean; user: User | null };
-type Page = NavPage | "Projects" | "Indstillinger";
+type Page = NavPage | "Projects" | "Repo Board" | "Indstillinger";
 type IntegrationKey = "garmin" | "motion" | "wellbeing" | "weather" | "electricity" | "calendar" | "melcloud" | "dba" | "unraid" | "pcwatch" | "privateering" | "notifications" | "displays";
 type IntegrationMap = Record<IntegrationKey, boolean>;
 
@@ -105,7 +106,7 @@ function App() {
       const next = (event as CustomEvent<IntegrationMap>).detail;
       if (!next) return;
       setIntegrations(next);
-      setPage((current) => current !== "Indstillinger" && current !== "Projects" && current !== "Hjem" && !pageEnabled(current, next) ? "Hjem" : current);
+      setPage((current) => current !== "Indstillinger" && current !== "Projects" && current !== "Repo Board" && current !== "Hjem" && !pageEnabled(current, next) ? "Hjem" : current);
     }
     function navigationChanged(event: Event) {
       const next = (event as CustomEvent<NavEntry[]>).detail;
@@ -193,9 +194,10 @@ function App() {
   }
 
   const isHome = page === "Hjem";
+  const inProjects = page === "Projects" || page === "Repo Board";
   const activeMenu = menu.find((item) => item.tabs.includes(page as NavPage));
   const groupTabs = activeMenu?.isCategory ? activeMenu.tabs : [];
-  const heading = isHome ? "Hjem" : activeMenu?.label ?? page;
+  const heading = isHome ? "Hjem" : inProjects ? "Projects" : activeMenu?.label ?? page;
 
   return <div className="app-frame">
     <aside className={`sidebar${editingNav ? " sidebar--editing" : ""}`}>
@@ -209,17 +211,17 @@ function App() {
       })}</nav>
       <div className="sidebar-nav-edit-row"><button type="button" className="sidebar-nav-edit" onClick={() => setEditingNav((current) => !current)}>{editingNav ? "Færdig" : "Tilpas menu"}</button>{editingNav && navSaveState !== "idle" && <small>{navSaveState === "saving" ? "Gemmer…" : navSaveState === "saved" ? "Gemt" : "Kunne ikke gemme"}</small>}</div>
       <div className="sidebar-divider" />
-      <nav className="sidebar-nav sidebar-nav--secondary" aria-label="Sekundær navigation">{session.user?.role === "admin" && <button className={`nav-item ${page === "Projects" ? "active" : ""}`} type="button" onClick={() => setPage("Projects")}><span className="nav-icon">⌘</span><span>Projects</span></button>}<button className={`nav-item ${page === "Indstillinger" ? "active" : ""}`} type="button" onClick={() => setPage("Indstillinger")}><span className="nav-icon">⚙</span><span>Indstillinger</span></button></nav>
-      <nav className="mobile-nav" aria-label="Mobil navigation">{mobileMenu.map((item) => <button className={activeMenu === item ? "active" : ""} key={item.key} type="button" onClick={() => setPage(item.tabs[0])} aria-current={activeMenu === item ? "page" : undefined}><span>{item.icon}</span><strong>{item.label}</strong></button>)}{session.user?.role === "admin" && <button className={page === "Projects" ? "active" : ""} type="button" onClick={() => setPage("Projects")} aria-current={page === "Projects" ? "page" : undefined}><span>⌘</span><strong>Projects</strong></button>}<button className={page === "Indstillinger" ? "active" : ""} type="button" onClick={() => setPage("Indstillinger")}><span>⚙</span><strong>Indstillinger</strong></button></nav>
+      <nav className="sidebar-nav sidebar-nav--secondary" aria-label="Sekundær navigation">{session.user?.role === "admin" && <button className={`nav-item ${inProjects ? "active" : ""}`} type="button" onClick={() => setPage("Projects")}><span className="nav-icon">⌘</span><span>Projects</span></button>}<button className={`nav-item ${page === "Indstillinger" ? "active" : ""}`} type="button" onClick={() => setPage("Indstillinger")}><span className="nav-icon">⚙</span><span>Indstillinger</span></button></nav>
+      <nav className="mobile-nav" aria-label="Mobil navigation">{mobileMenu.map((item) => <button className={activeMenu === item ? "active" : ""} key={item.key} type="button" onClick={() => setPage(item.tabs[0])} aria-current={activeMenu === item ? "page" : undefined}><span>{item.icon}</span><strong>{item.label}</strong></button>)}{session.user?.role === "admin" && <button className={inProjects ? "active" : ""} type="button" onClick={() => setPage("Projects")} aria-current={inProjects ? "page" : undefined}><span>⌘</span><strong>Projects</strong></button>}<button className={page === "Indstillinger" ? "active" : ""} type="button" onClick={() => setPage("Indstillinger")}><span>⚙</span><strong>Indstillinger</strong></button></nav>
       <div className="system-status"><span className="status-dot" /><div><small>Systemstatus</small><strong>Alt kører</strong></div></div>
     </aside>
 
     <div className="content-shell">
       <header className="app-header"><div><h1>{heading}</h1></div><div className="header-actions"><button className="theme-toggle" onClick={toggleTheme} aria-label="Skift tema">{theme === "light" ? "☾" : "☀"}</button><details className="user-menu"><summary className="user-menu-summary" aria-label="Åbn brugermenu"><span className="avatar">{initials(session.user)}</span><span className="user-name">{displayName}</span></summary><div className="user-menu-popover">{session.user?.role === "admin" && <button type="button" onClick={(event) => { setPage("Projects"); closeUserMenu(event); }}>Projects</button>}<button type="button" onClick={(event) => { setPage("Indstillinger"); closeUserMenu(event); }}>Indstillinger</button><button className="logout-button" type="button" onClick={logout}>Log ud</button></div></details></div></header>
       <main className="main-content">
-        {groupTabs.length > 0 && <div className="page-tabs" role="tablist">{groupTabs.map((tab) => <button key={tab} type="button" role="tab" aria-selected={tab === page} className={tab === page ? "active" : ""} onClick={() => setPage(tab)}>{NAV_BY_PAGE.get(tab)!.label}</button>)}</div>}
-        {page === "Hjem" && <HomePage onOpenPage={setPage} />}{page === "Projects" && session.user?.role === "admin" && <ProjectMapPage />}{page === "Garmin" && integrations.garmin && <GarminPage />}{page === "Motion" && integrations.motion && <MotionPage />}{page === "Velbefindende" && integrations.wellbeing && <WellbeingPage />}{page === "Vejr" && integrations.weather && <WeatherPage />}{page === "Strøm" && integrations.electricity && <ElectricityPage />}{page === "Kalender" && integrations.calendar && <CalendarPage />}{page === "Varmepumpe" && integrations.melcloud && <MelCloudPage />}{page === "Unraid" && integrations.unraid && <UnraidPage />}{page === 'PC Watch' && integrations.pcwatch && <PcWatchPage />}{page === "Privateering" && integrations.privateering && <PrivateeringPage />}{page === "Displays" && integrations.displays && <DisplaysPage />}{page === "Indstillinger" && <SettingsPage />}
-        {!isHome && page !== "Garmin" && page !== "Motion" && page !== "Velbefindende" && page !== "Vejr" && page !== "Strøm" && page !== "Kalender" && page !== "Varmepumpe" && page !== "Unraid" && page !== 'PC Watch' && page !== "Privateering" && page !== "Displays" && page !== "Projects" && page !== "Indstillinger" && <section className="placeholder-card"><p className="section-label">Planlagt</p><h2>{page}</h2><p>Modulet er på vej ind i Nexus.</p></section>}
+        {inProjects && session.user?.role === "admin" && <div className="page-tabs" role="tablist">{(["Projects", "Repo Board"] as const).map((tab) => <button key={tab} type="button" role="tab" aria-selected={tab === page} className={tab === page ? "active" : ""} onClick={() => setPage(tab)}>{tab === "Projects" ? "Project Map" : tab}</button>)}</div>}{groupTabs.length > 0 && <div className="page-tabs" role="tablist">{groupTabs.map((tab) => <button key={tab} type="button" role="tab" aria-selected={tab === page} className={tab === page ? "active" : ""} onClick={() => setPage(tab)}>{NAV_BY_PAGE.get(tab)!.label}</button>)}</div>}
+        {page === "Hjem" && <HomePage onOpenPage={setPage} />}{page === "Projects" && session.user?.role === "admin" && <ProjectMapPage />}{page === "Repo Board" && session.user?.role === "admin" && <RepoBoardPage />}{page === "Garmin" && integrations.garmin && <GarminPage />}{page === "Motion" && integrations.motion && <MotionPage />}{page === "Velbefindende" && integrations.wellbeing && <WellbeingPage />}{page === "Vejr" && integrations.weather && <WeatherPage />}{page === "Strøm" && integrations.electricity && <ElectricityPage />}{page === "Kalender" && integrations.calendar && <CalendarPage />}{page === "Varmepumpe" && integrations.melcloud && <MelCloudPage />}{page === "Unraid" && integrations.unraid && <UnraidPage />}{page === 'PC Watch' && integrations.pcwatch && <PcWatchPage />}{page === "Privateering" && integrations.privateering && <PrivateeringPage />}{page === "Displays" && integrations.displays && <DisplaysPage />}{page === "Indstillinger" && <SettingsPage />}
+        {!isHome && page !== "Garmin" && page !== "Motion" && page !== "Velbefindende" && page !== "Vejr" && page !== "Strøm" && page !== "Kalender" && page !== "Varmepumpe" && page !== "Unraid" && page !== 'PC Watch' && page !== "Privateering" && page !== "Displays" && page !== "Projects" && page !== "Repo Board" && page !== "Indstillinger" && <section className="placeholder-card"><p className="section-label">Planlagt</p><h2>{page}</h2><p>Modulet er på vej ind i Nexus.</p></section>}
       </main>
       <footer><span>Nexus v0.1</span><span>Simple by design.</span></footer>
     </div>

@@ -11,3 +11,9 @@
 .menu-settings-line > :first-child { flex: 1 1 140px; }
 .menu-settings-buttons { display: flex; gap: 4px; }
 .menu-settings-buttons button { min-width: 36px; min-height: 36px; }
+
+.repo-board-note { margin: 0 0 8px; color: var(--muted); font-size: .85rem; }
+.repo-board-frame { width: 100%; height: calc(100vh - 220px); min-height: 480px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-soft); }
+
+.repo-board-note { margin: 0 0 8px; color: var(--muted); font-size: .85rem; }
+.repo-board-frame { width: 100%; height: calc(100vh - 220px); min-height: 480px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-soft); }
