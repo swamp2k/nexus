@@ -411,3 +411,7 @@ When asked to make a change:
 10. Leave the repository simpler or at least no more confusing than you found it.
 
 Nexus should remain **simple by design**.
+
+## Shared UI building blocks
+
+New pages must reuse the shared classes in `src/ui.css` (`ui-btn`, `ui-btn--primary`, `ui-btn--ghost`, `ui-link`, `ui-card`, `ui-pill` with `--ok/--warn/--bad/--info`, and `ui-section` with `data-tone`) instead of writing new button/card/badge styles per page. Extend `ui.css` when something is missing.

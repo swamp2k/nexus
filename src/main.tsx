@@ -4,6 +4,7 @@ import App from "./App";
 import "leaflet/dist/leaflet.css";
 import "./styles.css";
 import "./navigation.css";
+import "./ui.css";
 import "./dashboard/dashboard.css";
 import "./home.css";
 import "./garmin.css";
