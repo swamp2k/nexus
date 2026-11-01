@@ -38,6 +38,11 @@
       "binding": "PCWATCH",
       "service": "pcwatch-worker",
       "entrypoint": "NexusIntegration"
+    },
+    {
+      "binding": "REPOBOARD",
+      "service": "repo-board",
+      "entrypoint": "NexusIntegration"
     }
   ],
   "r2_buckets": [
