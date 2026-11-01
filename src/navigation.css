@@ -11,3 +11,22 @@
 .menu-settings-line > :first-child { flex: 1 1 140px; }
 .menu-settings-buttons { display: flex; gap: 4px; }
 .menu-settings-buttons button { min-width: 36px; min-height: 36px; }
+
+.rb-bar { margin: 0 0 12px; }
+.rb-muted { color: var(--muted); }
+.rb-lanes { display: flex; gap: 12px; overflow-x: auto; align-items: flex-start; padding-bottom: 12px; }
+.rb-lane { flex: 0 0 300px; padding: 8px; border-radius: 10px; background: var(--surface-soft); }
+.rb-lane summary { font-weight: 800; cursor: pointer; padding: 4px; }
+.rb-lane-decide summary { color: var(--accent); }
+.rb-cards { display: grid; gap: 8px; margin-top: 6px; }
+.rb-card { padding: 10px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); }
+.rb-card header { display: flex; gap: 6px; align-items: center; margin-bottom: 4px; font-weight: 800; }
+.rb-card header a { color: var(--text); }
+.rb-tag { padding: 0 4px; border: 1px solid var(--border); border-radius: 4px; color: var(--muted); font-size: .7rem; font-weight: 400; }
+.rb-field { margin: 2px 0; font-size: .85rem; }
+.rb-field b { color: var(--muted); font-weight: 500; }
+.rb-pr { display: block; margin-top: 4px; color: var(--accent); font-size: .85rem; }
+.rb-warn { margin-top: 6px; color: var(--accent); font-size: .8rem; }
+.rb-card footer { display: flex; justify-content: space-between; align-items: center; margin-top: 8px; font-size: .75rem; }
+.rb-btns { display: flex; gap: 6px; }
+@media (max-width: 760px) { .rb-lanes { flex-direction: column; } .rb-lane { flex: auto; width: 100%; } }
