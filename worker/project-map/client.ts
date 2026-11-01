@@ -8,6 +8,7 @@ export type GithubRepo = {
 export type Worker = { id: string };
 export type WorkerDomain = { hostname: string; service: string; enabled?: boolean };
 export type WorkerPublicUrls = Record<string, string[]>;
+export type WorkerRoutes = Record<string, string[]>;
 
 function publicHost(raw: string): string | null {
   const value = raw.trim().toLowerCase();
@@ -75,7 +76,7 @@ async function cloudflareGet<T>(token: string, path: string): Promise<T> {
 export async function listCloudflareInventory(
   token: string,
   rawAccountId: string,
-): Promise<{ workers: Worker[]; pages: PagesProject[]; publicUrls: WorkerPublicUrls }> {
+): Promise<{ workers: Worker[]; pages: PagesProject[]; publicUrls: WorkerPublicUrls; routes: WorkerRoutes }> {
   const accountId = encodeURIComponent(rawAccountId);
   const workers = await cloudflareGet<Worker[]>(token, `/accounts/${accountId}/workers/scripts`);
   // Domain mappings are the authoritative public Worker hostnames.
@@ -91,6 +92,30 @@ export async function listCloudflareInventory(
     enabledScripts[worker.id] = result.enabled === true;
   }));
   const publicUrls = collectPublicUrls(workers, domains, subdomainResult.subdomain ?? null, enabledScripts);
+  // Best effort: zone routes need additional read permissions and are patterns, not proven public URLs.
+  const routes: WorkerRoutes = Object.fromEntries(workers.map((worker) => [worker.id, [] as string[]]));
+  try {
+    const zonesResponse = await fetch(`https://api.cloudflare.com/client/v4/zones?account.id=${accountId}&per_page=50`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    if (zonesResponse.ok) {
+      const zonesData = await zonesResponse.json() as { success: boolean; result: Array<{ id: string }> };
+      if (zonesData.success && Array.isArray(zonesData.result)) {
+        for (const zone of zonesData.result) {
+          const response = await fetch(`https://api.cloudflare.com/client/v4/zones/${encodeURIComponent(zone.id)}/workers/routes`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (!response.ok) continue;
+          const body = await response.json() as { success: boolean; result: Array<{ pattern: string; script?: string }> };
+          if (!body.success || !Array.isArray(body.result)) continue;
+          for (const route of body.result) {
+            if (route.script && routes[route.script] && typeof route.pattern === "string") routes[route.script].push(route.pattern);
+          }
+        }
+      }
+    }
+  } catch { /* Worker zone routes are optional. */ }
+  for (const name of Object.keys(routes)) routes[name] = [...new Set(routes[name])].sort();
   const pages: PagesProject[] = [];
 
   for (let page = 1; page <= 10; page += 1) {
@@ -109,5 +134,5 @@ export async function listCloudflareInventory(
     if (page >= (body.result_info?.total_pages ?? 1)) break;
   }
 
-  return { workers, pages, publicUrls };
+  return { workers, pages, publicUrls, routes };
 }
