@@ -1,0 +1,44 @@
+/* Fælles byggeklodser til nye sider: knapper, kort, mærkater, links og farvede kategorier.
+   Brug klasserne her i stedet for at lave nye knap-/kortstilarter pr. side. */
+
+/* Knapper: .ui-btn (neutral), + .ui-btn--primary (hovedhandling), .ui-btn--ghost (dæmpet) */
+.ui-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; min-height: 36px; padding: 7px 14px; border: 1px solid var(--border-strong); border-radius: 10px; background: var(--surface); color: var(--text); font: inherit; font-size: .86rem; font-weight: 700; cursor: pointer; }
+.ui-btn:hover { border-color: var(--accent); }
+.ui-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.ui-btn--primary { background: var(--accent-soft); border-color: transparent; color: var(--accent); }
+.ui-btn--primary:hover { background: color-mix(in srgb, var(--accent) 22%, var(--accent-soft)); }
+.ui-btn--ghost { background: transparent; border-color: transparent; color: var(--muted-strong); }
+.ui-btn--ghost:hover { background: var(--surface-soft); border-color: var(--border); }
+.ui-btn:disabled { opacity: .6; cursor: not-allowed; }
+
+/* Links uden understregning */
+.ui-link { color: var(--accent); text-decoration: none; }
+.ui-link:hover { text-decoration: underline; }
+
+/* Kort */
+.ui-card { display: grid; gap: 5px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 14px; background: var(--surface); }
+.ui-card-title { color: var(--text); font-weight: 800; font-size: 1.02rem; text-decoration: none; }
+a.ui-card-title:hover { color: var(--accent); }
+.ui-card-footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-top: 6px; }
+.ui-muted { color: var(--muted); }
+
+/* Mærkater: .ui-pill + .ui-pill--ok / --warn / --bad / --info */
+.ui-pill { display: inline-flex; align-items: center; width: fit-content; max-width: 100%; padding: 2px 9px; border: 1px solid var(--border); border-radius: 99px; background: var(--surface-soft); color: var(--muted-strong); font-size: .74rem; font-weight: 700; }
+.ui-pill--ok { border-color: transparent; background: color-mix(in srgb, var(--success) 16%, var(--surface)); color: var(--success); }
+.ui-pill--warn { border-color: transparent; background: color-mix(in srgb, var(--warning) 16%, var(--surface)); color: var(--warning); }
+.ui-pill--bad { border-color: transparent; background: color-mix(in srgb, var(--danger) 16%, var(--surface)); color: var(--danger); }
+.ui-pill--info { border-color: transparent; background: var(--accent-soft); color: var(--accent); }
+
+/* Farvede kategorier (sæt data-tone på sektionen): bad = røde, warn = gule, info = blå, ok = grønne, quiet = grå */
+.ui-section { --tone: var(--muted); --tone-soft: var(--surface-soft); padding: 8px 10px 12px; border-radius: 16px; background: var(--surface-soft); }
+.ui-section[data-tone="bad"] { --tone: var(--danger); --tone-soft: color-mix(in srgb, var(--danger) 14%, var(--surface)); }
+.ui-section[data-tone="warn"] { --tone: var(--warning); --tone-soft: color-mix(in srgb, var(--warning) 14%, var(--surface)); }
+.ui-section[data-tone="info"] { --tone: var(--accent); --tone-soft: var(--accent-soft); }
+.ui-section[data-tone="ok"] { --tone: var(--success); --tone-soft: color-mix(in srgb, var(--success) 14%, var(--surface)); }
+.ui-section > summary { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 10px; background: var(--tone-soft); color: var(--text); font-weight: 800; cursor: pointer; list-style: none; }
+.ui-section > summary::-webkit-details-marker { display: none; }
+.ui-section > summary::before { content: ""; width: 5px; height: 20px; border-radius: 3px; background: var(--tone); }
+.ui-section > summary::after { content: "›"; margin-left: auto; color: var(--muted); font-size: 1.2rem; transition: transform .15s; }
+.ui-section[open] > summary::after { transform: rotate(90deg); }
+.ui-section > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.ui-count { min-width: 22px; padding: 0 7px; border-radius: 99px; background: var(--tone); color: var(--surface); font-size: .78rem; font-weight: 800; text-align: center; }
