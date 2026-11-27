@@ -587,6 +587,132 @@
   padding-left: 22px;
 }
 
+.apps-tile-img {
+  width: 24px;
+  height: 24px;
+  object-fit: contain;
+  border-radius: 4px;
+  display: block;
+}
+
+.apps-tile-icon--sm .apps-tile-img {
+  width: 20px;
+  height: 20px;
+}
+
+.project-editor-icon-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.icon-candidates {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 4px;
+}
+
+.icon-candidate-btn {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface-soft);
+  cursor: pointer;
+}
+
+.icon-candidate-btn:hover {
+  border-color: var(--accent);
+}
+
+.icon-candidate-btn.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+}
+
+.icon-candidate-btn img {
+  width: 22px;
+  height: 22px;
+  object-fit: contain;
+}
+
+.emoji-picker {
+  margin-top: 6px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--surface-soft);
+  display: grid;
+  gap: 8px;
+}
+
+.emoji-picker-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.emoji-picker-search {
+  flex: 1;
+  padding: 6px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 0.84rem;
+}
+
+.emoji-picker-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.emoji-picker-tabs button {
+  padding: 3px 8px;
+  border: 1px solid var(--border);
+  border-radius: 99px;
+  background: var(--surface);
+  color: var(--muted-strong);
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.emoji-picker-tabs button.active {
+  background: var(--accent-soft);
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.emoji-picker-grid {
+  display: grid;
+  grid-template-columns: repeat(8, minmax(0, 1fr));
+  gap: 4px;
+  max-height: 170px;
+  overflow-y: auto;
+}
+
+.emoji-picker-btn {
+  display: grid;
+  place-items: center;
+  height: 34px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  font-size: 1.15rem;
+  cursor: pointer;
+}
+
+.emoji-picker-btn:hover {
+  background: var(--surface);
+}
+
 @media (max-width: 640px) {
   .apps-list-row {
     flex-wrap: wrap;

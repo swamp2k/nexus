@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
-import { categoryTone, projectMonogram } from "./catalogVisuals";
+import EmojiPicker from "./EmojiPicker";
+import { ProjectIcon } from "./catalogVisuals";
 
 export type ResourceKind = "repos" | "workers" | "pages" | "domains";
 export type ResourceInventory = Record<ResourceKind, string[]>;
@@ -121,12 +122,13 @@ function MultiSelect({
 }
 
 export default function ProjectMapEditor({
-  project, inventory, registry, repoMeta, prefill, existingCategories, onClose, onSaved,
+  project, inventory, registry, repoMeta, workerPublicUrls, prefill, existingCategories, onClose, onSaved,
 }: {
   project: EditableProject | null;
   inventory: ResourceInventory;
   registry: RegistryEntry[];
   repoMeta?: Record<string, RepoMeta>;
+  workerPublicUrls?: Record<string, string[]>;
   prefill?: EditorPrefill | null;
   existingCategories?: string[];
   onClose: () => void;
@@ -152,6 +154,58 @@ export default function ProjectMapEditor({
   const [confirmed, setConfirmed] = useState(original?.confirmed ?? false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [fetchingIcon, setFetchingIcon] = useState(false);
+  const [iconHint, setIconHint] = useState("");
+  const [iconCandidates, setIconCandidates] = useState<string[]>([]);
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+
+  const siteUrl = useMemo(() => {
+    const normalize = (raw: string | null | undefined): string | null => {
+      if (!raw?.trim()) return null;
+      const val = raw.trim().includes("://") ? raw.trim() : `https://${raw.trim()}`;
+      try {
+        const u = new URL(val);
+        return u.protocol === "https:" && u.hostname.includes(".") ? u.toString() : null;
+      } catch {
+        return null;
+      }
+    };
+    return (
+      normalize(productionUrl) ??
+      links.domains.map(normalize).find((u): u is string => Boolean(u)) ??
+      links.workers.flatMap((w) => workerPublicUrls?.[w] ?? []).map(normalize).find((u): u is string => Boolean(u)) ??
+      links.repos.map((r) => normalize(repoMeta?.[r]?.homepage)).find((u): u is string => Boolean(u)) ??
+      null
+    );
+  }, [productionUrl, links.domains, links.workers, links.repos, workerPublicUrls, repoMeta]);
+
+  async function fetchSiteIcon() {
+    if (!siteUrl) return;
+    setFetchingIcon(true);
+    setIconHint("");
+    setIconCandidates([]);
+    try {
+      const res = await fetch(`/api/project-map/icon?url=${encodeURIComponent(siteUrl)}`, {
+        credentials: "same-origin",
+        cache: "no-store",
+      });
+      if (!res.ok) throw new Error("fetch_failed");
+      const body = await res.json() as { iconUrl?: string | null; candidates?: string[] };
+      if (body.iconUrl) {
+        setIcon(body.iconUrl);
+        setIconCandidates(body.candidates ?? [body.iconUrl]);
+        setShowEmojiPicker(false);
+      } else {
+        setIconHint("Intet ikon fundet på siden — vælg en emoji");
+        setShowEmojiPicker(true);
+      }
+    } catch {
+      setIconHint("Kunne ikke hente ikon fra siden — vælg en emoji");
+      setShowEmojiPicker(true);
+    } finally {
+      setFetchingIcon(false);
+    }
+  }
 
   const hasPrivateRepo = useMemo(() => {
     if (!repoMeta) return false;
@@ -248,15 +302,67 @@ export default function ProjectMapEditor({
           </datalist>
         </label>
 
-        <label className="project-editor-field">
+        <div className="project-editor-field">
           <span>Ikon / Emoji (valgfrit)</span>
           <div className="project-editor-icon-wrap">
-            <span className="apps-tile-icon" data-tone={categoryTone(category)}>
-              {icon.trim() || projectMonogram(title || "A")}
-            </span>
-            <input maxLength={16} placeholder="fx 🚗 eller 🩺" value={icon} onChange={(event) => setIcon(event.target.value)} />
+            <ProjectIcon icon={icon} title={title || "A"} category={category} />
+            <input
+              maxLength={300}
+              placeholder="fx 🚗 eller https://…"
+              value={icon}
+              onChange={(event) => setIcon(event.target.value)}
+            />
           </div>
-        </label>
+          <div className="project-editor-icon-actions">
+            <button
+              type="button"
+              className="apps-btn-compact"
+              disabled={!siteUrl || fetchingIcon}
+              title={siteUrl ? `Hent ikon fra ${siteUrl}` : "Tilføj en produktions-URL eller domæne først"}
+              onClick={() => void fetchSiteIcon()}
+            >
+              {fetchingIcon ? "Henter…" : "Hent fra side"}
+            </button>
+            <button
+              type="button"
+              className="apps-btn-compact"
+              onClick={() => setShowEmojiPicker((cur) => !cur)}
+            >
+              Emoji
+            </button>
+            {icon.trim() && (
+              <button
+                type="button"
+                className="apps-btn-compact"
+                onClick={() => { setIcon(""); setIconCandidates([]); setIconHint(""); }}
+              >
+                Ryd
+              </button>
+            )}
+          </div>
+          {iconHint && <small className="settings-help">{iconHint}</small>}
+          {iconCandidates.length > 1 && (
+            <div className="icon-candidates">
+              {iconCandidates.map((url) => (
+                <button
+                  key={url}
+                  type="button"
+                  className={`icon-candidate-btn${icon.trim() === url ? " active" : ""}`}
+                  title={url}
+                  onClick={() => setIcon(url)}
+                >
+                  <img src={url} alt="" loading="lazy" referrerPolicy="no-referrer" />
+                </button>
+              ))}
+            </div>
+          )}
+          {showEmojiPicker && (
+            <EmojiPicker
+              onSelect={(emoji) => { setIcon(emoji); setIconHint(""); setIconCandidates([]); }}
+              onClose={() => setShowEmojiPicker(false)}
+            />
+          )}
+        </div>
       </div>
 
       <label className="project-editor-field">

@@ -4,6 +4,7 @@ import type { GithubRepo, PagesProject, RepoMeta, Worker, WorkerPublicUrls } fro
 import { getProjectMapCredentials, getProjectMapCredentialStatus } from "./credentials";
 import { handleProjectMapSettingsRoute } from "./settings-routes";
 import { applyRegistry, buildPublicApps, deleteRegistry, inventoryOf, parseRegistryEntry, readRegistry, resourceConflict, saveRegistry } from "./registry";
+import { fetchSiteIcons } from "./favicon";
 
 type ProjectMapEnv = Env & { ELOVERBLIK_CREDENTIALS_KEY?: string };
 
@@ -181,11 +182,22 @@ export async function handleProjectMapRoute(request: Request, env: ProjectMapEnv
   if (settingsResponse) return settingsResponse;
 
   const url = new URL(request.url);
-  if (url.pathname !== "/api/project-map" && url.pathname !== "/api/project-map/registry") return null;
+  if (url.pathname !== "/api/project-map" && url.pathname !== "/api/project-map/registry" && url.pathname !== "/api/project-map/icon") return null;
   if (!["GET", "POST", "PUT", "DELETE"].includes(request.method)) return json({ error: "method_not_allowed" }, { status: 405 });
 
   const auth = await requireAdmin(request, env);
   if (auth.response) return auth.response;
+
+  if (url.pathname === "/api/project-map/icon") {
+    if (request.method !== "GET") return json({ error: "method_not_allowed" }, { status: 405 });
+    const targetUrl = url.searchParams.get("url") ?? "";
+    try {
+      const result = await fetchSiteIcons(targetUrl);
+      return json({ ok: true, ...result });
+    } catch {
+      return json({ error: "invalid_url" }, { status: 400 });
+    }
+  }
 
   if (url.pathname === "/api/project-map/registry") {
     if (request.method === "GET") return json({ entries: await readRegistry(env.DB) });
@@ -203,6 +215,9 @@ export async function handleProjectMapRoute(request: Request, env: ProjectMapEnv
       const code = error instanceof Error ? error.message : "invalid_project_registry_entry";
       if (code === "invalid_production_url") {
         return json({ error: code, detail: "Produktions-URL skal være en gyldig https://-adresse." }, { status: 400 });
+      }
+      if (code === "invalid_icon") {
+        return json({ error: code, detail: "Ikon skal være en emoji/kort tekst eller en gyldig https://-adresse." }, { status: 400 });
       }
       return json({ error: "invalid_project_registry_entry" }, { status: 400 });
     }

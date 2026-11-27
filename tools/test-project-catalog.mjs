@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import { applyRegistry, buildPublicApps, parseRegistryEntry } from "../worker/project-map/registry.ts";
+import { extractIconCandidates, isSafePublicHost } from "../worker/project-map/favicon.ts";
 
 // 1. parseRegistryEntry: valid fields + defaults
 const parsed = parseRegistryEntry({
@@ -169,3 +170,55 @@ assert.equal(publicApps[1].description, "Safe custom description");
 assert.equal(publicApps[1].productionUrl, "https://app.example.com");
 
 console.log("test-project-catalog: all assertions passed");
+
+// 4. icon URLs & favicon extraction safety
+const urlIconEntry = parseRegistryEntry({
+  id: "icon-url-app",
+  title: "Icon URL App",
+  repos: [],
+  workers: [],
+  pages: [],
+  domains: [],
+  icon: "https://example.com/favicon.png",
+});
+assert.equal(urlIconEntry.icon, "https://example.com/favicon.png");
+
+assert.throws(() => parseRegistryEntry({
+  id: "bad-icon-http",
+  title: "Bad Icon",
+  repos: [],
+  workers: [],
+  pages: [],
+  domains: [],
+  icon: "http://example.com/favicon.png",
+}), /invalid_icon/);
+
+assert.throws(() => parseRegistryEntry({
+  id: "bad-icon-data",
+  title: "Bad Icon",
+  repos: [],
+  workers: [],
+  pages: [],
+  domains: [],
+  icon: "data:image/png;base64,AAA",
+}), /invalid_icon/);
+
+assert.equal(isSafePublicHost("example.com"), true);
+assert.equal(isSafePublicHost("localhost"), false);
+assert.equal(isSafePublicHost("127.0.0.1"), false);
+assert.equal(isSafePublicHost("192.168.1.1"), false);
+assert.equal(isSafePublicHost("169.254.169.254"), false);
+assert.equal(isSafePublicHost("[::1]"), false);
+
+const html = `
+  <link rel="icon" href="/favicon.ico">
+  <link rel="icon" type="image/svg+xml" href="/logo.svg">
+  <link rel="apple-touch-icon" href="https://cdn.example.com/apple-touch.png">
+  <link rel="icon" href="http://insecure.example.com/bad.png">
+  <link rel="icon" href="javascript:alert(1)">
+`;
+const candidates = extractIconCandidates(html, "https://app.example.com/home");
+assert.equal(candidates[0], "https://cdn.example.com/apple-touch.png");
+assert.equal(candidates[1], "https://app.example.com/logo.svg");
+assert.equal(candidates[2], "https://app.example.com/favicon.ico");
+assert.ok(!candidates.some((c) => c.startsWith("http://") || c.startsWith("javascript:")));
