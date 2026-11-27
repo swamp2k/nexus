@@ -3,10 +3,10 @@ import {
   GithubIcon,
   GridIcon,
   ListIcon,
+  ProjectIcon,
   categoryTone,
   displayHost,
   groupIntoShelves,
-  projectMonogram,
 } from "./catalogVisuals";
 import type { CategoryTone } from "./catalogVisuals";
 
@@ -122,13 +122,12 @@ export default function PublicAppsPage({
     const preferred = assets.filter((a) => isPreferredAsset(a.name));
     const primaryAsset = preferred[0] ?? assets[0] ?? null;
     const tone = categoryTone(app.category);
-    const glyph = app.icon?.trim() || projectMonogram(app.title);
     const host = displayHost(app.productionUrl);
 
     if (viewMode === "list") {
       return (
         <div className="apps-list-row" data-tone={tone} key={app.id}>
-          <span className="apps-tile-icon apps-tile-icon--sm" data-tone={tone} aria-hidden="true">{glyph}</span>
+          <ProjectIcon icon={app.icon} title={app.title} category={app.category} size="sm" />
           <div className="apps-list-main">
             <div className="apps-list-title-row">
               <strong>{app.title}</strong>
@@ -181,7 +180,7 @@ export default function PublicAppsPage({
     return (
       <article className="apps-tile" data-tone={tone} key={app.id}>
         <div className="apps-tile-head">
-          <span className="apps-tile-icon" data-tone={tone} aria-hidden="true">{glyph}</span>
+          <ProjectIcon icon={app.icon} title={app.title} category={app.category} />
           <div className="apps-tile-title-wrap">
             <div className="apps-tile-title-row">
               <h3>{app.title}</h3>

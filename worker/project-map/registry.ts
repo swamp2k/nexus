@@ -139,8 +139,20 @@ export function parseRegistryEntry(value: unknown): RegistryEntry {
   if (description.length > 400) throw new Error("invalid_description");
   const category = typeof record.category === "string" ? record.category.trim() : "";
   if (category.length > 40) throw new Error("invalid_category");
-  const icon = typeof record.icon === "string" ? record.icon.trim() : "";
-  if (icon.length > 16) throw new Error("invalid_icon");
+  const rawIcon = typeof record.icon === "string" ? record.icon.trim() : "";
+  let icon = "";
+  if (rawIcon) {
+    if (rawIcon.includes("://") || /^(http|javascript|data):/i.test(rawIcon)) {
+      try {
+        icon = normalizeOptionalHttpsUrl(rawIcon);
+      } catch {
+        throw new Error("invalid_icon");
+      }
+    } else {
+      if (rawIcon.length > 16) throw new Error("invalid_icon");
+      icon = rawIcon;
+    }
+  }
 
   return {
     id: record.id,

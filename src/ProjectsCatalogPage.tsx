@@ -9,10 +9,10 @@ import {
   GlobeIcon,
   GridIcon,
   ListIcon,
+  ProjectIcon,
   categoryTone,
   displayHost,
   groupIntoShelves,
-  projectMonogram,
 } from "./catalogVisuals";
 import type { CategoryTone } from "./catalogVisuals";
 
@@ -276,7 +276,6 @@ export default function ProjectsCatalogPage() {
     const desc = project.description?.trim() || firstMeta?.description?.trim() || "";
     const host = displayHost(prodUrl);
     const tone = categoryTone(project.category ?? "");
-    const glyph = project.icon?.trim() || projectMonogram(project.title);
     const preferredAsset = latestRelease?.assets.find((a) => /\.(exe|msi|dmg|appimage|deb|zip)$/i.test(a.name)) ?? latestRelease?.assets[0];
 
     const iconActions = (
@@ -329,7 +328,7 @@ export default function ProjectsCatalogPage() {
     if (viewMode === "list") {
       return (
         <div className="apps-list-row" data-tone={tone} key={project.id}>
-          <span className="apps-tile-icon apps-tile-icon--sm" data-tone={tone} aria-hidden="true">{glyph}</span>
+          <ProjectIcon icon={project.icon} title={project.title} category={project.category} size="sm" />
           <div className="apps-list-main">
             <div className="apps-list-title-row">
               <strong>{project.title}</strong>
@@ -375,7 +374,7 @@ export default function ProjectsCatalogPage() {
     return (
       <article className="apps-tile" data-tone={tone} key={project.id}>
         <div className="apps-tile-head">
-          <span className="apps-tile-icon" data-tone={tone} aria-hidden="true">{glyph}</span>
+          <ProjectIcon icon={project.icon} title={project.title} category={project.category} />
           <div className="apps-tile-title-wrap">
             <div className="apps-tile-title-row">
               <h3>{project.title}</h3>
@@ -587,6 +586,7 @@ export default function ProjectsCatalogPage() {
           inventory={data.inventory}
           registry={data.registry}
           repoMeta={data.repoMeta}
+          workerPublicUrls={data.workerPublicUrls}
           prefill={editing === "new" ? prefill : null}
           existingCategories={categories.map((c) => c.name)}
           onClose={() => { setEditing(null); setPrefill(null); }}

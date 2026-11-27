@@ -1,4 +1,51 @@
+import { useEffect, useState } from "react";
+
 export type CategoryTone = "blue" | "emerald" | "violet" | "amber" | "rose" | "teal" | "slate";
+
+export function isIconUrl(value: string | null | undefined): boolean {
+  return Boolean(value && /^https:\/\//i.test(value.trim()));
+}
+
+export function ProjectIcon({
+  icon,
+  title,
+  category,
+  size = "md",
+}: {
+  icon?: string;
+  title: string;
+  category?: string;
+  size?: "md" | "sm";
+}) {
+  const [imgError, setImgError] = useState(false);
+  useEffect(() => {
+    setImgError(false);
+  }, [icon]);
+
+  const tone = categoryTone(category ?? "");
+  const cls = size === "sm" ? "apps-tile-icon apps-tile-icon--sm" : "apps-tile-icon";
+
+  if (isIconUrl(icon) && !imgError) {
+    return (
+      <span className={cls} data-tone={tone} aria-hidden="true">
+        <img
+          className="apps-tile-img"
+          src={icon!.trim()}
+          alt=""
+          loading="lazy"
+          referrerPolicy="no-referrer"
+          onError={() => setImgError(true)}
+        />
+      </span>
+    );
+  }
+
+  return (
+    <span className={cls} data-tone={tone} aria-hidden="true">
+      {icon?.trim() || projectMonogram(title)}
+    </span>
+  );
+}
 
 const HASH_TONES: CategoryTone[] = ["blue", "emerald", "violet", "amber", "rose", "teal"];
 
