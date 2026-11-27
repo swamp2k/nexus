@@ -17,11 +17,24 @@ const parsed = parseRegistryEntry({
   showRepoPublic: true,
   hidden: false,
   pinned: true,
+  icon: "🩺",
 });
 assert.equal(parsed.isPublic, true);
 assert.equal(parsed.showRepoPublic, true);
 assert.equal(parsed.pinned, true);
+assert.equal(parsed.icon, "🩺");
 assert.equal(parsed.productionUrl, "https://example.com");
+
+// 1b. parseRegistryEntry: rejects icon > 16 chars
+assert.throws(() => parseRegistryEntry({
+  id: "bad-icon",
+  title: "Bad Icon",
+  repos: [],
+  workers: [],
+  pages: [],
+  domains: [],
+  icon: "12345678901234567",
+}), /invalid_icon/);
 
 // 2. parseRegistryEntry: rejects non-https productionUrl
 assert.throws(() => parseRegistryEntry({
@@ -144,6 +157,7 @@ const publicApps = buildPublicApps(snapshot, entries);
 assert.equal(publicApps.length, 2);
 // Pinned first ("PC Doctor"), then "Alpha Public"
 assert.equal(publicApps[0].id, "pc-doctor");
+assert.equal(publicApps[0].icon, "🩺");
 assert.equal(publicApps[0].repoUrl, "https://github.com/swamp2k/PCDoctor");
 assert.equal(publicApps[0].latestRelease?.tag, "v1.0.42");
 

@@ -21,6 +21,7 @@ export type MapProject = {
   showRepoPublic?: boolean;
   hidden?: boolean;
   pinned?: boolean;
+  icon?: string;
 };
 
 export type MapSnapshot = {
@@ -51,6 +52,7 @@ export type RegistryEntry = {
   showRepoPublic: boolean;
   hidden: boolean;
   pinned: boolean;
+  icon: string;
 };
 
 export type PublicApp = {
@@ -58,6 +60,7 @@ export type PublicApp = {
   title: string;
   description: string;
   category: string;
+  icon: string;
   productionUrl: string | null;
   repoUrl: string | null;
   latestRelease: {
@@ -136,6 +139,8 @@ export function parseRegistryEntry(value: unknown): RegistryEntry {
   if (description.length > 400) throw new Error("invalid_description");
   const category = typeof record.category === "string" ? record.category.trim() : "";
   if (category.length > 40) throw new Error("invalid_category");
+  const icon = typeof record.icon === "string" ? record.icon.trim() : "";
+  if (icon.length > 16) throw new Error("invalid_icon");
 
   return {
     id: record.id,
@@ -152,13 +157,14 @@ export function parseRegistryEntry(value: unknown): RegistryEntry {
     showRepoPublic: record.showRepoPublic !== false,
     hidden: record.hidden === true,
     pinned: record.pinned === true,
+    icon,
   };
 }
 
 export async function readRegistry(db: D1Database): Promise<RegistryEntry[]> {
   const rows = await db.prepare(
     `SELECT id, title, repos_json, workers_json, pages_json, domains_json, confirmed,
-            description, category, production_url, is_public, show_repo_public, hidden, pinned
+            description, category, production_url, is_public, show_repo_public, hidden, pinned, icon
      FROM project_map_registry`
   ).all<{
     id: string;
@@ -175,6 +181,7 @@ export async function readRegistry(db: D1Database): Promise<RegistryEntry[]> {
     show_repo_public: number;
     hidden: number;
     pinned: number;
+    icon: string;
   }>();
   return (rows.results ?? []).map((row) => ({
     id: row.id,
@@ -191,6 +198,7 @@ export async function readRegistry(db: D1Database): Promise<RegistryEntry[]> {
     showRepoPublic: row.show_repo_public !== 0,
     hidden: row.hidden === 1,
     pinned: row.pinned === 1,
+    icon: row.icon ?? "",
   }));
 }
 
@@ -198,9 +206,9 @@ export async function saveRegistry(db: D1Database, entry: RegistryEntry): Promis
   await db.prepare(
     `INSERT INTO project_map_registry (
        id, title, repos_json, workers_json, pages_json, domains_json, confirmed,
-       description, category, production_url, is_public, show_repo_public, hidden, pinned, updated_at
+       description, category, production_url, is_public, show_repo_public, hidden, pinned, icon, updated_at
      )
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
      ON CONFLICT(id) DO UPDATE SET
        title=excluded.title,
        repos_json=excluded.repos_json,
@@ -215,6 +223,7 @@ export async function saveRegistry(db: D1Database, entry: RegistryEntry): Promis
        show_repo_public=excluded.show_repo_public,
        hidden=excluded.hidden,
        pinned=excluded.pinned,
+       icon=excluded.icon,
        updated_at=CURRENT_TIMESTAMP`
   ).bind(
     entry.id,
@@ -231,6 +240,7 @@ export async function saveRegistry(db: D1Database, entry: RegistryEntry): Promis
     entry.showRepoPublic ? 1 : 0,
     entry.hidden ? 1 : 0,
     entry.pinned ? 1 : 0,
+    entry.icon,
   ).run();
 }
 
@@ -278,6 +288,7 @@ export function applyRegistry(snapshot: MapSnapshot, entries: RegistryEntry[]) {
         showRepoPublic: manual.showRepoPublic,
         hidden: manual.hidden,
         pinned: manual.pinned,
+        icon: manual.icon,
         warnings: KINDS.flatMap((kind) => manual[kind].filter((name) => !inventory[kind].includes(name)).map((name) => `Missing from latest scan: ${name}`)),
       });
       continue;
@@ -305,6 +316,7 @@ export function applyRegistry(snapshot: MapSnapshot, entries: RegistryEntry[]) {
       showRepoPublic: true,
       hidden: false,
       pinned: false,
+      icon: "",
       warnings: altered ? ["Remaining unconfirmed resources; other links were assigned manually"] : original.warnings,
     });
   }
@@ -369,6 +381,7 @@ export function buildPublicApps(snapshot: MapSnapshot | null, entries: RegistryE
       title: entry.title,
       description,
       category: entry.category.trim(),
+      icon: entry.icon,
       productionUrl,
       repoUrl,
       latestRelease: releaseRepo?.latestRelease ?? null,
