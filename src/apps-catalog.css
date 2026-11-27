@@ -1,0 +1,193 @@
+/* Public /apps showcase and admin Projects Catalog */
+.public-apps-shell {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: radial-gradient(circle at 88% 4%, color-mix(in srgb, var(--accent) 6%, transparent), transparent 32%), var(--bg);
+}
+
+.public-apps-header {
+  width: min(100% - 32px, 1120px);
+  margin: 0 auto;
+  padding: 20px 0 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.public-apps-brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.public-apps-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.public-apps-main {
+  width: min(100% - 32px, 1120px);
+  margin: 0 auto;
+  padding: 18px 0 40px;
+  display: grid;
+  gap: 18px;
+}
+
+.public-apps-intro h1 {
+  margin: 0 0 6px;
+  font-size: clamp(1.8rem, 4vw, 2.5rem);
+  letter-spacing: -0.04em;
+}
+
+.public-apps-intro p {
+  margin: 0;
+  font-size: 1rem;
+}
+
+.public-apps-footer {
+  width: min(100% - 32px, 1120px);
+  margin: auto auto 0;
+  padding: 20px 0 28px;
+  display: flex;
+  justify-content: space-between;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.apps-catalog-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.apps-search {
+  flex: 1 1 240px;
+  max-width: 380px;
+  padding: 9px 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+}
+
+.apps-search:focus {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.apps-catalog-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 14px;
+}
+
+.apps-catalog-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 16px;
+}
+
+.apps-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.apps-card-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.apps-card-desc {
+  margin: 0;
+  font-size: 0.92rem;
+  line-height: 1.5;
+  flex: 1;
+}
+
+.apps-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 2px;
+}
+
+.apps-assets-details {
+  font-size: 0.82rem;
+}
+
+.apps-assets-details summary {
+  cursor: pointer;
+}
+
+.apps-assets-list {
+  margin: 6px 0 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 4px;
+}
+
+.apps-unmapped-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.apps-unmapped-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.apps-unmapped-info {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.apps-unmapped-info p {
+  width: 100%;
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.login-public-link {
+  margin-top: 22px;
+  padding-top: 16px;
+  border-top: 1px solid var(--border);
+  text-align: center;
+  font-size: 0.9rem;
+}
+
+.project-editor-field textarea {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  resize: vertical;
+}
+
+.project-editor-flags {
+  display: grid;
+  gap: 8px;
+}
+
+.project-editor-confirm--nested {
+  padding-left: 22px;
+}

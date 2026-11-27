@@ -1,8 +1,39 @@
+export type ReleaseAsset = {
+  name: string;
+  downloadUrl: string;
+  size: number;
+};
+
+export type RepoRelease = {
+  tag: string;
+  name: string;
+  url: string;
+  publishedAt: string | null;
+  assets: ReleaseAsset[];
+};
+
+export type RepoMeta = {
+  fullName: string;
+  url: string;
+  isPrivate: boolean;
+  archived: boolean;
+  description: string | null;
+  homepage: string | null;
+  pushedAt: string | null;
+  latestRelease: RepoRelease | null;
+};
+
 export type GithubRepo = {
   name: string;
   full_name: string;
   archived: boolean;
   default_branch: string;
+  private?: boolean;
+  description?: string | null;
+  homepage?: string | null;
+  html_url?: string;
+  pushed_at?: string | null;
+  latestRelease?: RepoRelease | null;
 };
 
 export type Worker = { id: string };
@@ -49,7 +80,121 @@ export type PagesProject = {
   };
 };
 
+const GITHUB_GRAPHQL_QUERY = `query {
+  viewer {
+    repositories(first: 100, ownerAffiliations: OWNER, orderBy: { field: UPDATED_AT, direction: DESC }) {
+      nodes {
+        name
+        nameWithOwner
+        url
+        isPrivate
+        isArchived
+        description
+        homepageUrl
+        pushedAt
+        defaultBranchRef { name }
+        latestRelease {
+          tagName
+          name
+          url
+          publishedAt
+          isDraft
+          isPrerelease
+          releaseAssets(first: 12) {
+            nodes {
+              name
+              downloadUrl
+              size
+            }
+          }
+        }
+      }
+    }
+  }
+}`;
+
+type GraphQLRepoNode = {
+  name?: string;
+  nameWithOwner?: string;
+  url?: string;
+  isPrivate?: boolean;
+  isArchived?: boolean;
+  description?: string | null;
+  homepageUrl?: string | null;
+  pushedAt?: string | null;
+  defaultBranchRef?: { name?: string } | null;
+  latestRelease?: {
+    tagName?: string;
+    name?: string | null;
+    url?: string;
+    publishedAt?: string | null;
+    isDraft?: boolean;
+    isPrerelease?: boolean;
+    releaseAssets?: {
+      nodes?: Array<{ name?: string; downloadUrl?: string; size?: number }>;
+    } | null;
+  } | null;
+};
+
+async function listGithubReposGraphQL(token: string): Promise<GithubRepo[] | null> {
+  try {
+    const response = await fetch("https://api.github.com/graphql", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${token}`,
+        Accept: "application/vnd.github+json",
+        "Content-Type": "application/json",
+        "User-Agent": "Nexus-Project-Map",
+      },
+      body: JSON.stringify({ query: GITHUB_GRAPHQL_QUERY }),
+    });
+    if (!response.ok) return null;
+    const body = await response.json() as {
+      data?: { viewer?: { repositories?: { nodes?: GraphQLRepoNode[] } } };
+      errors?: unknown[];
+    };
+    if (body.errors?.length || !body.data?.viewer?.repositories?.nodes) return null;
+
+    return body.data.viewer.repositories.nodes
+      .filter((node): node is GraphQLRepoNode & { name: string; nameWithOwner: string } =>
+        Boolean(node.name && node.nameWithOwner))
+      .map((node) => {
+        const rel = node.latestRelease;
+        const latestRelease: RepoRelease | null = rel && !rel.isDraft && rel.tagName && rel.url
+          ? {
+              tag: rel.tagName,
+              name: rel.name?.trim() || rel.tagName,
+              url: rel.url,
+              publishedAt: rel.publishedAt ?? null,
+              assets: (rel.releaseAssets?.nodes ?? [])
+                .filter((a): a is { name: string; downloadUrl: string; size?: number } =>
+                  Boolean(a?.name && a?.downloadUrl))
+                .map((a) => ({ name: a.name, downloadUrl: a.downloadUrl, size: typeof a.size === "number" ? a.size : 0 })),
+            }
+          : null;
+
+        return {
+          name: node.name,
+          full_name: node.nameWithOwner,
+          archived: node.isArchived === true,
+          default_branch: node.defaultBranchRef?.name || "main",
+          private: node.isPrivate === true,
+          description: node.description ?? null,
+          homepage: node.homepageUrl ?? null,
+          html_url: node.url,
+          pushed_at: node.pushedAt ?? null,
+          latestRelease,
+        };
+      });
+  } catch {
+    return null;
+  }
+}
+
 export async function listGithubRepos(token: string): Promise<GithubRepo[]> {
+  const graphqlRepos = await listGithubReposGraphQL(token);
+  if (graphqlRepos) return graphqlRepos;
+
   const response = await fetch("https://api.github.com/user/repos?affiliation=owner&per_page=100&sort=updated", {
     headers: {
       Authorization: `Bearer ${token}`,
@@ -59,7 +204,8 @@ export async function listGithubRepos(token: string): Promise<GithubRepo[]> {
     },
   });
   if (!response.ok) throw new Error(`github_repos_${response.status}`);
-  return response.json<GithubRepo[]>();
+  const repos = await response.json<GithubRepo[]>();
+  return repos.map((repo) => ({ ...repo, latestRelease: null }));
 }
 
 async function cloudflareGet<T>(token: string, path: string): Promise<T> {

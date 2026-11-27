@@ -3,6 +3,23 @@ import { useEffect, useMemo, useState } from "react";
 export type ResourceKind = "repos" | "workers" | "pages" | "domains";
 export type ResourceInventory = Record<ResourceKind, string[]>;
 
+export type RepoMeta = {
+  fullName: string;
+  url: string;
+  isPrivate: boolean;
+  archived: boolean;
+  description: string | null;
+  homepage: string | null;
+  pushedAt: string | null;
+  latestRelease: {
+    tag: string;
+    name: string;
+    url: string;
+    publishedAt: string | null;
+    assets: Array<{ name: string; downloadUrl: string; size: number }>;
+  } | null;
+};
+
 export type RegistryEntry = {
   id: string;
   title: string;
@@ -11,6 +28,13 @@ export type RegistryEntry = {
   pages: string[];
   domains: string[];
   confirmed: boolean;
+  description?: string;
+  category?: string;
+  productionUrl?: string;
+  isPublic?: boolean;
+  showRepoPublic?: boolean;
+  hidden?: boolean;
+  pinned?: boolean;
 };
 
 export type EditableProject = {
@@ -23,6 +47,21 @@ export type EditableProject = {
   domains: string[];
   confirmed?: boolean;
   manual?: boolean;
+  description?: string;
+  category?: string;
+  productionUrl?: string;
+  isPublic?: boolean;
+  showRepoPublic?: boolean;
+  hidden?: boolean;
+  pinned?: boolean;
+};
+
+export type EditorPrefill = {
+  id?: string;
+  title?: string;
+  repos?: string[];
+  description?: string;
+  productionUrl?: string;
 };
 
 const FIELDS: Array<{ kind: ResourceKind; label: string; hint: string }> = [
@@ -31,6 +70,8 @@ const FIELDS: Array<{ kind: ResourceKind; label: string; hint: string }> = [
   { kind: "pages", label: "Cloudflare Pages", hint: "Søg i Pages-projekter" },
   { kind: "domains", label: "Domæner", hint: "Søg i domæner" },
 ];
+
+const CATEGORY_SUGGESTIONS = ["Web Apps", "Desktop Tools", "Home & Servers", "Utilities", "Other"];
 
 function slugify(value: string) {
   return value.toLowerCase().trim().replace(/[^a-z0-9_-]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 100);
@@ -77,19 +118,28 @@ function MultiSelect({
 }
 
 export default function ProjectMapEditor({
-  project, inventory, registry, onClose, onSaved,
+  project, inventory, registry, repoMeta, prefill, onClose, onSaved,
 }: {
   project: EditableProject | null;
   inventory: ResourceInventory;
   registry: RegistryEntry[];
+  repoMeta?: Record<string, RepoMeta>;
+  prefill?: EditorPrefill | null;
   onClose: () => void;
   onSaved: () => Promise<void>;
 }) {
   const original = registry.find((entry) => entry.id === project?.id);
-  const [title, setTitle] = useState(original?.title ?? project?.title ?? "");
-  const [id, setId] = useState(project?.id ?? "");
+  const [title, setTitle] = useState(original?.title ?? project?.title ?? prefill?.title ?? "");
+  const [id, setId] = useState(project?.id ?? prefill?.id ?? "");
+  const [description, setDescription] = useState(original?.description ?? project?.description ?? prefill?.description ?? "");
+  const [category, setCategory] = useState(original?.category ?? project?.category ?? "");
+  const [productionUrl, setProductionUrl] = useState(original?.productionUrl ?? project?.productionUrl ?? prefill?.productionUrl ?? "");
+  const [isPublic, setIsPublic] = useState(original?.isPublic ?? project?.isPublic ?? false);
+  const [showRepoPublic, setShowRepoPublic] = useState(original?.showRepoPublic ?? project?.showRepoPublic ?? true);
+  const [pinned, setPinned] = useState(original?.pinned ?? project?.pinned ?? false);
+  const [hidden, setHidden] = useState(original?.hidden ?? project?.hidden ?? false);
   const [links, setLinks] = useState<ResourceInventory>({
-    repos: original?.repos ?? project?.repos ?? (project?.repo ? [project.repo] : []),
+    repos: original?.repos ?? project?.repos ?? (project?.repo ? [project.repo] : prefill?.repos ?? []),
     workers: original?.workers ?? project?.workers ?? [],
     pages: original?.pages ?? project?.pages ?? [],
     domains: original?.domains ?? project?.domains ?? [],
@@ -97,6 +147,11 @@ export default function ProjectMapEditor({
   const [confirmed, setConfirmed] = useState(original?.confirmed ?? false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+
+  const hasPrivateRepo = useMemo(() => {
+    if (!repoMeta) return false;
+    return links.repos.some((name) => repoMeta[name]?.isPrivate === true);
+  }, [links.repos, repoMeta]);
 
   // Ownership is determined only by manual assignments, not automatic discovery suggestions.
   const owners = useMemo(() => Object.fromEntries(FIELDS.map(({ kind }) => [
@@ -117,7 +172,19 @@ export default function ProjectMapEditor({
       const response = await fetch("/api/project-map/registry", {
         method: "PUT", credentials: "same-origin", cache: "no-store",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ id: finalId, title: title.trim(), ...links, confirmed }),
+        body: JSON.stringify({
+          id: finalId,
+          title: title.trim(),
+          ...links,
+          confirmed,
+          description: description.trim(),
+          category: category.trim(),
+          productionUrl: productionUrl.trim(),
+          isPublic,
+          showRepoPublic,
+          hidden,
+          pinned,
+        }),
       });
       if (!response.ok) {
         const result = await response.json() as { error?: string; detail?: string };
@@ -153,13 +220,58 @@ export default function ProjectMapEditor({
       </header>
       <label className="project-editor-field"><span>Projektnavn</span><input value={title} maxLength={120} onChange={(event) => setTitle(event.target.value)} /></label>
       {!project && <label className="project-editor-field"><span>Projekt-ID (valgfrit)</span><input value={id} maxLength={100} placeholder={slugify(title) || "project-id"} onChange={(event) => setId(event.target.value)} /></label>}
+
+      <label className="project-editor-field">
+        <span>Beskrivelse</span>
+        <textarea rows={2} maxLength={400} placeholder="Kort beskrivelse af hvad projektet gør…" value={description} onChange={(event) => setDescription(event.target.value)} />
+      </label>
+
+      <label className="project-editor-field">
+        <span>Kategori</span>
+        <input list="project-category-suggestions" maxLength={40} placeholder="fx Web Apps, Desktop Tools…" value={category} onChange={(event) => setCategory(event.target.value)} />
+        <datalist id="project-category-suggestions">
+          {CATEGORY_SUGGESTIONS.map((item) => <option key={item} value={item} />)}
+        </datalist>
+      </label>
+
+      <label className="project-editor-field">
+        <span>Produktions-URL (valgfrit)</span>
+        <input type="url" maxLength={300} placeholder="https://…" value={productionUrl} onChange={(event) => setProductionUrl(event.target.value)} />
+        <small className="settings-help">Overskriver automatisk domæne/Worker-link i oversigten og på /apps.</small>
+      </label>
+
       <p className="settings-help">Vælg én eller flere ressourcer. Ressourcer, der allerede er manuelt tilknyttet et andet projekt, er låst.</p>
       {FIELDS.map(({ kind, label, hint }) => <MultiSelect key={kind} label={label} hint={hint}
         items={[...new Set([...(inventory[kind] ?? []), ...links[kind]])].sort()}
         selected={links[kind]} owners={owners[kind]}
         onChange={(next) => { setLinks((old) => ({ ...old, [kind]: next })); setConfirmed(false); }} />)}
-      <label className="project-editor-confirm"><input type="checkbox" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} />
-        <span>Jeg har gennemgået og bekræftet forbindelserne</span></label>
+
+      <div className="project-editor-flags">
+        <label className="project-editor-confirm">
+          <input type="checkbox" checked={isPublic} onChange={(event) => setIsPublic(event.target.checked)} />
+          <span>Vis offentligt på <code>/apps</code></span>
+        </label>
+        {isPublic && hasPrivateRepo && (
+          <p className="settings-help">Et tilknyttet repo er privat — kun titel, beskrivelse og produktions-URL vises offentligt.</p>
+        )}
+        <label className="project-editor-confirm project-editor-confirm--nested">
+          <input type="checkbox" checked={showRepoPublic} disabled={!isPublic} onChange={(event) => setShowRepoPublic(event.target.checked)} />
+          <span>Vis GitHub-link offentligt</span>
+        </label>
+        <label className="project-editor-confirm">
+          <input type="checkbox" checked={pinned} onChange={(event) => setPinned(event.target.checked)} />
+          <span>Fastgør øverst</span>
+        </label>
+        <label className="project-editor-confirm">
+          <input type="checkbox" checked={hidden} onChange={(event) => setHidden(event.target.checked)} />
+          <span>Skjul i oversigten</span>
+        </label>
+        <label className="project-editor-confirm">
+          <input type="checkbox" checked={confirmed} onChange={(event) => setConfirmed(event.target.checked)} />
+          <span>Jeg har gennemgået og bekræftet forbindelserne</span>
+        </label>
+      </div>
+
       {error && <p className="settings-feedback error" role="alert">{error}</p>}
       <div className="project-editor-actions">
         {original && <button type="button" className="secondary-action" disabled={saving} onClick={() => void reset()}>Fjern override</button>}

@@ -29,6 +29,7 @@ import "./integrations.css";
 import "./display-pairing.css";
 import "./displays.css";
 import "./project-map.css";
+import "./apps-catalog.css";
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>

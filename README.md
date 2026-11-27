@@ -127,6 +127,10 @@ External specialist projects remain the source of truth for their own domains. N
 
 `/display` is a kiosk-style view intended for a shared tablet. A device is paired once with a code from the Displays page and then shows its assigned dashboard without a login. It has no normal app chrome, fills the screen, refreshes automatically and renders the same widgets as Home.
 
+## Projects & Public Apps (`/apps`)
+
+Admins have a unified **Projects** area with three tabs: **Oversigt** (a friendly catalog with descriptions, production links, and GitHub Release downloads), **Repo Board**, and **Project Map**. Individual projects can be marked **Public** to appear on the login-free `/apps` showcase (linked from the login screen).
+
 ## Data strategy
 
 ### D1
