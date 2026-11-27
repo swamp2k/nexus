@@ -219,10 +219,12 @@ export default function ProjectMapEditor({
   ])) as Record<ResourceKind, Record<string, string>>, [registry, project, id]);
 
   useEffect(() => {
-    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape" && !showEmojiPicker) onClose();
+    };
     window.addEventListener("keydown", closeOnEscape);
     return () => window.removeEventListener("keydown", closeOnEscape);
-  }, [onClose]);
+  }, [onClose, showEmojiPicker]);
 
   async function save() {
     setSaving(true); setError("");

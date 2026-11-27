@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 type EmojiItem = { emoji: string; keywords: string };
 type EmojiCategory = { id: string; label: string; items: EmojiItem[] };
@@ -102,6 +102,17 @@ export default function EmojiPicker({
   const [search, setSearch] = useState("");
   const [activeCat, setActiveCat] = useState<string>("all");
 
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.stopPropagation();
+        onClose();
+      }
+    };
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  }, [onClose]);
+
   const visibleItems = useMemo(() => {
     const q = search.trim().toLowerCase();
     const pool = activeCat === "all"
@@ -112,7 +123,14 @@ export default function EmojiPicker({
   }, [search, activeCat]);
 
   return (
-    <div className="emoji-picker" role="region" aria-label="Vælg emoji">
+    <div
+      className="emoji-picker-backdrop"
+      role="presentation"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
+    >
+      <div className="emoji-picker" role="dialog" aria-modal="true" aria-label="Vælg emoji">
       <div className="emoji-picker-head">
         <input
           type="search"
@@ -166,6 +184,7 @@ export default function EmojiPicker({
           ))
         )}
       </div>
+    </div>
     </div>
   );
 }
