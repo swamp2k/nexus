@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { categoryTone, projectMonogram } from "./catalogVisuals";
 
 export type ResourceKind = "repos" | "workers" | "pages" | "domains";
 export type ResourceInventory = Record<ResourceKind, string[]>;
@@ -35,6 +36,7 @@ export type RegistryEntry = {
   showRepoPublic?: boolean;
   hidden?: boolean;
   pinned?: boolean;
+  icon?: string;
 };
 
 export type EditableProject = {
@@ -54,6 +56,7 @@ export type EditableProject = {
   showRepoPublic?: boolean;
   hidden?: boolean;
   pinned?: boolean;
+  icon?: string;
 };
 
 export type EditorPrefill = {
@@ -118,13 +121,14 @@ function MultiSelect({
 }
 
 export default function ProjectMapEditor({
-  project, inventory, registry, repoMeta, prefill, onClose, onSaved,
+  project, inventory, registry, repoMeta, prefill, existingCategories, onClose, onSaved,
 }: {
   project: EditableProject | null;
   inventory: ResourceInventory;
   registry: RegistryEntry[];
   repoMeta?: Record<string, RepoMeta>;
   prefill?: EditorPrefill | null;
+  existingCategories?: string[];
   onClose: () => void;
   onSaved: () => Promise<void>;
 }) {
@@ -133,6 +137,7 @@ export default function ProjectMapEditor({
   const [id, setId] = useState(project?.id ?? prefill?.id ?? "");
   const [description, setDescription] = useState(original?.description ?? project?.description ?? prefill?.description ?? "");
   const [category, setCategory] = useState(original?.category ?? project?.category ?? "");
+  const [icon, setIcon] = useState(original?.icon ?? project?.icon ?? "");
   const [productionUrl, setProductionUrl] = useState(original?.productionUrl ?? project?.productionUrl ?? prefill?.productionUrl ?? "");
   const [isPublic, setIsPublic] = useState(original?.isPublic ?? project?.isPublic ?? false);
   const [showRepoPublic, setShowRepoPublic] = useState(original?.showRepoPublic ?? project?.showRepoPublic ?? true);
@@ -179,6 +184,7 @@ export default function ProjectMapEditor({
           confirmed,
           description: description.trim(),
           category: category.trim(),
+          icon: icon.trim(),
           productionUrl: productionUrl.trim(),
           isPublic,
           showRepoPublic,
@@ -226,13 +232,32 @@ export default function ProjectMapEditor({
         <textarea rows={2} maxLength={400} placeholder="Kort beskrivelse af hvad projektet gør…" value={description} onChange={(event) => setDescription(event.target.value)} />
       </label>
 
-      <label className="project-editor-field">
-        <span>Kategori</span>
-        <input list="project-category-suggestions" maxLength={40} placeholder="fx Web Apps, Desktop Tools…" value={category} onChange={(event) => setCategory(event.target.value)} />
-        <datalist id="project-category-suggestions">
-          {CATEGORY_SUGGESTIONS.map((item) => <option key={item} value={item} />)}
-        </datalist>
-      </label>
+      <div className="project-editor-row">
+        <label className="project-editor-field">
+          <span>Kategori</span>
+          <input list="project-category-suggestions" maxLength={40} placeholder="fx Shopping, Web Apps…" value={category} onChange={(event) => setCategory(event.target.value)} />
+          <datalist id="project-category-suggestions">
+            {Array.from(new Map(
+              [...CATEGORY_SUGGESTIONS, ...(existingCategories ?? [])]
+                .map((item) => item.trim())
+                .filter(Boolean)
+                .map((item) => [item.toLowerCase(), item]),
+            ).values())
+              .sort((a, b) => a.localeCompare(b))
+              .map((item) => <option key={item} value={item} />)}
+          </datalist>
+        </label>
+
+        <label className="project-editor-field">
+          <span>Ikon / Emoji (valgfrit)</span>
+          <div className="project-editor-icon-wrap">
+            <span className="apps-tile-icon" data-tone={categoryTone(category)}>
+              {icon.trim() || projectMonogram(title || "A")}
+            </span>
+            <input maxLength={16} placeholder="fx 🚗 eller 🩺" value={icon} onChange={(event) => setIcon(event.target.value)} />
+          </div>
+        </label>
+      </div>
 
       <label className="project-editor-field">
         <span>Produktions-URL (valgfrit)</span>

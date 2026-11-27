@@ -1,6 +1,20 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import ProjectMapEditor from "./ProjectMapEditor";
 import type { EditableProject, EditorPrefill, RegistryEntry, RepoMeta, ResourceInventory } from "./ProjectMapEditor";
+import {
+  CheckIcon,
+  CopyIcon,
+  EditIcon,
+  GithubIcon,
+  GlobeIcon,
+  GridIcon,
+  ListIcon,
+  categoryTone,
+  displayHost,
+  groupIntoShelves,
+  projectMonogram,
+} from "./catalogVisuals";
+import type { CategoryTone } from "./catalogVisuals";
 
 type Project = EditableProject & {
   status: string;
@@ -35,6 +49,7 @@ type RepoBoardData = {
 };
 
 type Filter = "all" | "public" | "web" | "desktop" | "hidden";
+type ViewMode = "grid" | "list";
 
 function safeUrl(value: string | null | undefined): string | null {
   if (!value) return null;
@@ -68,8 +83,17 @@ export default function ProjectsCatalogPage() {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<ViewMode>(() => {
+    const saved = localStorage.getItem("nexus-projects-view");
+    return saved === "list" ? "list" : "grid";
+  });
   const [editing, setEditing] = useState<string | "new" | null>(null);
   const [prefill, setPrefill] = useState<EditorPrefill | null>(null);
+
+  useEffect(() => {
+    localStorage.setItem("nexus-projects-view", viewMode);
+  }, [viewMode]);
 
   const load = useCallback(async (method: "GET" | "POST" = "GET") => {
     setError("");
@@ -135,6 +159,20 @@ export default function ProjectsCatalogPage() {
     });
   }, [data, boardByRepo]);
 
+  const categories = useMemo(() => {
+    const counts = new Map<string, { name: string; count: number; tone: CategoryTone }>();
+    for (const { project } of enrichedProjects) {
+      if (project.hidden) continue;
+      const raw = (project.category ?? "").trim();
+      if (!raw) continue;
+      const key = raw.toLowerCase();
+      const existing = counts.get(key);
+      if (existing) existing.count += 1;
+      else counts.set(key, { name: raw, count: 1, tone: categoryTone(raw) });
+    }
+    return Array.from(counts.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }, [enrichedProjects]);
+
   const visibleProjects = useMemo(() => {
     const q = search.trim().toLowerCase();
     return enrichedProjects
@@ -145,6 +183,9 @@ export default function ProjectsCatalogPage() {
         if (filter === "public" && !project.isPublic) return false;
         if (filter === "web" && !prodUrl) return false;
         if (filter === "desktop" && !latestRelease) return false;
+        if (selectedCategory && (project.category ?? "").trim().toLowerCase() !== selectedCategory.toLowerCase()) {
+          return false;
+        }
         if (!q) return true;
         const desc = (project.description ?? "").toLowerCase();
         const cat = (project.category ?? "").toLowerCase();
@@ -154,7 +195,18 @@ export default function ProjectsCatalogPage() {
         if ((a.project.pinned === true) !== (b.project.pinned === true)) return a.project.pinned ? -1 : 1;
         return a.project.title.localeCompare(b.project.title);
       });
-  }, [enrichedProjects, filter, search]);
+  }, [enrichedProjects, filter, selectedCategory, search]);
+
+  const useShelves = selectedCategory === null && filter !== "hidden" && !search.trim();
+  const shelves = useMemo(() => {
+    if (!useShelves) return [];
+    return groupIntoShelves(visibleProjects, {
+      getCategory: (item) => item.project.category ?? "",
+      getPinned: (item) => item.project.pinned === true,
+      featuredLabel: "Fastgjorte",
+      uncategorizedLabel: "Uden kategori",
+    });
+  }, [useShelves, visibleProjects]);
 
   async function togglePublic(project: Project) {
     if (!data) return;
@@ -178,6 +230,7 @@ export default function ProjectsCatalogPage() {
           confirmed: existing?.confirmed ?? project.confirmed ?? false,
           description: existing?.description ?? project.description ?? "",
           category: existing?.category ?? project.category ?? "",
+          icon: existing?.icon ?? project.icon ?? "",
           productionUrl: existing?.productionUrl ?? project.productionUrl ?? "",
           isPublic: !project.isPublic,
           showRepoPublic: existing?.showRepoPublic ?? project.showRepoPublic ?? true,
@@ -213,6 +266,169 @@ export default function ProjectsCatalogPage() {
     setEditing("new");
   }
 
+  function selectCategoryPill(name: string) {
+    if (filter === "hidden") setFilter("all");
+    setSelectedCategory((cur) => (cur?.toLowerCase() === name.toLowerCase() ? null : name));
+  }
+
+  function renderItem(item: (typeof visibleProjects)[number]) {
+    const { project, firstMeta, latestRelease, prodUrl, boardMatch } = item;
+    const desc = project.description?.trim() || firstMeta?.description?.trim() || "";
+    const host = displayHost(prodUrl);
+    const tone = categoryTone(project.category ?? "");
+    const glyph = project.icon?.trim() || projectMonogram(project.title);
+    const preferredAsset = latestRelease?.assets.find((a) => /\.(exe|msi|dmg|appimage|deb|zip)$/i.test(a.name)) ?? latestRelease?.assets[0];
+
+    const iconActions = (
+      <div className="apps-icon-actions">
+        <button
+          type="button"
+          className={`apps-icon-btn${project.isPublic ? " is-active" : ""}`}
+          disabled={togglingId === project.id}
+          title={project.isPublic ? "Offentlig på /apps — klik for at gøre privat" : "Privat — klik for at gøre offentlig"}
+          aria-label={project.isPublic ? "Gør privat" : "Gør offentlig"}
+          onClick={() => void togglePublic(project)}
+        >
+          <GlobeIcon />
+        </button>
+        {boardMatch && (
+          <button
+            type="button"
+            className={`apps-icon-btn${copiedId === project.id ? " is-copied" : ""}`}
+            title={copiedId === project.id ? "Kopieret!" : `Kopiér resume-prompt (${boardMatch.laneTitle})`}
+            aria-label="Kopiér prompt"
+            onClick={() => copyPrompt(project.id, boardMatch.resumePrompt)}
+          >
+            {copiedId === project.id ? <CheckIcon /> : <CopyIcon />}
+          </button>
+        )}
+        {firstMeta && (
+          <a
+            className="apps-icon-btn"
+            href={firstMeta.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            title="Åbn GitHub-repo"
+            aria-label="Åbn GitHub-repo"
+          >
+            <GithubIcon />
+          </a>
+        )}
+        <button
+          type="button"
+          className="apps-icon-btn"
+          title="Redigér projekt"
+          aria-label="Redigér projekt"
+          onClick={() => { setPrefill(null); setEditing(project.id); }}
+        >
+          <EditIcon />
+        </button>
+      </div>
+    );
+
+    if (viewMode === "list") {
+      return (
+        <div className="apps-list-row" data-tone={tone} key={project.id}>
+          <span className="apps-tile-icon apps-tile-icon--sm" data-tone={tone} aria-hidden="true">{glyph}</span>
+          <div className="apps-list-main">
+            <div className="apps-list-title-row">
+              <strong>{project.title}</strong>
+              {project.isPublic && <span className="apps-dot-public" title="Offentlig på /apps" />}
+              {project.category && (
+                <button
+                  type="button"
+                  className="apps-cat-pill"
+                  data-tone={tone}
+                  onClick={() => selectCategoryPill(project.category!)}
+                >
+                  {project.category}
+                </button>
+              )}
+              {boardMatch && <span className="ui-pill ui-pill--info">{boardMatch.laneTitle}</span>}
+            </div>
+            <p className="apps-list-sub">
+              {desc || host || (firstMeta ? repoShortName(firstMeta.fullName) : "")}
+            </p>
+          </div>
+          <div className="apps-list-actions">
+            {prodUrl && (
+              <a className="apps-btn-compact apps-btn-compact--primary" href={prodUrl} target="_blank" rel="noopener noreferrer">
+                Åbn ↗
+              </a>
+            )}
+            {latestRelease && (
+              <a
+                className={prodUrl ? "apps-btn-compact" : "apps-btn-compact apps-btn-compact--primary"}
+                href={preferredAsset?.downloadUrl ?? latestRelease.url}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {latestRelease.tag}
+              </a>
+            )}
+            {iconActions}
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <article className="apps-tile" data-tone={tone} key={project.id}>
+        <div className="apps-tile-head">
+          <span className="apps-tile-icon" data-tone={tone} aria-hidden="true">{glyph}</span>
+          <div className="apps-tile-title-wrap">
+            <div className="apps-tile-title-row">
+              <h3>{project.title}</h3>
+              {project.isPublic && <span className="apps-dot-public" title="Offentlig på /apps" />}
+            </div>
+            <div className="apps-tile-badges">
+              {project.category && (
+                <button
+                  type="button"
+                  className="apps-cat-pill"
+                  data-tone={tone}
+                  onClick={() => selectCategoryPill(project.category!)}
+                >
+                  {project.category}
+                </button>
+              )}
+              {boardMatch && <span className="apps-lane-tag">{boardMatch.laneTitle}</span>}
+            </div>
+          </div>
+        </div>
+
+        {desc ? (
+          <p className="apps-tile-desc">{desc}</p>
+        ) : host ? (
+          <p className="apps-tile-meta">{host}</p>
+        ) : firstMeta ? (
+          <p className="apps-tile-meta">{repoShortName(firstMeta.fullName)}</p>
+        ) : null}
+
+        <div className="apps-tile-bar">
+          <div className="apps-tile-primary">
+            {prodUrl && (
+              <a className="apps-btn-compact apps-btn-compact--primary" href={prodUrl} target="_blank" rel="noopener noreferrer">
+                Åbn ↗
+              </a>
+            )}
+            {latestRelease && (
+              <a
+                className={prodUrl ? "apps-btn-compact" : "apps-btn-compact apps-btn-compact--primary"}
+                href={preferredAsset?.downloadUrl ?? latestRelease.url}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Download {latestRelease.tag}
+              </a>
+            )}
+          </div>
+          {iconActions}
+        </div>
+      </article>
+    );
+  }
+
   if (error && !data) {
     return <p className="project-map-notice project-map-notice--warning">{error}</p>;
   }
@@ -223,14 +439,36 @@ export default function ProjectsCatalogPage() {
   return (
     <div className="project-map-page">
       <div className="apps-catalog-toolbar">
-        <input
-          type="search"
-          className="apps-search"
-          placeholder="Søg i projekter…"
-          aria-label="Søg i projekter"
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-        />
+        <div className="apps-toolbar-left">
+          <input
+            type="search"
+            className="apps-search"
+            placeholder="Søg i projekter…"
+            aria-label="Søg i projekter"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+          />
+          <div className="apps-view-toggle" role="group" aria-label="Visning">
+            <button
+              type="button"
+              className={viewMode === "grid" ? "active" : ""}
+              aria-label="Kortvisning"
+              title="Kortvisning"
+              onClick={() => setViewMode("grid")}
+            >
+              <GridIcon />
+            </button>
+            <button
+              type="button"
+              className={viewMode === "list" ? "active" : ""}
+              aria-label="Listevisning"
+              title="Listevisning"
+              onClick={() => setViewMode("list")}
+            >
+              <ListIcon />
+            </button>
+          </div>
+        </div>
         <div className="project-toolbar-actions">
           <a className="ui-btn ui-btn--ghost" href="/apps" target="_blank" rel="noopener noreferrer">
             Åbn /apps ↗
@@ -261,12 +499,33 @@ export default function ProjectsCatalogPage() {
             ["all", "Alle"],
             ["public", "Offentlige"],
             ["web", "Web"],
-            ["desktop", "Desktop / Releases"],
+            ["desktop", "Desktop"],
             ["hidden", "Skjulte"],
           ] as Array<[Filter, string]>
         ).map(([key, label]) => (
-          <button key={key} type="button" className={filter === key ? "active" : ""} onClick={() => setFilter(key)}>
+          <button
+            key={key}
+            type="button"
+            className={filter === key && !selectedCategory ? "active" : ""}
+            onClick={() => { setFilter(key); if (key === "hidden") setSelectedCategory(null); }}
+          >
             {label}
+          </button>
+        ))}
+
+        {categories.length > 0 && <span className="apps-filter-sep" aria-hidden="true" />}
+
+        {categories.map((cat) => (
+          <button
+            key={cat.name}
+            type="button"
+            data-tone={cat.tone}
+            className={`apps-filter-cat${selectedCategory?.toLowerCase() === cat.name.toLowerCase() ? " active" : ""}`}
+            onClick={() => selectCategoryPill(cat.name)}
+          >
+            <span className="apps-tone-dot" />
+            <span>{cat.name}</span>
+            <small>{cat.count}</small>
           </button>
         ))}
       </div>
@@ -275,81 +534,24 @@ export default function ProjectsCatalogPage() {
         <section className="ui-card">
           <p className="ui-muted">Ingen projekter matcher filteret.</p>
         </section>
+      ) : useShelves ? (
+        <div className="apps-shelves">
+          {shelves.map((shelf) => (
+            <section className="apps-shelf" key={shelf.key}>
+              <header className="apps-shelf-head" data-tone={shelf.tone}>
+                <span className="apps-tone-dot" />
+                <h2>{shelf.isFeatured ? `★ ${shelf.label}` : shelf.label}</h2>
+                <span className="apps-shelf-count">{shelf.items.length}</span>
+              </header>
+              <div className={viewMode === "list" ? "apps-list" : "apps-catalog-grid"}>
+                {shelf.items.map(renderItem)}
+              </div>
+            </section>
+          ))}
+        </div>
       ) : (
-        <div className="apps-catalog-grid">
-          {visibleProjects.map(({ project, firstMeta, latestRelease, prodUrl, boardMatch }) => {
-            const desc = project.description?.trim() || firstMeta?.description?.trim() || "";
-            const preferredAsset = latestRelease?.assets.find((a) => /\.(exe|msi|dmg|appimage|deb|zip)$/i.test(a.name)) ?? latestRelease?.assets[0];
-
-            return (
-              <article className="ui-card apps-catalog-card" key={project.id}>
-                <div className="apps-card-head">
-                  <h3 className="ui-card-title">{project.title}</h3>
-                  <div className="apps-card-pills">
-                    {project.isPublic && <span className="ui-pill ui-pill--ok">Offentlig</span>}
-                    {project.category && <span className="ui-pill">{project.category}</span>}
-                    {boardMatch && <span className="ui-pill ui-pill--info">{boardMatch.laneTitle}</span>}
-                  </div>
-                </div>
-
-                <p className={desc ? "apps-card-desc" : "apps-card-desc ui-muted"}>
-                  {desc || "Ingen beskrivelse endnu."}
-                </p>
-
-                <div className="apps-actions">
-                  {prodUrl && (
-                    <a className="ui-btn ui-btn--primary" href={prodUrl} target="_blank" rel="noopener noreferrer">
-                      Åbn ↗
-                    </a>
-                  )}
-                  {latestRelease && (
-                    <a
-                      className={prodUrl ? "ui-btn" : "ui-btn ui-btn--primary"}
-                      href={preferredAsset?.downloadUrl ?? latestRelease.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                    >
-                      Download {latestRelease.tag}
-                    </a>
-                  )}
-                  {firstMeta && (
-                    <a className="ui-btn ui-btn--ghost" href={firstMeta.url} target="_blank" rel="noopener noreferrer">
-                      GitHub ↗
-                    </a>
-                  )}
-                </div>
-
-                <div className="ui-card-footer">
-                  <button
-                    type="button"
-                    className="ui-btn ui-btn--ghost"
-                    disabled={togglingId === project.id}
-                    onClick={() => void togglePublic(project)}
-                  >
-                    {togglingId === project.id ? "Gemmer…" : project.isPublic ? "Gør privat" : "Gør offentlig"}
-                  </button>
-                  <div className="rb-btns">
-                    {boardMatch && (
-                      <button
-                        type="button"
-                        className="ui-btn ui-btn--ghost"
-                        onClick={() => copyPrompt(project.id, boardMatch.resumePrompt)}
-                      >
-                        {copiedId === project.id ? "Kopieret" : "Kopiér prompt"}
-                      </button>
-                    )}
-                    <button
-                      type="button"
-                      className="ui-btn"
-                      onClick={() => { setPrefill(null); setEditing(project.id); }}
-                    >
-                      Redigér
-                    </button>
-                  </div>
-                </div>
-              </article>
-            );
-          })}
+        <div className={viewMode === "list" ? "apps-list" : "apps-catalog-grid"}>
+          {visibleProjects.map(renderItem)}
         </div>
       )}
 
@@ -386,6 +588,7 @@ export default function ProjectsCatalogPage() {
           registry={data.registry}
           repoMeta={data.repoMeta}
           prefill={editing === "new" ? prefill : null}
+          existingCategories={categories.map((c) => c.name)}
           onClose={() => { setEditing(null); setPrefill(null); }}
           onSaved={async () => { await load(); }}
         />
