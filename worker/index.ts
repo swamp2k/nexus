@@ -18,7 +18,7 @@ import { handleRepoBoardRoute } from "./repo-board/routes";
 import { handlePcWatchRoute } from "./pcwatch/routes";
 import { handlePrivateeringRoute } from "./privateering/routes";
 import { handleUserRoute } from "./users/routes";
-import { handleProjectMapRoute } from "./project-map/routes";
+import { handleProjectMapRoute, handlePublicAppsRoute } from "./project-map/routes";
 import { handleProjectMapSettingsRoute } from "./project-map/settings-routes";
 import { handleJournalAiRoute } from "./wellbeing/journal-ai";
 import { handleMiyagiConversationRoute } from "./wellbeing/miyagi-conversation";
@@ -37,6 +37,7 @@ export default {
     const url = new URL(request.url);
     try {
       if (url.pathname === "/api/health") return Response.json({ ok: true, service: "nexus", version: "0.1.0" } satisfies HealthResponse, { headers: { "Cache-Control": "no-store" } });
+      if (url.pathname === "/api/public/apps") { const response = await handlePublicAppsRoute(request, env); if (response) return response; }
 
       if (url.pathname.startsWith("/api/display/")) {
         const response = await handleDisplayRoute(request, env);

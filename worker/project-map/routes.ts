@@ -1,9 +1,9 @@
 import { getAuthenticatedUser } from "../auth/session";
 import { listCloudflareInventory, listGithubRepos } from "./client";
-import type { GithubRepo, PagesProject, Worker, WorkerPublicUrls } from "./client";
+import type { GithubRepo, PagesProject, RepoMeta, Worker, WorkerPublicUrls } from "./client";
 import { getProjectMapCredentials, getProjectMapCredentialStatus } from "./credentials";
 import { handleProjectMapSettingsRoute } from "./settings-routes";
-import { applyRegistry, deleteRegistry, inventoryOf, parseRegistryEntry, readRegistry, resourceConflict, saveRegistry } from "./registry";
+import { applyRegistry, buildPublicApps, deleteRegistry, inventoryOf, parseRegistryEntry, readRegistry, resourceConflict, saveRegistry } from "./registry";
 
 type ProjectMapEnv = Env & { ELOVERBLIK_CREDENTIALS_KEY?: string };
 
@@ -24,6 +24,7 @@ type Snapshot = {
   repoOnly: string[];
   archivedRepoOnly: string[];
   workerPublicUrls?: WorkerPublicUrls;
+  repoMeta?: Record<string, RepoMeta>;
 };
 
 const SNAPSHOT_KEY = "project-map/snapshot.json";
@@ -124,6 +125,20 @@ function rebuildSnapshot(base: Snapshot | null, repos: GithubRepo[], workers: Wo
   const repoOnly = repos.filter((repo) => !repo.archived && !representedRepos.has(repo.full_name)).map((repo) => repo.full_name).sort();
   const archivedRepoOnly = repos.filter((repo) => repo.archived && !representedRepos.has(repo.full_name)).map((repo) => repo.full_name).sort();
 
+  const repoMeta: Record<string, RepoMeta> = {};
+  for (const repo of repos) {
+    repoMeta[repo.full_name] = {
+      fullName: repo.full_name,
+      url: repo.html_url || `https://github.com/${repo.full_name}`,
+      isPrivate: repo.private === true,
+      archived: repo.archived === true,
+      description: repo.description ?? null,
+      homepage: repo.homepage ?? null,
+      pushedAt: repo.pushed_at ?? null,
+      latestRelease: repo.latestRelease ?? null,
+    };
+  }
+
   return {
     generatedAt: new Date().toISOString(),
     source: "live",
@@ -132,6 +147,7 @@ function rebuildSnapshot(base: Snapshot | null, repos: GithubRepo[], workers: Wo
     repoOnly,
     archivedRepoOnly,
     workerPublicUrls,
+    repoMeta,
   };
 }
 
@@ -147,6 +163,17 @@ async function refresh(env: ProjectMapEnv): Promise<{ snapshot: Snapshot | null;
   const snapshot = rebuildSnapshot(current, repos, cf.workers, cf.pages, cf.publicUrls);
   await env.DATA.put(SNAPSHOT_KEY, JSON.stringify(snapshot), { httpMetadata: { contentType: "application/json" } });
   return { snapshot, missing: [] };
+}
+
+export async function handlePublicAppsRoute(request: Request, env: ProjectMapEnv): Promise<Response | null> {
+  if (new URL(request.url).pathname !== "/api/public/apps") return null;
+  if (request.method !== "GET") return json({ error: "method_not_allowed" }, { status: 405 });
+
+  const [registry, snapshot] = await Promise.all([readRegistry(env.DB), readSnapshot(env)]);
+  return json({
+    generatedAt: snapshot?.generatedAt ?? null,
+    apps: buildPublicApps(snapshot, registry),
+  });
 }
 
 export async function handleProjectMapRoute(request: Request, env: ProjectMapEnv): Promise<Response | null> {
@@ -172,7 +199,13 @@ export async function handleProjectMapRoute(request: Request, env: ProjectMapEnv
 
     let entry;
     try { entry = parseRegistryEntry(await request.json()); }
-    catch { return json({ error: "invalid_project_registry_entry" }, { status: 400 }); }
+    catch (error) {
+      const code = error instanceof Error ? error.message : "invalid_project_registry_entry";
+      if (code === "invalid_production_url") {
+        return json({ error: code, detail: "Produktions-URL skal være en gyldig https://-adresse." }, { status: 400 });
+      }
+      return json({ error: "invalid_project_registry_entry" }, { status: 400 });
+    }
     const snapshot = await readSnapshot(env);
     if (!snapshot) return json({ error: "snapshot_not_found" }, { status: 404 });
     const inventory = inventoryOf(snapshot);
